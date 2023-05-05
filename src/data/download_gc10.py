@@ -3,6 +3,8 @@ import os.path
 import kaggle
 import logging
 
+from utils.paths import resolve_project_path
+
 logging.getLogger().setLevel(logging.INFO)
 
 def download_gc10(path):
@@ -11,11 +13,10 @@ def download_gc10(path):
     kaggle.api.dataset_download_files('alex000kim/gc10det', path=path, unzip=True)
 
 def load_gc10_if_missing():
-    project_dir = Path(__file__).resolve().parents[2]
-    gc10_path = os.path.join(project_dir, "data", "gc-10")
+    gc10_path = resolve_project_path("data/gc-10")
 
     if not os.path.exists(gc10_path):
-        load_gc10(gc10_path)
+        download_gc10(gc10_path)
 
 
 if __name__ == '__main__':

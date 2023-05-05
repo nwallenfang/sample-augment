@@ -1,9 +1,13 @@
-project_name
+Thesis Nils
 ==============================
 
-A short description of the project.
+Thesis Project on Sampling Strategies for Synthetic Data Augmentation.
 
-Project Organization
+## Installation
+Enter this directory and call `pip install -e .`.
+Anaconda Environment file: TODO
+
+## Project Organization
 ------------
 
     ├── LICENSE
