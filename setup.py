@@ -4,7 +4,13 @@ setup(
     name='src',
     packages=find_packages(),
     version='0.1.0',
-    description='A short description of the project.',
-    author='Your name (or your organization/company/team)',
+    description='Thesis Project on Sampling Strategies for Synthetic Data Augmentation.',
+    author='Nils Wallenfang',
     license='MIT',
+    install_requires = [
+        'kaggle',
+        'dep2>=2.4.1',
+        'click',
+        'python-dotenv>=0.5.1',
+    ]
 )
