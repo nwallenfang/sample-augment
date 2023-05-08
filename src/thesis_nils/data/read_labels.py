@@ -11,8 +11,8 @@ import json
 from typing import Dict, List, Tuple
 import xmltodict
 
-from data.download_gc10 import load_gc10_if_missing
-from utils.paths import resolve_project_path
+from thesis_nils.data.download_gc10 import load_gc10_if_missing
+from thesis_nils.utils.paths import resolve_project_path
 
 
 def xml_to_labels(xml: Dict) -> Tuple[int, List[int]]:
@@ -25,8 +25,9 @@ def xml_to_labels(xml: Dict) -> Tuple[int, List[int]]:
         primary_label = int(xml['annotation']['folder'])
     except ValueError:
         assert xml['annotation']['folder'] == 'all'
-        
+
     return primary_label, []
+
 
 def main():
     load_gc10_if_missing()
@@ -46,6 +47,7 @@ def main():
     interim_dir = resolve_project_path('data/interim', create=True)
     with open(f"{interim_dir}/labels.json", "w") as json_file:
         json.dump(id_to_labels, json_file)
+
 
 if __name__ == '__main__':
     main()
