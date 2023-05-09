@@ -50,11 +50,11 @@ def xml_to_labels(xml: Dict) -> Dict:
                     secondary.append(label)
                 except ValueError:
                     pass  # mislabelled instance
-        elif type(objects) is collections.OrderedDict:  # one object
+        elif type(objects) in (collections.OrderedDict, dict):  # one object
             label = int(objects['name'].split('_')[0])  # first character is label index
             secondary.append(label)
         else:
-            raise ValueError('weird objects tag in xml')
+            raise ValueError(f'weird objects tag in xml {type(objects)}')
 
     return {'y': primary_label, 'secondary': secondary}
 
@@ -146,7 +146,7 @@ def compare_dir_and_xml_labels(xml_labels: Dict, dir_labels: Dict):
         img_text = f"dir: {LABEL_TO_ENGLISH_NAME[dir_labels[name]]}, xml: {LABEL_TO_ENGLISH_NAME[xml_labels[name]['y']]}\n \
          secondary: {secondary_labels}"
         show_image(img, title=name, text=img_text,
-                   save_path=f'reports/figures/label-exploration/mismatch_{name}.png')
+                   save_path=resolve_project_path(f'reports/figures/label-exploration/mismatch_{name}.png'))
         mismatch_index += 1
 
 

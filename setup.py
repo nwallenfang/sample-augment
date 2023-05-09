@@ -14,6 +14,8 @@ setup(
         'python-dotenv>=0.5.1',
         'xmltodict',
         'matplotlib',
-        'numpy'
+        'numpy',
+        'torch',
+        'torchvision'
     ]
 )
