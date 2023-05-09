@@ -6,6 +6,7 @@ Things I'd like to look at:
 - histogram per class
 - percentage of multi-classes and which classes are likely to be secondary
 - class instance counts and compare with Excel file
+- look at the whole training set with a dimension reduction method such as UMAP
 """
 
 import json
