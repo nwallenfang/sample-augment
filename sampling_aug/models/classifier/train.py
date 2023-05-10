@@ -5,17 +5,16 @@ from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch import nn  # All neural network modules
 from torch.utils.data import DataLoader  # Gives easier dataset management
 
-from sampling_aug.data.image_dataset import GC10InMemoryDataset
-from sampling_aug.utils.paths import project_path
+from data.image_dataset import GC10InMemoryDataset
+from utils.paths import project_path
 
 
-def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_epochs=23, batch_size=64, learning_rate=0.001):
+def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_epochs=23, batch_size=64,
+          learning_rate=0.001):
     """
         this code is taken in large part from Michel's notebook,
         see references/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
     """
-
-    # TODO use DataParallel to make use of our 2 GPUs
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # this DataParallel approach doesn't work on windows. If we want to accelerate with 2 GPUS, we need to use DDP:
