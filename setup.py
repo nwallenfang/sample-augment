@@ -16,6 +16,8 @@ setup(
         'matplotlib',
         'numpy',
         'torch',
-        'torchvision'
+        'torchvision',
+        'tqdm',
+        'pillow'
     ]
 )

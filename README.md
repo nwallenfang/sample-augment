@@ -6,6 +6,7 @@ Thesis Project on Sampling Strategies for Synthetic Data Augmentation.
 ## Installation
 Enter this directory and call `pip install -e .`.
 Anaconda Environment file: TODO
+Pytorch installation instructions: TODO
 
 ## Project Organization
 ------------

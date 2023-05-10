@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 
 
-def resolve_project_path(path: str, create=False) -> str:
+def project_path(path: str, create=False) -> str:
     """ Resolve sub_path with project root path """
     # TODO does this fail when calling like this? python path/to/script.py
     path = Path(path)

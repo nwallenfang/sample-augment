@@ -1,20 +1,32 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, random_split
 from tqdm import tqdm  # For nice progress bar!
-from PIL import Image
-import matplotlib.pyplot as plt
 from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch import nn  # All neural network modules
-from torch.utils.data import DataLoader  # Gives easier dataset managment
+from torch.utils.data import DataLoader  # Gives easier dataset management
+
+from sampling_aug.data.image_dataset import GC10InMemoryDataset
+from sampling_aug.utils.paths import project_path
 
 
+def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_epochs=23, batch_size=64, learning_rate=0.001):
+    """
+        this code is taken in large part from Michel's notebook,
+        see references/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
+    """
 
-
-def train(dataset: Dataset, model, num_epochs = 23,    batch_size = 64
-):
+    # TODO use DataParallel to make use of our 2 GPUs
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # this DataParallel approach doesn't work on windows. If we want to accelerate with 2 GPUS, we need to use DDP:
+    # https://cloudblogs.microsoft.com/opensource/2021/08/04/introducing-distributed-data-parallel-support-on-pytorch-windows/
+    # if torch.cuda.device_count() > 1:
+    #   print("Let's use", torch.cuda.device_count(), "GPUs!")
+    #   model = nn.DataParallel(model)
+
     # Train Network
-    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
 
     # Loss and optimizer
     criterion = nn.CrossEntropyLoss()
@@ -29,29 +41,35 @@ def train(dataset: Dataset, model, num_epochs = 23,    batch_size = 64
     n_total_steps = len(train_loader)
     for epoch in range(num_epochs):
         model.train()
+        batch_idx = 0
+        train_loss = -1
+        val_loss = -1
+
         for batch_idx, (image, label) in enumerate(tqdm(train_loader)):
             # Get data to cuda if possible
             image = image.to(device=device)
             label = label.to(device=device)
 
             # forward
-            preds = model(image) # Pass batch
-            train_loss = criterion(preds, label) # Calculate the loss
+            predictions = model(image)  # Pass batch
+            train_loss = criterion(predictions, label)  # Calculate the loss
 
             # backward
-            optimizer.zero_grad() # 
-            train_loss.backward() # Calculate the gradients
+            optimizer.zero_grad()  #
+            train_loss.backward()  # Calculate the gradients
 
             # gradient descent or adam step
-            optimizer.step() # Uptade the weights
-            
+            optimizer.step()  # Update the weights
+
             # store loss
             train_batch_losses.append(train_loss.item())
-            
-        train_losses.append(sum(train_batch_losses)/len(train_batch_losses))
-        print (f'Epoch [{epoch+1}/{num_epochs}], Step [{batch_idx+1}/{n_total_steps}], Train Loss: {train_loss.item():.4f}')
-            
+
+        train_losses.append(sum(train_batch_losses) / len(train_batch_losses))
+        print(
+            f'Epoch [{epoch + 1}/{num_epochs}], Step [{batch_idx + 1}/{n_total_steps}], Train Loss: {train_loss.item():.4f}')
+
         model.eval()
+        torch.save(model.state_dict(), project_path('models/checkpoints/densenet201/first_training.pt'))
         for batch_idx, (image, label) in enumerate(tqdm(test_loader)):
             # Get data to cuda if possible
             image = image.to(device=device)
@@ -59,16 +77,16 @@ def train(dataset: Dataset, model, num_epochs = 23,    batch_size = 64
 
             # forward
             with torch.no_grad():
-                preds = model(image) # Pass batch
-                
-            val_loss = criterion(preds, label) # Calculate the loss
-            
+                predictions = model(image)  # Pass batch
+
+            val_loss = criterion(predictions, label)  # Calculate the loss
+
             # store loss
             val_batch_losses.append(val_loss.item())
-            
-        val_losses.append(sum(val_batch_losses)/len(val_batch_losses))
-        print (f'Epoch [{epoch+1}/{num_epochs}], Step [{batch_idx+1}/{n_total_steps}], Val Loss: {val_loss.item():.4f}')
 
+        val_losses.append(sum(val_batch_losses) / len(val_batch_losses))
+        print(
+            f'Epoch [{epoch + 1}/{num_epochs}], Step [{batch_idx + 1}/{n_total_steps}], Val Loss: {val_loss.item():.4f}')
 
 
 def main():
@@ -77,9 +95,7 @@ def main():
     this code is taken in large part from Michel's notebook,
     see references/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
     """
-    in_channels = 3
     num_classes = 10
-    learning_rate = 0.001
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -93,21 +109,26 @@ def main():
     # Modify the classifier part of the model
     # TODO figure out why -> Michel
     model.classifier = nn.Sequential(
-                                nn.Linear(1920, 960),
-                                nn.ReLU(),
-                                nn.Dropout(0.2),
-                                nn.Linear(960, 240),
-                                nn.ReLU(),
-                                nn.Dropout(0.2),
-                                nn.Linear(240, 30),
-                                nn.ReLU(),
-                                nn.Dropout(0.2),
-                                nn.Linear(30, num_classes))
+        nn.Linear(1920, 960),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(960, 240),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(240, 30),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(30, num_classes))
     model.to(device)
 
+    dataset = GC10InMemoryDataset()
+    # TODO replace with proper stratified splitting
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, test_size])
 
-    
+    train(train_dataset, val_dataset, model)
+
 
 if __name__ == '__main__':
-    
     main()
