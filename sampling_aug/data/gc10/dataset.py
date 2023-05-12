@@ -2,9 +2,9 @@ import json
 import os
 
 from PIL import Image
-from torch import FloatTensor, IntTensor
+from torch import FloatTensor, LongTensor
 from torch.utils.data import Dataset
-from torchvision.transforms import Resize, ToTensor, Grayscale, Compose
+from torchvision.transforms import Resize, ToTensor, Grayscale, Compose, Normalize
 from tqdm import tqdm
 
 from sampling_aug.data.gc10.download import load_gc10_if_missing
@@ -26,12 +26,12 @@ class GC10InMemoryDataset(Dataset):
             ToTensor(),
             Grayscale(num_output_channels=3),
             # TODO check if these normalization factors are correct for GC-10
-            # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
         load_gc10_if_missing()
         self.root_dir = project_path('data/gc-10')
         self.data = FloatTensor(1)
-        self.labels = IntTensor(1)
+        self.labels = LongTensor(1)
         self.label_dict = {}
 
         self._read()
@@ -43,8 +43,8 @@ class GC10InMemoryDataset(Dataset):
 
         n = len(self.label_dict)
 
-        self.data = FloatTensor(n, 3, 256, 256) # I would like to try training at 512, 512 as well
-        self.labels = IntTensor(n)
+        self.data = FloatTensor(n, 3, 256, 256)  # I would like to try training at 512, 512 as well
+        self.labels = LongTensor(n)
 
         print("loading GC10 into RAM and doing preprocessing..", flush=True)
 

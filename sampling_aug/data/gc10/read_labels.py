@@ -51,7 +51,7 @@ def xml_to_labels(xml: Dict) -> Dict:
                 except ValueError:
                     pass  # mislabelled instance
         elif type(objects) in (collections.OrderedDict, dict):  # one object
-            label = int(objects['name'].split('_')[0])  # first character is label index
+            label = int(objects['name'].split('_')[0]   )  # first character is label index
             secondary.append(label)
         else:
             raise ValueError(f'weird objects tag in xml {type(objects)}')

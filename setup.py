@@ -18,6 +18,8 @@ setup(
         'torch',
         'torchvision',
         'tqdm',
-        'pillow'
+        'pillow',
+        'scikit-learn',
+        'lightning'
     ]
 )
