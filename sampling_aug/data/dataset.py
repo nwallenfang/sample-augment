@@ -42,7 +42,18 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset):
     logging.info('loading images into TensorDataset..')
     label_tensors = torch.tensor(image_dataset.targets, dtype=torch.int)
     image_tensors = torch.stack([image_dataset[i][0] for i in tqdm(range(len(image_dataset)))])
+    # TODO save a dictionary pointing from the tensor indices to the image IDs / paths for traceability
 
+    # convert image_tensors to uint8
+    image_data: np.ndarray = image_tensors.numpy()
+
+    # there could be negative values, so shift by the minimum to bring into range 0...max
+    image_data -= np.min(image_data)
+    # image_data might be float32, convert to float64 for higher accuracy when scaling
+    image_data = image_data.astype(np.float64) / np.max(image_data)
+    image_data *= 255  # Now scale by 255
+    image_data = image_data.astype(np.uint8)
+    image_tensors = torch.from_numpy(image_data)
     tensor_dataset = TensorDataset(image_tensors, label_tensors)
     return tensor_dataset
 
@@ -52,7 +63,6 @@ def test_image_folder_dataset():
         Resize((256, 256)),
         ToTensor(),
         Grayscale(num_output_channels=3),
-        # TODO check if these normalization factors are correct for GC-10
         Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
@@ -77,13 +87,16 @@ def main():
         ToTensor(),
         Grayscale(num_output_channels=3),
         # TODO check if these normalization factors are correct for GC-10
-        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        # on second thought: These normalization factors might be used to bring GC10
+        # to the same distribution as ImageNet since we're using a DenseNet classifier
+        # that was pretrained on ImageNet
+        # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
     tensor_dataset = image_folder_to_tensor_dataset(dataset)
 
-    dataset_dir = project_path('data/interim/datasets/', create=True)
-    dataset_path = os.path.join(dataset_dir, 'gc10_complete_tensor.pt')
+    dataset_dir = project_path('data/interim/', create=True)
+    dataset_path = os.path.join(dataset_dir, 'gc10_tensors.pt')
     # tensor_dataset = torch.load(dataset_path)
     # print(len(tensor_dataset))
     # TODO I need the image ids as well in the dataset

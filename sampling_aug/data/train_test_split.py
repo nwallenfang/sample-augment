@@ -7,9 +7,10 @@ from torch.utils.data import Dataset, Subset, TensorDataset
 from torchvision.datasets import ImageFolder
 
 
-def stratified_split(dataset: ImageFolder | TensorDataset, train_ratio: float = 0.8, random_seed=42) -> (
-        Subset, Subset):
+def stratified_split(dataset, train_ratio: float = 0.8, random_seed=42):
     """
+        dataset can be instance of ImageFolder or TensorDataset.
+        (can't use typing for Python3.7 compatibility..)
         perform a random stratified split of a dataset into two datasets
     """
     n = len(dataset)

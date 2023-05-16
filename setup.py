@@ -15,11 +15,13 @@ setup(
         'xmltodict',
         'matplotlib',
         'numpy',
-        'torch',
+        'torch',  # needs to be installed with conda!
         'torchvision',
         'tqdm',
         'pillow',
         'scikit-learn',
-        'lightning'
+        'lightning',
+        'psutil',
+        'scipy',
     ]
 )
