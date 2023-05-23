@@ -91,6 +91,6 @@ target/
 data/*/*
 
 # models are too large
-models/
+/models/
     
 */lightning_logs/
