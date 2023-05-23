@@ -93,4 +93,4 @@ data/*/*
 # models are too large
 models/
     
-lightning_logs/
+*/lightning_logs/
