@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from sampling_aug.utils.paths import resolve_project_path
+from sampling_aug.utils.paths import project_path
 
 
 def show_image(img: np.ndarray, title: str, text: str, save_path: str = None):
@@ -12,4 +12,4 @@ def show_image(img: np.ndarray, title: str, text: str, save_path: str = None):
     plt.figtext(0.5, 0.05, text, ha='center', fontsize=9)
 
     if save_path:
-        plt.savefig(resolve_project_path(save_path))
+        plt.savefig(project_path(save_path))

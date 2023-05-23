@@ -11,7 +11,7 @@ import xmltodict
 import matplotlib
 
 from sampling_aug.data.gc10.download import load_gc10_if_missing
-from sampling_aug.utils.paths import resolve_project_path
+from sampling_aug.utils.paths import project_path
 from sampling_aug.utils.plot import show_image
 
 # from data/gc10/Defect Descriptions.xlsx, which also contains some example images
@@ -51,7 +51,7 @@ def xml_to_labels(xml: Dict) -> Dict:
                 except ValueError:
                     pass  # mislabelled instance
         elif type(objects) in (collections.OrderedDict, dict):  # one object
-            label = int(objects['name'].split('_')[0])  # first character is label index
+            label = int(objects['name'].split('_')[0]   )  # first character is label index
             secondary.append(label)
         else:
             raise ValueError(f'weird objects tag in xml {type(objects)}')
@@ -65,7 +65,7 @@ def read_xml_labels() -> Dict:
     """
     load_gc10_if_missing()
 
-    label_directory = resolve_project_path('data/gc-10/lable')
+    label_directory = project_path('data/gc-10/lable')
     id_to_labels = {}
 
     for filename in os.listdir(label_directory):
@@ -86,7 +86,7 @@ def read_xml_labels() -> Dict:
     # that matches number of xml files, but doesn't match number of image files which is 2300
     # so there are 6 images missing
 
-    interim_dir = resolve_project_path('data/interim', create=True)
+    interim_dir = project_path('data/interim', create=True)
     with open(f"{interim_dir}/xml_labels.json", "w") as json_file:
         json.dump(id_to_labels, json_file, indent=2)
 
@@ -99,11 +99,11 @@ def read_directory_labels() -> Dict:
     """
     id_to_labels = {}
     for label in range(1, 11):
-        for filename in os.listdir(resolve_project_path(f'data/gc-10/{label}')):
+        for filename in os.listdir(project_path(f'data/gc-10/{label}')):
             image_id = filename.split('.')[0][4:]  # cut out 'img_'
             id_to_labels[image_id] = label
 
-    interim_dir = resolve_project_path('data/interim', create=True)
+    interim_dir = project_path('data/interim', create=True)
 
     with open(f"{interim_dir}/dir_labels.json", "w") as json_file:
         json.dump(id_to_labels, json_file, indent=2)
@@ -139,14 +139,14 @@ def compare_dir_and_xml_labels(xml_labels: Dict, dir_labels: Dict):
         dir_label, xml_label = dir_labels[name], xml_labels[name]['y']
         if xml_label == 'all':
             continue  # skip these for now
-        path = resolve_project_path(f"data/gc-10/{dir_label}/img_{name}.jpg")
+        path = project_path(f"data/gc-10/{dir_label}/img_{name}.jpg")
         img = matplotlib.image.imread(path)
 
         secondary_labels = [LABEL_TO_ENGLISH_NAME[label] for label in xml_labels[name]['secondary']]
         img_text = f"dir: {LABEL_TO_ENGLISH_NAME[dir_labels[name]]}, xml: {LABEL_TO_ENGLISH_NAME[xml_labels[name]['y']]}\n \
          secondary: {secondary_labels}"
         show_image(img, title=name, text=img_text,
-                   save_path=resolve_project_path(f'reports/figures/label-exploration/mismatch_{name}.png'))
+                   save_path=project_path(f'reports/figures/label-exploration/mismatch_{name}.png'))
         mismatch_index += 1
 
 
@@ -202,7 +202,7 @@ def construct_processed_labels(xml_labels, dir_labels):
                 'y': y, 'secondary': secondary
             }
 
-    interim_dir = resolve_project_path('data/interim', create=True)
+    interim_dir = project_path('data/interim', create=True)
     with open(f"{interim_dir}/labels.json", "w") as json_file:
         json.dump(labels, json_file, indent=2)
 

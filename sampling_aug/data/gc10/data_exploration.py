@@ -14,12 +14,12 @@ import json
 import numpy as np
 from matplotlib import pyplot as plt
 
-from sampling_aug.utils.paths import resolve_project_path
+from sampling_aug.utils.paths import project_path
 
 
 def main():
     labels = {}
-    with open(resolve_project_path('data/interim/labels.json')) as label_file:
+    with open(project_path('data/interim/labels.json')) as label_file:
         labels = json.load(label_file)
 
     # how many instances with secondary labels?
@@ -73,7 +73,7 @@ def main():
     ax.set_title("Occurrences of secondary class labels per primary class")
     fig.tight_layout()
 
-    plt.savefig(resolve_project_path('reports/figures/label-exploration/secondary_labels.pdf'))
+    plt.savefig(project_path('reports/figures/label-exploration/secondary_labels.pdf'))
     plt.show()
 
 

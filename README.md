@@ -6,6 +6,7 @@ Thesis Project on Sampling Strategies for Synthetic Data Augmentation.
 ## Installation
 Enter this directory and call `pip install -e .`.
 Anaconda Environment file: TODO
+Pytorch installation instructions: TODO
 
 ## Project Organization
 ------------
@@ -52,9 +53,10 @@ Anaconda Environment file: TODO
     │   │
     │   └── visualization  <- Scripts to create exploratory and results oriented visualizations
     │       └── visualize.py
-    │
-    └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
 
+
+## License
+This repository contains a fork of [StyleGAN2-ADA](https://github.com/NVlabs/stylegan2-ada-pytorch), which is released under a license for non-commercial use.
 
 --------
 
