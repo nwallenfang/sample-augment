@@ -1,16 +1,15 @@
-import os
+import os.path
 import pickle
 from pathlib import Path
 
 import numpy as np
 import torch
 import torchvision
-from torch import LongTensor, Tensor
+from torch import Tensor
 from torch.utils.data import TensorDataset
 from torchvision.transforms import Resize, Compose, Grayscale, ToTensor
 from tqdm import tqdm
 
-from sampling_aug.data.train_test_split import stratified_split
 from utils.logging import logger
 from utils.paths import project_path
 
@@ -43,11 +42,6 @@ class CustomTensorDataset(TensorDataset):
     def get_img_id(self, index: int) -> str:
         """
             img_id is just the filename without the file ending and the redundant `img_` prefix
-        Args:
-            index:
-
-        Returns:
-
         """
         img_id = str(self.img_paths[index].name)
         img_id = img_id.split('.')[0][4:]
@@ -57,22 +51,28 @@ class CustomTensorDataset(TensorDataset):
         return Path.joinpath(self.root_dir, self.img_paths[index])
 
     @classmethod
-    def load(cls, path: Path, name: str) -> "CustomTensorDataset":
-        tensors = torch.load(path / f"{name}_tensors.pt")
-        with open(path / f"{name}_metadata.pkl", 'rb') as meta_file:
+    def load(cls, full_path: Path) -> "CustomTensorDataset":
+        tensors = torch.load(full_path)
+
+        tensor_filename = full_path.stem
+        meta_path: Path = full_path.parents[0] / f"{tensor_filename}_meta.pkl"
+        if not meta_path.is_file():
+            logger.error(f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
+            raise ValueError(f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
+        with open(meta_path, 'rb') as meta_file:
             name, root_dir, img_paths = pickle.load(meta_file)
 
         return CustomTensorDataset(name, tensors[0], tensors[1], root_dir=root_dir, img_paths=img_paths)
 
-    def save(self, path: Path):
-        torch.save(self.tensors, path / f"{self.name}_tensors.pt")
+    def save(self, path: Path, description: str = "tensors"):
+        torch.save(self.tensors, path / f"{self.name}_{description}.pt")
         # root dir and img ids are python primitives, should be easier like this
         # since I had some trouble loading the CustomTensorDataset with torch.load
-        with open(path / f"{self.name}_metadata.pkl", 'wb') as meta_file:
+        with open(path / f"{self.name}_{description}_meta.pkl", 'wb') as meta_file:
             pickle.dump((self.name, self.root_dir, self.img_paths), meta_file)
 
 
-def image_folder_to_tensor_dataset(image_dataset: ImageDataset) -> CustomTensorDataset:
+def image_folder_to_tensor_dataset(image_dataset: ImageDataset, name: str = 'gc10') -> CustomTensorDataset:
     """
         ImageFolder dataset is designed for big datasets that don't fit into RAM (think ImageNet).
         For GC10 we can easily load the whole dataset into RAM transform the ImageDataset into a Tensor-based one
@@ -84,7 +84,7 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset) -> CustomTensorD
 
     # save a dictionary pointing from the tensor indices to the image IDs / paths for traceability
     logger.info('reading image paths (metadata)..')
-    root_dir = Path(project_path('data/gc-10'))
+    root_dir = Path(project_path('data/gc-10'))  # FIXME make independent of gc10 (ImageDataSet might contain the path)
     img_paths = []
     for img_path, _img_class in tqdm(image_dataset.imgs):
         path_obj = Path(img_path)
@@ -100,15 +100,16 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset) -> CustomTensorD
     image_data *= 255  # Now scale by 255
     image_data = image_data.astype(np.uint8)
     image_tensors = torch.from_numpy(image_data)
-    tensor_dataset = CustomTensorDataset('gc10', image_tensors, label_tensors, img_paths=img_paths, root_dir=root_dir)
+    tensor_dataset = CustomTensorDataset(name, image_tensors, label_tensors, img_paths=img_paths, root_dir=root_dir)
     return tensor_dataset
 
 
-
-
-
 def main():
-    # test_image_folder_dataset()
+    from data.train_test_split import create_train_val_test_sets
+    """
+        Runs the complete data processing pipeline.
+        Load GC10 dataset, do label sanitization, do image preprocessing, do train/test/val split.
+    """
     preprocessing = Compose([
         Resize((256, 256)),
         ToTensor(),
@@ -118,15 +119,20 @@ def main():
         # Optimally, the Generator should generate images with this distribution as well.
         # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    image_dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
-    tensor_dataset: CustomTensorDataset = image_folder_to_tensor_dataset(image_dataset)
+    # tensor_path
+    if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
+        image_dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
+        tensor_dataset: CustomTensorDataset = image_folder_to_tensor_dataset(image_dataset)
+        assert isinstance(tensor_dataset, TensorDataset)
+        dataset_dir = Path(project_path('data/interim/', create=True))
+        tensor_dataset.save(dataset_dir)
+    else:
+        tensor_dataset = CustomTensorDataset.load(Path(project_path('data/interim/gc10_tensors.pt')))
 
-    dataset_dir = Path(project_path('data/interim/', create=True))
-
-    # dataset_path = os.path.join(dataset_dir, 'gc10_tensors.pt')
-    # torch.save(tensor_dataset, dataset_path)
-
-    tensor_dataset.save(dataset_dir)
+    train_data, val_data, test_data = create_train_val_test_sets(tensor_dataset)
+    train_data.save(path=project_path('data/interim/'), description='train')
+    val_data.save(path=project_path('data/interim/'), description='val')
+    test_data.save(path=project_path('data/interim/'), description='test')
 
 
 if __name__ == '__main__':
