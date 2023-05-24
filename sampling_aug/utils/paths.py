@@ -15,4 +15,4 @@ def project_path(path: str, create=False) -> str:
     if not os.path.exists(full_path) and create:
         os.mkdir(full_path)  # TODO could break if parent dir doesn't exist
 
-    return Path(full_path)
+    return full_path

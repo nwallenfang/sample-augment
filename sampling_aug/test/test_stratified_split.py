@@ -1,7 +1,10 @@
+from pathlib import Path
+
 import numpy as np
 import torch
 from torch.utils.data import TensorDataset
 
+from data.dataset import CustomTensorDataset
 from data.train_test_split import stratified_split
 
 
@@ -27,6 +30,53 @@ def run_test(n, min_test_instances, number_of_1s=4):
     assert len(train.indices) + len(test.indices) == n
     assert test_counts[1] >= min_test_instances
     assert train_counts[1] <= min_test_instances
+
+
+def test_repeated_split():
+    n = 1000
+    dummy_data = torch.ones([n, 1, 1])
+    dummy_labels = torch.zeros(n, dtype=torch.long)
+    dataset = CustomTensorDataset(image_tensor=dummy_data, label_tensor=dummy_labels,
+                                  img_paths=[Path() for _ in range(n)], root_dir=Path(), name='test')
+
+    train_val, test = stratified_split(dataset, random_seed=42)
+    train, val = stratified_split(train_val, random_seed=42)
+
+    assert len(train) + len(val) + len(test) == n
+
+
+def test_split_determinism():
+    n = 1000
+    dummy_data = torch.ones([n, 1, 1])
+    for i in range(n):
+        dummy_data[i][:] = i
+    dummy_labels = torch.zeros(n, dtype=torch.long)
+    dataset = CustomTensorDataset(image_tensor=dummy_data, label_tensor=dummy_labels,
+                                  img_paths=[Path() for _ in range(n)], root_dir=Path(), name='test')
+
+    train_1, test_1 = stratified_split(dataset, random_seed=42)
+    train_2, test_2 = stratified_split(dataset, random_seed=42)
+
+    some_data_1 = [train_1[i] for i in range(20)]
+    some_data_2 = [train_2[i] for i in range(20)]
+
+    some_test_data_1 = [test_1[i] for i in range(20)]
+    some_test_data_2 = [test_2[i] for i in range(20)]
+
+    assert some_data_1 == some_data_2
+    assert some_test_data_1 == some_test_data_2
+
+    train_1, test_1 = stratified_split(dataset, random_seed=42)
+    train_2, test_2 = stratified_split(dataset, random_seed=43)
+
+    some_data_1 = [train_1[i] for i in range(20)]
+    some_data_2 = [train_2[i] for i in range(20)]
+
+    some_test_data_1 = [test_1[i] for i in range(20)]
+    some_test_data_2 = [test_2[i] for i in range(20)]
+
+    assert some_data_1 != some_data_2
+    assert some_test_data_1 != some_test_data_2
 
 
 def test_stratified_split():

@@ -71,7 +71,7 @@ def stratified_split(dataset: ImageFolder | CustomTensorDataset, train_ratio: fl
     else:
         # take metadata (img paths) from dataset into Subsets
         train_dataset = CustomSubset(dataset, train_indices)
-        test_dataset = CustomSubset(dataset, train_indices)
+        test_dataset = CustomSubset(dataset, test_indices)
 
     return train_dataset, test_dataset
 
