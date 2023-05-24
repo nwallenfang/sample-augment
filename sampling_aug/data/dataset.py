@@ -28,7 +28,7 @@ class CustomTensorDataset(TensorDataset):
         PyTorch TensorDataset with the extension that we're also saving the paths to the original images
     """
 
-    def __init__(self, name: str, image_tensor: Tensor, label_tensor: Tensor, img_paths: list[Path], root_dir: Path):
+    def __init__(self, name: str, image_tensor: Tensor, label_tensor: Tensor, img_paths: list, root_dir: Path):
         """
         Args:
             img_paths (list[Path]): list going from Tensor index to relative path of the given image
@@ -68,6 +68,8 @@ class CustomTensorDataset(TensorDataset):
         torch.save(self.tensors, path / f"{self.name}_{description}.pt")
         # root dir and img ids are python primitives, should be easier like this
         # since I had some trouble loading the CustomTensorDataset with torch.load
+        # TODO it's bad to save those file paths because they're not portable at all
+        # could be possible to only save the ids..
         with open(path / f"{self.name}_{description}_meta.pkl", 'wb') as meta_file:
             pickle.dump((self.name, self.root_dir, self.img_paths), meta_file)
 
@@ -111,7 +113,7 @@ def main():
         Load GC10 dataset, do label sanitization, do image preprocessing, do train/test/val split.
     """
     preprocessing = Compose([
-        Resize((256, 256)),
+        Resize((256, 256), interpolation=torchvision.transforms.InterpolationMode.BICUBIC, antialias=True),
         ToTensor(),
         Grayscale(num_output_channels=3),
         # These normalization factors might be used to bring GC10
@@ -123,6 +125,7 @@ def main():
     if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
         image_dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
         tensor_dataset: CustomTensorDataset = image_folder_to_tensor_dataset(image_dataset)
+        del image_dataset
         assert isinstance(tensor_dataset, TensorDataset)
         dataset_dir = Path(project_path('data/interim/', create=True))
         tensor_dataset.save(dataset_dir)
@@ -130,9 +133,10 @@ def main():
         tensor_dataset = CustomTensorDataset.load(Path(project_path('data/interim/gc10_tensors.pt')))
 
     train_data, val_data, test_data = create_train_val_test_sets(tensor_dataset)
-    train_data.save(path=project_path('data/interim/'), description='train')
-    val_data.save(path=project_path('data/interim/'), description='val')
-    test_data.save(path=project_path('data/interim/'), description='test')
+    del tensor_dataset
+    train_data.save(path=Path(project_path('data/interim/')), description='train')
+    val_data.save(path=Path(project_path('data/interim/')), description='val')
+    test_data.save(path=Path(project_path('data/interim/')), description='test')
 
 
 if __name__ == '__main__':

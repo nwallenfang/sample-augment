@@ -21,6 +21,16 @@ from training import training_loop
 from metrics import metric_main
 from torch_utils import training_stats
 from torch_utils import custom_ops
+import sys
+# quick hack so the import line below works
+# need to fix this for later versions
+import os
+# src_path = os.path.dirname(os.path.abspath(__file__))
+# stylegan_path = os.path.join(src_path, 'models/generator/stylegan2/')
+# print('path:' + stylegan_path)
+# sys.path.insert(0, stylegan_path)
+sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nilsß\sampling_aug\\')
+
 from sampling_aug.utils.paths import project_path
 
 
@@ -113,12 +123,11 @@ def setup_training_loop_kwargs(
     args.training_set_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data,
                                                use_labels=True, max_size=None, xflip=False)
     if os.path.isfile(data):
-        # could be path to custom TensorDataset, in that case use another DataSet instance
+        # could be path to custom TensorDataset, in that case use our custom DataSet instance
         _, extension = os.path.splitext(data)
         if extension in ['.pt', '.pth']:
-            args.training_set_kwargs = dnnlib.EasyDict(class_name='training.dataset.TensorDataset',
-                                                       tensor_path=data, use_labels=True)
-            # max_size=None, xflip=False,
+            args.training_set_kwargs = dnnlib.EasyDict(class_name='training.dataset.StyleGANDataset',
+                                                       tensor_path=data, custom_name='gc10_pre_FFHQ', use_labels=True)
 
     # used to be num_workers = 2 or 3 but failed on Windows
     args.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, num_workers=0) #, prefetch_factor=2)
@@ -573,31 +582,31 @@ def train_gc10():
     # TODO fix the PATH issues when calling this script from VSCode/shell instead of Pycharm
     # has to do with project_path as well
     config_kwargs = {
-        'data': r"H:\thesis\repos\thesis_nils\data\interim\gc10_tensors.pt",
+        'data': r"H:\thesis\repos\thesis_nils\data\interim\gc10_train.pt",
+        # 'custom_name' 'gc10_pre_FFHQ'
         'gpus': 2,
         'snap': None,
         'metrics': None,
-        'seed': None,
+        'seed': 16,  # remeber to change this when running the experiment a second time ;)
         'cond': True,
         'subset': None,
-        'mirror': None,
+        'mirror': True,  # checked each class and xflip can be done semantically for GC10
         'cfg': None,
-        'gamma': None,
-        'kimg': None,
+        'gamma': None,  # TODO it's recommended to tune this parameter
+        'kimg': 5000,
         'batch': None,
         'aug': None,
         'p': None,
-        'target': None,
+        'target': None,  # ADA target value, might need tweaking
         'augpipe': None,
-        'resume': None,
-        'freezed': None,
+        'resume': 'ffhq256',  # checkpoint for transfer learning / resuming interrupted run
+        'freezed': None,  # int, 'Freeze-D', maybe the amount of layers to freeze?
         'fp32': None,
         'nhwc': None,
         'nobench': None,
         'allow_tf32': None,
-        'workers': None
+        'workers': 1  # could try setting number of workers to 1, since the data is fully in RAM
     }
-    print(config_kwargs['data'])
     dry_run = False
 
     dnnlib.util.Logger(should_flush=True)

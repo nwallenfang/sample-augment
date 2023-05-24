@@ -248,21 +248,17 @@ class StyleGANDataset(Dataset):
         StyleGAN on GC10.
     """
 
-    def __init__(self, data: np.ndarray, labels: np.ndarray, **kwargs):
-        # tensors = torch.load(tensor_path)
-        # if not isinstance(tensors, torch.utils.data.TensorDataset):
-        #     raise UserError("TensorDataset expected when passing a .pt file!")
-        # self.tensors = tensors
+    def __init__(self, tensor_path, custom_name, resolution=None, **kwargs):
+        # data: np.ndarray, labels: np.ndarray
+        tensors = torch.load(tensor_path)
+        
         # StyleGAN expects uint8, so we'll need to do some conversions
-        # self.data = tensors.tensors[0].numpy().astype(np.uint8)
+        self.data = tensors[0].numpy().astype(np.uint8)
 
         # expecting the labels to be integer starting from 0 to number of classes-1
-        # self.labels = (tensors.tensors[1]).numpy().astype(np.int64)
-        self.data = data
-        self.labels = labels
-
-        # TODO check if xflip can be enabled for GC10 dataset
-        super().__init__(name='placeholder', raw_shape=data.shape, **kwargs)
+        self.labels = tensors[1].numpy().astype(np.int64)
+        
+        super().__init__(name=custom_name, raw_shape=self.data.shape, **kwargs)
 
     def _load_raw_labels(self):
         return self.labels

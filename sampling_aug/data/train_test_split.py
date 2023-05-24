@@ -24,7 +24,7 @@ def stratified_split(dataset: ImageFolder | CustomTensorDataset, train_ratio: fl
     """
         Perform a random stratified split of a Dataset into two Datasets (called train and test set).
     Args:
-        dataset: Dataset instance to split, can be an instance of type CustomTensorDataset
+        dataset(ImageFolder | CustomTensorDataset): Dataset instance to split, can be an instance of type CustomTensorDataset
         train_ratio: Ratio of training set size in relation to total size
         random_seed:
         min_instances_per_class: Minimum number of instances of each class that will be in the test set
