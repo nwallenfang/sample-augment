@@ -4,55 +4,26 @@ Thesis Nils
 Thesis Project on Sampling Strategies for Synthetic Data Augmentation.
 
 ## Installation
+First, initialize an Anaconda environment. You can use one of the `environment.yml` files to replicate a working environment.
+- `environment_cpu.yml`
+  - Python 3.10 Environment for local development without CUDA installed.
+  - Can use this for anything but training/evaluating models
+  - This environment was tested on a local Ubuntu 22 installation.
+- `environment_gpu.yml`
+  - Python 3.10 environment with CUDA installed
+  - This environment was used for running experiments (Classifier training, etc.) on the IPT DS machine `ipt-d-0432`
+  - This can NOT run StyleGAN
+  - TODO
+- `environment_stylegan.yml`
+  - StyleGAN depends on a specific version of PyTorch and on Python 3.7
+  - not every method in `sampling_aug` is compatible with this configuration, so only use this when training/evaluating StyleGAN
+  - TODO
 Enter this directory and call `pip install -e .`.
-Anaconda Environment file: TODO
 Pytorch installation instructions: TODO
 
 ## Project Organization
-------------
-
-    ├── LICENSE
-    ├── Makefile           <- Makefile with commands like `make data` or `make train`
-    ├── README.md          <- The top-level README for developers using this project.
-    ├── data
-    │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
-    │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
-    │
-    ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
-    │
-    ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-    │
-    ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-    │   └── figures        <- Generated graphics and figures to be used in reporting
-    │
-    ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-    │                         generated with `pip freeze > requirements.txt`
-    │
-    ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported
-    ├── src                <- Source code for use in this project.
-    │   ├── __init__.py    <- Makes src a Python module
-    │   │
-    │   ├── data           <- Scripts to download or generate data
-    │   │   └── make_dataset.py
-    │   │
-    │   ├── features       <- Scripts to turn raw data into features for modeling
-    │   │   └── build_features.py
-    │   │
-    │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions
-    │   │   ├── predict_model.py
-    │   │   └── train_model.py
-    │   │
-    │   └── visualization  <- Scripts to create exploratory and results oriented visualizations
-    │       └── visualize.py
+The main Python package is located in [sampling_aug/](sampling_aug). All datasets that are generated in `sampling_aug` get saved under [data/](data).
+Classifier checkpoints do get saved in [models/](models), though StyleGAN checkpoints might get saved somewhere else depending on their specific output directory.
 
 
 ## License
