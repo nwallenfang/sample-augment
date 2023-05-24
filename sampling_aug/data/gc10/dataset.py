@@ -12,10 +12,7 @@ from sampling_aug.utils.paths import project_path
 
 
 class GC10InMemoryDataset(Dataset):
-    # TODO compare this with normal image folder dataset
-    # TODO put in its own file
-    # TODO load data directly on GPU
-    # TODO try TensorDataset, maybe the preprocessed version of this could be saved as a single file to save on
+    # TODO is this deprecated in favor of TensorDataset? Might remove this
     # -> see https://discuss.pytorch.org/t/how-to-load-all-data-into-gpu-for-training/27609/23
     def __init__(self):
         # pre-processing transforms
@@ -25,7 +22,6 @@ class GC10InMemoryDataset(Dataset):
             Resize((256, 256)),
             ToTensor(),
             Grayscale(num_output_channels=3),
-            # TODO check if these normalization factors are correct for GC-10
             Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
         load_gc10_if_missing()

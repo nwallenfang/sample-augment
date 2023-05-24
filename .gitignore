@@ -67,7 +67,7 @@ target/
 .idea
 
 # VS Code
-# .vscode/
+.vscode/
 
 # Spyder
 .spyproject/
@@ -89,3 +89,8 @@ target/
 
 # raw and processed data (results should be saved somewhere else)
 data/*/*
+
+# models are too large
+/models/
+    
+lightning_logs/
