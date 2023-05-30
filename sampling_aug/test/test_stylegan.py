@@ -1,4 +1,4 @@
-from models.generator.stylegan2 import generate as gen
+import generate as gen
 from utils.paths import project_path
 
 

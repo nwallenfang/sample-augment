@@ -1,6 +1,6 @@
 ## StyleGAN2-ADA &mdash; Official PyTorch implementation
 
-![Teaser image](docs/stylegan2-ada-teaser-1024x252.png)
+![Teaser image](models/stylegan2/docs/stylegan2-ada-teaser-1024x252.png)
 
 **Training Generative Adversarial Networks with Limited Data**<br>
 Tero Karras, Miika Aittala, Janne Hellsten, Samuli Laine, Jaakko Lehtinen, Timo Aila<br>
@@ -65,7 +65,7 @@ This repository is a faithful reimplementation of [StyleGAN2-ADA](https://github
 * 64-bit Python 3.7 and PyTorch 1.7.1. See [https://pytorch.org/](https://pytorch.org/) for PyTorch install instructions.
 * CUDA toolkit 11.0 or later.  Use at least version 11.1 if running on RTX 3090.  (Why is a separate CUDA toolkit installation required?  See comments in [#2](https://github.com/NVlabs/stylegan2-ada-pytorch/issues/2#issuecomment-779457121).)
 * Python libraries: `pip install click requests tqdm pyspng ninja imageio-ffmpeg==0.4.3`.  We use the Anaconda3 2020.11 distribution which installs most of these by default.
-* Docker users: use the [provided Dockerfile](Dockerfile) to build an image with the required library dependencies.
+* Docker users: use the [provided Dockerfile](models/stylegan2/Dockerfile) to build an image with the required library dependencies.
 
 The code relies heavily on custom PyTorch extensions that are compiled on the fly using NVCC. On Windows, the compilation requires Microsoft Visual Studio. We recommend installing [Visual Studio Community Edition](https://visualstudio.microsoft.com/vs/) and adding it into `PATH` using `"C:\Program Files (x86)\Microsoft Visual Studio\<VERSION>\Community\VC\Auxiliary\Build\vcvars64.bat"`.
 
@@ -150,13 +150,13 @@ w = G.mapping(z, c, truncation_psi=0.5, truncation_cutoff=8)
 img = G.synthesis(w, noise_mode='const', force_fp32=True)
 ```
 
-Please refer to [`generate.py`](generate.py), [`style_mixing.py`](style_mixing.py), and [`projector.py`](projector.py) for further examples.
+Please refer to [`generate.py`](models/stylegan2/generate.py), [`style_mixing.py`](models/stylegan2/style_mixing.py), and [`projector.py`](models/stylegan2/projector.py) for further examples.
 
 ## Preparing datasets
 
 Datasets are stored as uncompressed ZIP archives containing uncompressed PNG files and a metadata file `dataset.json` for labels.
 
-Custom datasets can be created from a folder containing images; see [`python dataset_tool.py --help`](docs/dataset-tool-help.txt) for more information. Alternatively, the folder can also be used directly as a dataset, without running it through `dataset_tool.py` first, but doing so may lead to suboptimal performance.
+Custom datasets can be created from a folder containing images; see [`python dataset_tool.py --help`](models/stylegan2/docs/dataset-tool-help.txt) for more information. Alternatively, the folder can also be used directly as a dataset, without running it through `dataset_tool.py` first, but doing so may lead to suboptimal performance.
 
 Legacy TFRecords datasets are not supported &mdash; see below for instructions on how to convert them.
 
@@ -269,7 +269,7 @@ The training configuration can be further customized with additional command lin
 * `--augpipe=blit` enables pixel blitting but disables all other augmentations.
 * `--augpipe=bgcfnc` enables all available augmentations (blit, geom, color, filter, noise, cutout).
 
-Please refer to [`python train.py --help`](docs/train-help.txt) for the full list.
+Please refer to [`python train.py --help`](models/stylegan2/docs/train-help.txt) for the full list.
 
 ## Expected training time
 
@@ -298,7 +298,7 @@ The above measurements were done using NVIDIA Tesla V100 GPUs with default setti
 
 In typical cases, 25000 kimg or more is needed to reach convergence, but the results are already quite reasonable around 5000 kimg. 1000 kimg is often enough for transfer learning, which tends to converge significantly faster. The following figure shows example convergence curves for different datasets as a function of wallclock time, using the same settings as above:
 
-![Training curves](docs/stylegan2-ada-training-curves.png)
+![Training curves](models/stylegan2/docs/stylegan2-ada-training-curves.png)
 
 Note: `--cfg=auto` serves as a reasonable first guess for the hyperparameters but it does not necessarily lead to optimal results for a given dataset. For example, `--cfg=stylegan2` yields considerably better FID  for FFHQ-140k at 1024x1024 than illustrated above. We recommend trying out at least a few different values of `--gamma` for each new dataset.
 

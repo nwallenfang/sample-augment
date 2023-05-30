@@ -4,12 +4,10 @@
 import lightning as pl
 import torch
 from torch.utils.data import DataLoader
-from torch.utils.data import TensorDataset
 from torchvision import transforms
 from data.dataset import CustomTensorDataset
 
-from data.train_test_split import create_train_val_test_sets
-from models.classifier.densenet201 import DenseNet201
+from models.DenseNetClassifier import DenseNet201
 from utils.paths import project_path
 from pathlib import Path
 

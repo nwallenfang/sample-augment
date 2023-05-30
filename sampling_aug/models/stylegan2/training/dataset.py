@@ -12,11 +12,9 @@ import zipfile
 import PIL.Image
 import json
 import torch
-from torch import Tensor
 from torch.utils.data import TensorDataset
 
 import dnnlib
-from train import UserError
 
 try:
     import pyspng

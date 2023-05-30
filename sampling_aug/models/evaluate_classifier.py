@@ -7,7 +7,7 @@ from torch.utils.data import TensorDataset
 from torchvision.transforms import Normalize, ToPILImage
 
 from data.dataset import CustomTensorDataset
-from models.classifier.densenet201 import DenseNet201
+from models.DenseNetClassifier import DenseNet201
 from utils.paths import project_path
 
 import matplotlib.pyplot as plt

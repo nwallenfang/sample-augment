@@ -9,7 +9,6 @@
 """Train a GAN using the techniques described in the paper
 "Training Generative Adversarial Networks with Limited Data"."""
 
-import os
 import click
 import re
 import json
@@ -30,8 +29,6 @@ import os
 # print('path:' + stylegan_path)
 # sys.path.insert(0, stylegan_path)
 sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nilsß\sampling_aug\\')
-
-from sampling_aug.utils.paths import project_path
 
 
 # ----------------------------------------------------------------------------
@@ -483,21 +480,21 @@ def main(ctx, outdir, dry_run, **config_kwargs):
 
     \b
     # Train with custom dataset using 1 GPU.
-    python train.py --outdir=~/training-runs --data=~/mydataset.zip --gpus=1
+    python train_classifier.py --outdir=~/training-runs --data=~/mydataset.zip --gpus=1
 
     \b
     # Train class-conditional CIFAR-10 using 2 GPUs.
-    python train.py --outdir=~/training-runs --data=~/datasets/cifar10.zip \\
+    python train_classifier.py --outdir=~/training-runs --data=~/datasets/cifar10.zip \\
         --gpus=2 --cfg=cifar --cond=1
 
     \b
     # Transfer learn MetFaces from FFHQ using 4 GPUs.
-    python train.py --outdir=~/training-runs --data=~/datasets/metfaces.zip \\
+    python train_classifier.py --outdir=~/training-runs --data=~/datasets/metfaces.zip \\
         --gpus=4 --cfg=paper1024 --mirror=1 --resume=ffhq1024 --snap=10
 
     \b
     # Reproduce original StyleGAN2 config F.
-    python train.py --outdir=~/training-runs --data=~/datasets/ffhq.zip \\
+    python train_classifier.py --outdir=~/training-runs --data=~/datasets/ffhq.zip \\
         --gpus=8 --cfg=stylegan2 --mirror=1 --aug=noaug
 
     \b
@@ -574,10 +571,8 @@ def main(ctx, outdir, dry_run, **config_kwargs):
 
 
 # ----------------------------------------------------------------------------
-from pathlib import Path
 
-
-def train_gc10():
+def train_stylegan():
     outdir = r'E:\Master_Thesis_Nils\stylegan-training'
     # TODO fix the PATH issues when calling this script from VSCode/shell instead of Pycharm
     # has to do with project_path as well
@@ -668,4 +663,4 @@ def train_gc10():
 
 if __name__ == "__main__":
     # main()  # pylint: disable=no-value-for-parameter
-    train_gc10()
+    train_stylegan()
