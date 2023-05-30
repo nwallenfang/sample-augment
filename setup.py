@@ -17,6 +17,7 @@ setup(
         'numpy',
         'torch',  # needs to be installed with conda!
         'torchvision',
+        'torchmetrics',
         'tqdm',
         'pillow',
         'scikit-learn',

@@ -1,6 +1,7 @@
 import torch
 from lightning import LightningModule
 from torch import nn
+from lightning.pytorch.utilities import grad_norm
 
 
 class DenseNet201(LightningModule):
@@ -31,13 +32,24 @@ class DenseNet201(LightningModule):
     def training_step(self, batch, batch_idx):
         images, labels = batch
         predictions = self.model(images)
-        return self.criterion(predictions, labels)
+        loss = self.criterion(predictions, labels)
+        self.log("train_loss", loss)
+        return loss
 
     def validation_step(self, batch, batch_idx):
         images, labels = batch
         predictions = self.model(images)
         val_loss = self.criterion(predictions, labels)
-        self.log("val_loss", val_loss)
+        self.log("val_loss", val_loss, sync_dist=True)
+
+
+    def on_before_optimizer_step(self, optimizer):
+        # Compute the 2-norm for each layer
+        # If using mixed precision, the gradients are already unscaled here
+        # see https://lightning.ai/docs/pytorch/stable/debug/debugging_intermediate.html
+        # TODO layer doesn't exist
+        norms = grad_norm(self.model.layer, norm_type=2)
+        self.log_dict(norms)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)

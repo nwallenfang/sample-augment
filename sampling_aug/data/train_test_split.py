@@ -30,7 +30,7 @@ def stratified_split(dataset: ImageFolder | CustomTensorDataset, train_ratio: fl
         min_instances_per_class: Minimum number of instances of each class that will be in the test set
     """
     np.random.seed(random_seed)
-    # TODO assert this is deterministic if random_seed is set
+    
     if isinstance(dataset, ImageFolder):
         labels = dataset.targets
     else:  # is TensorDataset
@@ -76,19 +76,19 @@ def stratified_split(dataset: ImageFolder | CustomTensorDataset, train_ratio: fl
     return train_dataset, test_dataset
 
 
-def create_train_val_test_sets(dataset: TensorDataset):
+def create_train_val_test_sets(dataset: TensorDataset, random_seed=15):
     """
         Expects data/interim/gc10_tensors.pt to exist.
         Create gc10_train.pt, gc10_val.pt, gc10_test.pt from successive stratified splits.
     """
-    train_val_data, test_data = stratified_split(dataset, train_ratio=0.8, random_seed=15)
+    train_val_data, test_data = stratified_split(dataset, train_ratio=0.8, random_seed=random_seed)
     # stratified split returns Subsets, turn train_val_data into a TensorDataset to split it again
     # train_data, val_data = stratified_split(TensorDataset(dataset.tensors[0][train_val_data.indices],
     #                                                       dataset.tensors[1][train_val_data.indices].type(LongTensor)),
     #                                         random_seed=15,
     #                                         train_ratio=0.9)
     train_data, val_data = stratified_split(train_val_data,
-                                            random_seed=15,
+                                            random_seed=random_seed,
                                             train_ratio=0.9)
 
     return train_data, val_data, test_data

@@ -1,18 +1,18 @@
-import logging
 import os
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import pyplot as plt
+import torchvision.transforms.functional as F
 from torch import Tensor
 from torch.utils.data import Subset
 from torchvision.transforms import Normalize, Grayscale, ToTensor, Resize, Compose
+from torchvision.utils import make_grid
 
-import data
 from data.dataset import ImageDataset, CustomTensorDataset
 from data.train_test_split import stratified_split
-from utils.logging import logger
 from utils.paths import project_path
+from data import dataset as dataset_package
 
 
 def create_image_folder_dataset():
@@ -50,7 +50,7 @@ def test_loading_imagedataset():
 def test_load_training_set():
     if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
         print('initializing DataSets for this test..')
-        data.dataset.main()
+        dataset_package.main()
 
     # stylegan training doesn't work after the new train test split
     # might be our dataset or because I'm trying to do transfer learning with a FFHQ checkpoint.
@@ -77,11 +77,31 @@ def test_load_training_set():
     plt.show()
 
 
+plt.rcParams["savefig.bbox"] = 'tight'
+
+
+def show(imgs):
+    if not isinstance(imgs, list):
+        imgs = [imgs]
+    fig, axs = plt.subplots(ncols=len(imgs), squeeze=False)
+    for i, img in enumerate(imgs):
+        img = img.detach()
+        img = F.to_pil_image(img)
+        axs[0, i].imshow(np.asarray(img))
+        axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+
+
 def main():
     """
         visual inspection of some images from the TensorDataset
     """
-    # TODO
+    # make a grid for each class, image IDs could be useful as well, to compare to the unscaled/quantized version
+    dataset = CustomTensorDataset.load(Path(project_path('data/interim/gc10_train.pt')))
+    data, labels = dataset.tensors
+    for class_idx in range(10):
+        pass
+    grid = make_grid()
+    show(grid)
     pass
 
 
