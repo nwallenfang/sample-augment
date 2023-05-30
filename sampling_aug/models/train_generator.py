@@ -11,8 +11,7 @@ from train import UserError, setup_training_loop_kwargs, subprocess_fn
 
 def train_stylegan():
     out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
-    # TODO fix the PATH issues when calling this script from VSCode/shell instead of Pycharm
-    # has to do with project_path as well
+
     config_kwargs = {
         'data': r"H:\thesis\repos\thesis_nils\data\interim\gc10_train.pt",
         # 'custom_name' 'gc10_pre_FFHQ'
@@ -24,7 +23,7 @@ def train_stylegan():
         'subset': None,
         'mirror': True,  # checked each class and x-flip can be done semantically for GC10
         'cfg': None,
-        'gamma': None,  # TODO it's recommended to tune this parameter
+        'gamma': None,  # tune this parameter with values such as 0.1, 0.5, 1, 5, 10
         'kimg': 5000,
         'batch': None,
         'aug': None,
