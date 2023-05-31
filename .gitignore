@@ -97,3 +97,5 @@ data/*/*
 lightning_logs/
 
 .pytest_cache
+
+*.iml

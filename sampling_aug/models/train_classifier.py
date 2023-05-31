@@ -7,17 +7,20 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from data.dataset import CustomTensorDataset
 
-from models.DenseNetClassifier import DenseNet201
+from DenseNetClassifier import DenseNet201
 from utils.paths import project_path
 from pathlib import Path
 
 from lightning.pytorch.strategies import DDPStrategy
 
 def preprocess(dataset):
-    # TODO if dtype == uint8
+
     data = dataset.tensors[0]
-    data = data.float()
-    data /= 255.0
+    
+    if data.dtype == torch.uint8:
+        # convert to float32
+        data = data.float()
+        data /= 255.0
     
     # might need to preprocess to required resolution
     preprocess = transforms.Compose([
@@ -31,33 +34,46 @@ def preprocess(dataset):
     return dataset
 
 
-def main():
-    # dataset: TensorDataset = torch.load(project_path('data/interim/datasets/gc10_complete_tensor.pt'))
+DEBUG = False
 
-    # train_data, val_data, test_data = create_train_val_test_sets(dataset)
+
+def main():
     train_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_train.pt')))
     val_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_val.pt')))
+    test_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_test.pt')))
+    
     # train_data is in uint8 format, since that's the expected format for StyleGAN training
     # convert to float format and rescale
     train_data = preprocess(train_data)
     val_data = preprocess(val_data)
+    test_data = preprocess(test_data)
 
-    train_loader = DataLoader(train_data, num_workers=8)  # 1 worker should suffice since the data is in RAM already
-    val_loader = DataLoader(val_data, num_workers=8)
+    train_loader = DataLoader(train_data, num_workers=1, pin_memory=True, persistent_workers=True)  # 1 worker should suffice since the data is in RAM already
+    val_loader = DataLoader(val_data, num_workers=1, pin_memory=True, persistent_workers=True)
+    test_loader = DataLoader(test_data, num_workers=1, pin_memory=True, persistent_workers=True)
     model = DenseNet201()
 
     conditional_args = {}
     
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and not DEBUG:
         # Set gloo as DDP backend. The default (NCCL) is unavailable on Windows.
         ddp = DDPStrategy(process_group_backend="gloo")
         conditional_args['strategy'] = ddp
 
+    if DEBUG:
+        # detect_anomaly=True, overfit_batches=0.01, log_every_n_steps=8
+        conditional_args['detect_anomaly'] = False
+        conditional_args['overfit_batches'] = 0.01
+        conditional_args['log_every_n_steps'] = 8
+        conditional_args['devices'] = 1
+        
+        
     # debugging since the training doesn't seem to converge at all
     # try overfitting tiny set
-    trainer = pl.Trainer(max_epochs=20, detect_anomaly=True, overfit_batches=0.01, **conditional_args)        
+    # TODO configure output directory
+    trainer = pl.Trainer(max_epochs=10, **conditional_args)        
     trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
-    torch.save(model.state_dict() )
+    trainer.test(ckpt_path='best', dataloaders=test_loader)
 
 
 if __name__ == '__main__':

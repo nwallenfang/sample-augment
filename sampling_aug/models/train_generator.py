@@ -4,16 +4,20 @@ import re
 import tempfile
 
 import torch
+import sys 
+sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sampling_aug\\')
+sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sampling_aug\\models\\stylegan2\\')
 
-import dnnlib
-from train import UserError, setup_training_loop_kwargs, subprocess_fn
+
+import models.stylegan2.dnnlib as dnnlib
+from models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn
 
 
 def train_stylegan():
     out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
 
     config_kwargs = {
-        'data': r"H:\thesis\repos\thesis_nils\data\interim\gc10_train.pt",
+        'data': r"H:\thesis\sampling_aug\data\interim\gc10_train.pt",
         # 'custom_name' 'gc10_pre_FFHQ'
         'gpus': 2,
         'snap': None,
@@ -29,11 +33,12 @@ def train_stylegan():
         'aug': None,
         'p': None,
         'target': None,  # ADA target value, might need tweaking
-        'augpipe': None,
-        'resume': "E:\\Master_Thesis_Nils\\stylegan-training\\00009-gc10_pre_FFHQ-cond-mirror-auto2-kimg5000"
-                  "-resumecelebahq256\\network-snapshot-000200.pkl",
+        'augpipe': 'bgc-gc10',  # custom augmentation pipeline without 90 degree rotations
+        'resume': 'ffhq256',
+            #"E:\\Master_Thesis_Nils\\stylegan-training\\00009-gc10_pre_FFHQ-cond-mirror-auto2-kimg5000"
+            #      "-resumecelebahq256\\network-snapshot-000200.pkl",
         # 'celebahq256', # 'ffhq256',  # checkpoint for transfer learning / resuming interrupted run
-        'freezed': None,  # int, 'Freeze-D', 'freeze the highest-resolution layers of the discriminator during transfer'
+        'freezed': 3,  # int, 'Freeze-D', 'freeze the highest-resolution layers of the discriminator during transfer'
         'fp32': None,
         'nhwc': None,
         'nobench': None,
@@ -44,6 +49,7 @@ def train_stylegan():
 
     dnnlib.util.Logger(should_flush=True)
 
+    print('Starting..')
     # Setup training options.
     try:
         run_desc, args = setup_training_loop_kwargs(**config_kwargs)

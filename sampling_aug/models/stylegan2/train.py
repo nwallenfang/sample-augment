@@ -14,13 +14,16 @@ import re
 import json
 import tempfile
 import torch
+import sys
+sys.path.append('stylegan2\\')
+
 import dnnlib
 
 from training import training_loop
 from metrics import metric_main
 from torch_utils import training_stats
 from torch_utils import custom_ops
-import sys
+
 # quick hack so the import line below works
 # need to fix this for later versions
 import os
@@ -28,7 +31,7 @@ import os
 # stylegan_path = os.path.join(src_path, 'models/generator/stylegan2/')
 # print('path:' + stylegan_path)
 # sys.path.insert(0, stylegan_path)
-sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nilsß\sampling_aug\\')
+
 
 
 # ----------------------------------------------------------------------------
@@ -310,6 +313,9 @@ def setup_training_loop_kwargs(
         'bg': dict(xflip=1, rotate90=1, xint=1, scale=1, rotate=1, aniso=1, xfrac=1),
         'bgc': dict(xflip=1, rotate90=1, xint=1, scale=1, rotate=1, aniso=1, xfrac=1, brightness=1, contrast=1,
                     lumaflip=1, hue=1, saturation=1),
+        # our custom augmentation pipeline without 90 deg rotations
+        'bgc-gc10': dict(xflip=1, rotate90=0, xint=1, scale=1, rotate=1, aniso=1, xfrac=1, brightness=1, contrast=1,
+                    lumaflip=1, hue=1, saturation=1),
         'bgcf': dict(xflip=1, rotate90=1, xint=1, scale=1, rotate=1, aniso=1, xfrac=1, brightness=1, contrast=1,
                      lumaflip=1, hue=1, saturation=1, imgfilter=1),
         'bgcfn': dict(xflip=1, rotate90=1, xint=1, scale=1, rotate=1, aniso=1, xfrac=1, brightness=1, contrast=1,
@@ -582,12 +588,12 @@ def train_stylegan():
         'gpus': 2,
         'snap': None,
         'metrics': None,
-        'seed': 16,  # remeber to change this when running the experiment a second time ;)
+        'seed': 16,  # remember to change this when running the experiment a second time ;)
         'cond': True,
         'subset': None,
         'mirror': True,  # checked each class and xflip can be done semantically for GC10
         'cfg': None,
-        'gamma': None,  # TODO it's recommended to tune this parameter
+        'gamma': None,  # it's recommended to tune this parameter (e.g., 0.1, 0.5, 1, 5, 10)
         'kimg': 5000,
         'batch': None,
         'aug': None,

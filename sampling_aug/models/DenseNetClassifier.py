@@ -33,23 +33,35 @@ class DenseNet201(LightningModule):
         images, labels = batch
         predictions = self.model(images)
         loss = self.criterion(predictions, labels)
-        self.log("train_loss", loss)
+        accuracy = (predictions.argmax(dim=-1) == labels).float().mean()
+        self.log("train_loss", loss, sync_dist=True)
+        self.log("train_acc", accuracy, on_step=False, on_epoch=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         images, labels = batch
         predictions = self.model(images)
         val_loss = self.criterion(predictions, labels)
+        
+        accuracy = (predictions.argmax(dim=-1) == labels).float().mean()
+        self.log("val_acc", accuracy, sync_dist=True)
         self.log("val_loss", val_loss, sync_dist=True)
 
+    def test_step(self, batch, batch_idx):
+        images, labels = batch
+        predictions = self.model(images)
+        test_loss = self.criterion(predictions, labels)
+        accuracy = (predictions.argmax(dim=-1) == labels).float().mean()
+        self.log("test_acc", accuracy, sync_dist=True)
 
     def on_before_optimizer_step(self, optimizer):
         # Compute the 2-norm for each layer
         # If using mixed precision, the gradients are already unscaled here
         # see https://lightning.ai/docs/pytorch/stable/debug/debugging_intermediate.html
         # TODO layer doesn't exist
-        norms = grad_norm(self.model.layer, norm_type=2)
-        self.log_dict(norms)
+        # norms = grad_norm(self.model.layer, norm_type=2)
+        # self.log_dict(norms)
+        pass
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
