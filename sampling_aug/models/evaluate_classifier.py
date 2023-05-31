@@ -1,3 +1,4 @@
+import json
 from abc import abstractmethod, ABC
 from pathlib import Path
 
@@ -7,7 +8,8 @@ import torch.cuda
 import torch.nn as nn
 import torchmetrics
 import torchvision
-from sklearn.metrics import ConfusionMatrixDisplay
+import typing
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
@@ -38,16 +40,23 @@ class Metric(ABC):
 
 class ConfusionMatrixMetric(Metric):
     display: ConfusionMatrixDisplay
+    labels: str
 
-    def calculate(self, predictions: Tensor, labels: Tensor):
+    def __init__(self, labels=None):
+        if labels:
+            self.labels = labels
+
+    def calculate(self, predictions: Tensor, labels: Tensor) -> "ConfusionMatrixMetric":
         predicted_labels = torch.argmax(predictions, dim=1).cpu().numpy()
         targets = labels.cpu().numpy()
 
-        self.display = ConfusionMatrixDisplay.from_predictions(targets, predicted_labels)
+        self.display = ConfusionMatrixDisplay.from_predictions(targets, predicted_labels, display_labels=self.labels)
+        return self
 
-    def show(self):
-        plt.figure()
-        self.display.plot()
+    @staticmethod
+    def show(title=None):
+        if title:
+            plt.suptitle(title)
         plt.show()
 
 
@@ -78,6 +87,28 @@ def get_free_memory():
     return r - a
 
 
+def load_densenet(checkpoint_path: str, num_classes: int, device):
+    classifier = torchvision.models.densenet201()
+    classifier.classifier = nn.Sequential(
+        nn.Linear(1920, 960),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(960, 240),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(240, 30),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(30, num_classes))
+    checkpoint = torch.load(checkpoint_path,
+                            map_location=lambda storage, loc: storage)
+    classifier.load_state_dict(checkpoint)
+    classifier.eval()
+    del checkpoint
+    classifier.to(device)
+    return classifier
+
+
 def main():
     # should read number of classes from the model, since it might change
     # But it doesn't seem like there is a canonical way of getting that. Maybe just by passing in an input
@@ -98,26 +129,10 @@ def main():
     if device == 'cuda:0':
         # if we get the Lightning classifier working instead of the old method,
         # we will need to implement the forward method
-        classifier = torchvision.models.densenet201()
-        classifier.classifier = nn.Sequential(
-            nn.Linear(1920, 960),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(960, 240),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(240, 30),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(30, num_classes))
-        checkpoint = torch.load(project_path('models/checkpoints/densenet201/epoch-18-val-0.111.pt'),
-                                map_location=lambda storage, loc: storage)
-        classifier.load_state_dict(checkpoint)
-        classifier.eval()
-        del checkpoint
-        classifier.to(device)
-
+        classifier = load_densenet(project_path('models/checkpoints/densenet201/epoch-18-val-0.111.pt'), num_classes,
+                                   device)
     else:  # load to CPU instead
+        print("Warning: Using Lightning checkpoint. Doesn't work atm.")
         classifier = DenseNet201.load_from_checkpoint(project_path('models/checkpoints/first_lightning_training.ckpt'),
                                                       map_location=torch.device('cpu'))
 
@@ -154,8 +169,73 @@ def main():
 
 
 def run_metrics_on_predictions_file():
-    predictions = torch.load()
+    classes = [
+        "punching_hole",
+        "welding_line",
+        "crescent_gap",
+        "water_spot",
+        "oil_spot",
+        "silk_spot",
+        "inclusion",
+        "rolled_pit",
+        "crease",
+        "waist_folding"
+    ]
+    # TODO probably move to test since this is specific to GC10
+
+    test_data = CustomTensorDataset.load(Path(project_path('data/ds_data/gc10_test.pt')))
+    test_data: CustomTensorDataset = typing.cast(CustomTensorDataset, preprocess(test_data))
+
+    predictions = torch.load(project_path('data/ds_data/predictions_densenet.pt'))
+    assert len(predictions) == len(test_data)
+
+    imgs, labels = test_data.tensors[0], test_data.tensors[1]
+    # ConfusionMatrixMetric().calculate(predictions, labels).show()
+
+    # retrieve secondary labels for test instances
+    with open(project_path('data/interim/labels.json', 'r')) as label_json_file:
+        label_info = json.load(label_json_file)
+
+    # for i in range(10):
+    #     i += 10
+    #     test_img = imgs[i]
+    #     test_img_id = test_data.get_img_id(i)
+    #     test_img_path = test_data.get_img_path(i)
+    #     test_img = ToPILImage()(inverse_normalize(test_img))
+    #     secondary = [classes[sec] for sec in label_info[test_img_id]['secondary']]
+    #
+    #     plt.imshow(test_img)
+    #     plt.title(f'{test_img_id} - {test_img_path}')
+    #     plt.figtext(0.5, 0.05, f'true: {classes[labels[i]]}, secondary: {secondary} '
+    #                            f'- predicted: {classes[torch.argmax(predictions[i])]}', ha='center', fontsize=9)
+    #     plt.show()
+
+    # count number of misclassifications
+    # calc ratio of predicted labels that are part of secondary labels
+    misclassification_idx = [i for i in range(len(predictions)) if torch.argmax(predictions[i]) != labels[i]]
+
+    print(f'test size: {len(predictions)}')
+    print(f'number of misses: {len(misclassification_idx)}')
+    number_of_secondary_hits = 0
+
+    # let's be lenient towards the model and change all misses with secondary hits to their secondary labels
+    for idx in misclassification_idx:
+        predicted_label = torch.argmax(predictions[idx])
+        true_label = labels[idx]
+        assert predicted_label != true_label
+        secondary = label_info[test_data.get_img_id(idx)]['secondary']
+
+        # secondary can be a single class index or a list of indices
+        if secondary and (predicted_label == secondary or predicted_label in secondary):
+            labels[idx] = predicted_label
+            number_of_secondary_hits += 1
+
+    print(f'number of secondary hits: {number_of_secondary_hits}')
+    ConfusionMatrixMetric(labels=classes).calculate(predictions, labels).show()
+    confusion_mat = confusion_matrix(torch.argmax(predictions, dim=1).numpy(), labels.numpy())
+    print(confusion_mat)
 
 
 if __name__ == '__main__':
-    main()
+    run_metrics_on_predictions_file()
+    # main()
