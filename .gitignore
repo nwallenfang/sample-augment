@@ -64,7 +64,8 @@ target/
 *.rdb
 
 # Pycharm
-.idea
+# don't ignore this since it contains some relevant settings for other users
+# .idea
 
 # VS Code
 .vscode/
