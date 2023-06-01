@@ -17,7 +17,7 @@ def test_tensor_dataset():
 
 def test_custom_tensor_dataset():
     path = Path(project_path('data/interim/'))
-    dataset: CustomTensorDataset = CustomTensorDataset.load(path, 'gc10')
+    dataset: CustomTensorDataset = CustomTensorDataset.load(path)
     print()
     print(f"Full path: {dataset.get_img_path(10)}")
     print(f"Img ID: {dataset.get_img_id(10)}")

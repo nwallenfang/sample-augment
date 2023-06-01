@@ -18,7 +18,6 @@ from sampling_aug.utils.paths import project_path
 
 
 def main():
-    labels = {}
     with open(project_path('data/interim/labels.json')) as label_file:
         labels = json.load(label_file)
 
@@ -52,7 +51,7 @@ def main():
     ]
 
     fig, ax = plt.subplots()
-    im = ax.imshow(label_matrix.T)
+    ax.imshow(label_matrix.T)
 
     # Show all ticks and label them with the respective list entries
     ax.set_xticks(np.arange(len(classes)), labels=classes)

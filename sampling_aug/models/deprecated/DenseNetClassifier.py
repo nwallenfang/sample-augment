@@ -1,7 +1,6 @@
 import torch
 from lightning import LightningModule
 from torch import nn
-from lightning.pytorch.utilities import grad_norm
 
 
 class DenseNet201(LightningModule):
@@ -50,7 +49,7 @@ class DenseNet201(LightningModule):
     def test_step(self, batch, batch_idx):
         images, labels = batch
         predictions = self.model(images)
-        test_loss = self.criterion(predictions, labels)
+        # test_loss = self.criterion(predictions, labels)
         accuracy = (predictions.argmax(dim=-1) == labels).float().mean()
         self.log("test_acc", accuracy, sync_dist=True)
 

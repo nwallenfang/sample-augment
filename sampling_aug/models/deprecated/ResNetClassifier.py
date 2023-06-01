@@ -75,8 +75,8 @@ class ResNetClassifier(pl.LightningModule):
                 for param in child.parameters():
                     param.requires_grad = False
 
-    def forward(self, X):
-        return self.resnet_model(X)
+    def forward(self, x):
+        return self.resnet_model(x)
 
     def configure_optimizers(self):
         return self.optimizer(self.parameters(), lr=self.lr)
@@ -230,7 +230,7 @@ if __name__ == "__main__":
         save_last=True,
     )
 
-    stopping_callback = pl.callbacks.EarlyStopping()
+    stopping_callback = pl.callbacks.EarlyStopping(monitor="val_loss")
 
     # Instantiate lightning trainer and train model
     trainer_args = {

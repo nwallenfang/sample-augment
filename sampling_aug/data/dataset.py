@@ -85,7 +85,6 @@ class CustomTensorDataset(TensorDataset):
         torch.save(self.tensors, path / f"{self.name}_{description}.pt")
         # root dir and img ids are python primitives, should be easier like this
         # since I had some trouble loading the CustomTensorDataset with torch.load
-        #   Or it could be possible to only save the ids..
 
         # make the Paths portable to other OS
         img_paths_strings = [str(path) for path in self.img_paths]

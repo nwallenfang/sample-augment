@@ -5,8 +5,8 @@ from sampling_aug.utils.paths import project_path
 
 
 def show_image(img: np.ndarray, title: str, text: str, save_path: str = None):
-    fig = plt.figure()
-    ax = plt.imshow(img, cmap='gray')
+    _fig = plt.figure()
+    _ax = plt.imshow(img, cmap='gray')
 
     plt.title(title)
     plt.figtext(0.5, 0.05, text, ha='center', fontsize=9)

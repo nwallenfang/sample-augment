@@ -4,10 +4,10 @@ import re
 import tempfile
 
 import torch
-import sys 
-sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sampling_aug\\')
-sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sampling_aug\\models\\stylegan2\\')
+# import sys
 
+# sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sampling_aug\\')
+# sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sampling_aug\\models\\stylegan2\\')
 
 import models.stylegan2.dnnlib as dnnlib
 from models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn
@@ -35,8 +35,8 @@ def train_stylegan():
         'target': None,  # ADA target value, might need tweaking
         'augpipe': 'bgc-gc10',  # custom augmentation pipeline without 90 degree rotations
         'resume': 'ffhq256',
-            #"E:\\Master_Thesis_Nils\\stylegan-training\\00009-gc10_pre_FFHQ-cond-mirror-auto2-kimg5000"
-            #      "-resumecelebahq256\\network-snapshot-000200.pkl",
+        # "E:\\Master_Thesis_Nils\\stylegan-training\\00009-gc10_pre_FFHQ-cond-mirror-auto2-kimg5000"
+        #      "-resumecelebahq256\\network-snapshot-000200.pkl",
         # 'celebahq256', # 'ffhq256',  # checkpoint for transfer learning / resuming interrupted run
         'freezed': 3,  # int, 'Freeze-D', 'freeze the highest-resolution layers of the discriminator during transfer'
         'fp32': None,

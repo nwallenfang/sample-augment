@@ -4,7 +4,7 @@
 """
 import numpy as np
 from sklearn.model_selection import train_test_split
-from torch.utils.data import Subset, TensorDataset, Dataset
+from torch.utils.data import Subset
 from torchvision.datasets import ImageFolder
 
 from data.dataset import CustomTensorDataset
@@ -24,7 +24,8 @@ def stratified_split(dataset: ImageFolder | CustomTensorDataset, train_ratio: fl
     """
         Perform a random stratified split of a Dataset into two Datasets (called train and test set).
     Args:
-        dataset(ImageFolder | CustomTensorDataset): Dataset instance to split, can be an instance of type CustomTensorDataset
+        dataset(ImageFolder | CustomTensorDataset): Dataset instance to split,
+            can be an instance of type CustomTensorDataset.
         train_ratio: Ratio of training set size in relation to total size
         random_seed:
         min_instances_per_class: Minimum number of instances of each class that will be in the test set
@@ -76,7 +77,7 @@ def stratified_split(dataset: ImageFolder | CustomTensorDataset, train_ratio: fl
     return train_dataset, test_dataset
 
 
-def create_train_val_test_sets(dataset: TensorDataset, random_seed=15):
+def create_train_val_test_sets(dataset: CustomTensorDataset, random_seed=15):
     """
         Expects data/interim/gc10_tensors.pt to exist.
         Create gc10_train.pt, gc10_val.pt, gc10_test.pt from successive stratified splits.

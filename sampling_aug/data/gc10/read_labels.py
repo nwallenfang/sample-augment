@@ -15,7 +15,7 @@ from sampling_aug.utils.paths import project_path
 from sampling_aug.utils.plot import show_image
 
 # from data/gc10/Defect Descriptions.xlsx, which also contains some example images
-LABEL_TO_ENGLISH_NAME = {
+LABEL_TO_NAME = {
     1: "punching_hole",
     2: "welding_line",
     3: "crescent_gap",
@@ -51,7 +51,7 @@ def xml_to_labels(xml: Dict) -> Dict:
                 except ValueError:
                     pass  # mislabelled instance
         elif type(objects) in (collections.OrderedDict, dict):  # one object
-            label = int(objects['name'].split('_')[0]   )  # first character is label index
+            label = int(objects['name'].split('_')[0])  # first character is label index
             secondary.append(label)
         else:
             raise ValueError(f'weird objects tag in xml {type(objects)}')
@@ -142,8 +142,8 @@ def compare_dir_and_xml_labels(xml_labels: Dict, dir_labels: Dict):
         path = project_path(f"data/gc-10/{dir_label}/img_{name}.jpg")
         img = matplotlib.image.imread(path)
 
-        secondary_labels = [LABEL_TO_ENGLISH_NAME[label] for label in xml_labels[name]['secondary']]
-        img_text = f"dir: {LABEL_TO_ENGLISH_NAME[dir_labels[name]]}, xml: {LABEL_TO_ENGLISH_NAME[xml_labels[name]['y']]}\n \
+        secondary_labels = [LABEL_TO_NAME[label] for label in xml_labels[name]['secondary']]
+        img_text = f"dir: {LABEL_TO_NAME[dir_labels[name]]}, xml: {LABEL_TO_NAME[xml_labels[name]['y']]}\n \
          secondary: {secondary_labels}"
         show_image(img, title=name, text=img_text,
                    save_path=project_path(f'reports/figures/label-exploration/mismatch_{name}.png'))
