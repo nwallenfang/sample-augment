@@ -1,3 +1,0 @@
-<component name="DependencyValidationManager">
-  <scope name="StyleGAN fork" pattern="file[thesis_nils]:sampling_aug/models/stylegan2/*" />
-</component>
