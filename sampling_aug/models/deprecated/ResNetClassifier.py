@@ -31,6 +31,7 @@ class ResNetClassifier(pl.LightningModule):
     }
     optimizers = {"adam": Adam, "sgd": SGD}
 
+    # noinspection PyTypeChecker
     def __init__(
             self,
             num_classes,
@@ -64,9 +65,9 @@ class ResNetClassifier(pl.LightningModule):
         )
         # Using a pretrained ResNet backbone
         self.resnet_model = self.resnets[resnet_version](pretrained=transfer)
-        # Replace old FC layer with Identity so we can train our own
+        # Replace old FC layer with Identity, so we can train our own
         linear_size = list(self.resnet_model.children())[-1].in_features
-        # replace final layer for fine tuning
+        # replace final layer for finetuning
         self.resnet_model.fc = nn.Linear(linear_size, num_classes)
 
         if tune_fc_only:  # option to only tune the fully-connected layers

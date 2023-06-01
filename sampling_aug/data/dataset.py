@@ -1,5 +1,6 @@
 import os.path
 import pickle
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -43,15 +44,18 @@ class CustomTensorDataset(TensorDataset):
         """
             img_id is just the filename without the file ending and the redundant `img_` prefix
         """
-        img_id = str(self.img_paths[index].name)
-        img_id = img_id.split('.')[0][4:]
+        if isinstance(self.img_paths[index], Path):
+            img_id = str(self.img_paths[index].name)
+            img_id = img_id.split('.')[0][4:]
+        else:
+            img_id = self.img_paths[index]
         return str(img_id)
 
     def get_img_path(self, index: int) -> Path:
         return Path.joinpath(self.root_dir, self.img_paths[index])
 
     @classmethod
-    def load(cls, full_path: Path) -> "CustomTensorDataset":
+    def load(cls, full_path: Path, root_dir_overwrite: Path = None) -> "CustomTensorDataset":
         tensors = torch.load(full_path)
 
         tensor_filename = full_path.stem
@@ -60,7 +64,20 @@ class CustomTensorDataset(TensorDataset):
             logger.error(f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
             raise ValueError(f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
         with open(meta_path, 'rb') as meta_file:
-            name, root_dir, img_paths = pickle.load(meta_file)
+            # for now, the img_paths still are OS dependent, so we sometimes struggle
+            name, root_dir_string, img_paths = pickle.load(meta_file)
+            # img_paths are relative so resolving these should always work
+            img_paths = [Path(path_string) for path_string in img_paths]
+
+        if root_dir_overwrite:
+            root_dir = root_dir_overwrite
+        else:
+            root_dir = Path(root_dir_string)
+            if not root_dir.is_dir():
+                logger.error(
+                    f'CustomTensorDataset load(): Invalid root_dir "{root_dir_string}" found in metafile.'
+                    f' Please provide `root_dir_overwrite` parameter.')
+                sys.exit(-1)
 
         return CustomTensorDataset(name, tensors[0], tensors[1], root_dir=root_dir, img_paths=img_paths)
 
@@ -68,10 +85,14 @@ class CustomTensorDataset(TensorDataset):
         torch.save(self.tensors, path / f"{self.name}_{description}.pt")
         # root dir and img ids are python primitives, should be easier like this
         # since I had some trouble loading the CustomTensorDataset with torch.load
-        # TODO it's bad to save those file paths because they're not portable at all
-        # could be possible to only save the ids..
+        #   Or it could be possible to only save the ids..
+
+        # make the Paths portable to other OS
+        img_paths_strings = [str(path) for path in self.img_paths]
+        root_dir_string = str(self.root_dir)
+
         with open(path / f"{self.name}_{description}_meta.pkl", 'wb') as meta_file:
-            pickle.dump((self.name, self.root_dir, self.img_paths), meta_file)
+            pickle.dump((self.name, root_dir_string, img_paths_strings), meta_file)
 
 
 def image_folder_to_tensor_dataset(image_dataset: ImageDataset, name: str = 'gc10') -> CustomTensorDataset:
@@ -132,7 +153,7 @@ def main():
     else:
         tensor_dataset = CustomTensorDataset.load(Path(project_path('data/interim/gc10_tensors.pt')))
 
-    train_data, val_data, test_data = create_train_val_test_sets(tensor_dataset)
+    train_data, val_data, test_data = create_train_val_test_sets(tensor_dataset, random_seed=15)
     del tensor_dataset
     train_data.save(path=Path(project_path('data/interim/')), description='train')
     val_data.save(path=Path(project_path('data/interim/')), description='val')

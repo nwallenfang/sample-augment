@@ -8,7 +8,7 @@ from torch import nn  # All neural network modules
 from torch.utils.data import DataLoader  # Gives easier dataset management
 
 from data.dataset import CustomTensorDataset
-from models.train_classifier import preprocess
+from models.deprecated.train_classifier import preprocess
 from utils.paths import project_path
 
 
@@ -87,8 +87,8 @@ def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_e
             # store loss
             val_batch_losses.append(val_loss.item())
 
-        torch.save(model.state_dict(), project_path(f'models/checkpoints/densenet201/tmp-{epoch}-val-{val_loss:.3f}.pt'))
-
+        torch.save(model.state_dict(),
+                   project_path(f'models/checkpoints/densenet201/tmp-{epoch}-val-{val_loss:.3f}.pt'))
 
         val_losses.append(sum(val_batch_losses) / len(val_batch_losses))
         print(

@@ -16,7 +16,7 @@ from torchvision.transforms import Normalize, ToPILImage
 from tqdm import tqdm
 
 from data.dataset import CustomTensorDataset
-from models.DenseNetClassifier import DenseNet201
+from models.deprecated.DenseNetClassifier import DenseNet201
 from utils.paths import project_path
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
@@ -183,7 +183,7 @@ def run_metrics_on_predictions_file():
     ]
     # TODO probably move to test since this is specific to GC10
 
-    test_data = CustomTensorDataset.load(Path(project_path('data/ds_data/gc10_test.pt')))
+    test_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_test.pt')))
     test_data: CustomTensorDataset = typing.cast(CustomTensorDataset, preprocess(test_data))
 
     predictions = torch.load(project_path('data/ds_data/predictions_densenet.pt'))
@@ -233,7 +233,13 @@ def run_metrics_on_predictions_file():
     print(f'number of secondary hits: {number_of_secondary_hits}')
     ConfusionMatrixMetric(labels=classes).calculate(predictions, labels).show()
     confusion_mat = confusion_matrix(torch.argmax(predictions, dim=1).numpy(), labels.numpy())
+    counts = np.bincount(labels)
     print(confusion_mat)
+    print(' --- ')
+    # TODO something is wrong here! The counts show that the classes aren't properly balanced
+    #  need to see if this problem is already present in the train_test split
+    # TODO verify that train, test and val sets are disjoint!!
+    print(counts)
 
 
 if __name__ == '__main__':
