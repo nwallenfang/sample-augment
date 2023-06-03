@@ -7,7 +7,7 @@ from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch import nn  # All neural network modules
 from torch.utils.data import DataLoader  # Gives easier dataset management
 
-from data.dataset import CustomTensorDataset
+from data.dataset import SamplingAugDataset
 from models.deprecated.train_classifier import preprocess
 from utils.paths import project_path
 
@@ -26,6 +26,7 @@ def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_e
     #   print("Let's use", torch.cuda.device_count(), "GPUs!")
     #   model = nn.DataParallel(model)
 
+    # TODO set random_seed so the experiment is (more) reproducible
     # Train Network
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
@@ -128,8 +129,8 @@ def main():
         nn.Linear(30, num_classes))
     model.to(device)
 
-    train_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_train.pt')))
-    val_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_val.pt')))
+    train_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
+    val_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
 
     train_data = preprocess(train_data)
     val_data = preprocess(val_data)

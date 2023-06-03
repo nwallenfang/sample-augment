@@ -7,12 +7,12 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Subset
 from torchvision.datasets import ImageFolder
 
-from data.dataset import CustomTensorDataset
+from data.dataset import SamplingAugDataset
 from utils.logging import logger
 
 
-class CustomSubset(CustomTensorDataset):
-    def __init__(self, dataset: CustomTensorDataset, indices):
+class CustomSubset(SamplingAugDataset):
+    def __init__(self, dataset: SamplingAugDataset, indices):
         tensors_data = dataset.tensors[0][indices]
         tensors_labels = dataset.tensors[1][indices]
         img_paths = list(np.array(dataset.img_paths)[indices])
@@ -20,12 +20,12 @@ class CustomSubset(CustomTensorDataset):
         super().__init__(dataset.name, tensors_data, tensors_labels, img_paths, dataset.root_dir)
 
 
-def stratified_split(dataset: ImageFolder | CustomTensorDataset, train_ratio: float = 0.8, random_seed: int = 42,
+def stratified_split(dataset: ImageFolder | SamplingAugDataset, train_ratio: float = 0.8, random_seed: int = 42,
                      min_instances_per_class: int = 10):
     """
         Perform a random stratified split of a Dataset into two Datasets (called train and test set).
     Args:
-        dataset(ImageFolder | CustomTensorDataset): Dataset instance to split,
+        dataset(ImageFolder | SamplingAugDataset): Dataset instance to split,
             can be an instance of type CustomTensorDataset.
         train_ratio: Ratio of training set size in relation to total size
         random_seed:
@@ -80,7 +80,7 @@ def stratified_split(dataset: ImageFolder | CustomTensorDataset, train_ratio: fl
     return train_dataset, test_dataset
 
 
-def create_train_val_test_sets(dataset: CustomTensorDataset, random_seed=15):
+def create_train_val_test_sets(dataset: SamplingAugDataset, random_seed=15):
     """
         Expects data/interim/gc10_tensors.pt to exist.
         Create gc10_train.pt, gc10_val.pt, gc10_test.pt from successive stratified splits.

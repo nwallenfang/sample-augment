@@ -24,7 +24,7 @@ class ImageDataset(torchvision.datasets.ImageFolder):
     pass
 
 
-class CustomTensorDataset(TensorDataset):
+class SamplingAugDataset(TensorDataset):
     """
         PyTorch TensorDataset with the extension that we're also saving the paths to the original images
     """
@@ -55,7 +55,7 @@ class CustomTensorDataset(TensorDataset):
         return Path.joinpath(self.root_dir, self.img_paths[index])
 
     @classmethod
-    def load(cls, full_path: Path, root_dir_overwrite: Path = None) -> "CustomTensorDataset":
+    def load_from_file(cls, full_path: Path, root_dir_overwrite: Path = None) -> "SamplingAugDataset":
         tensors = torch.load(full_path)
 
         tensor_filename = full_path.stem
@@ -79,9 +79,9 @@ class CustomTensorDataset(TensorDataset):
                     f' Please provide `root_dir_overwrite` parameter.')
                 sys.exit(-1)
 
-        return CustomTensorDataset(name, tensors[0], tensors[1], root_dir=root_dir, img_paths=img_paths)
+        return SamplingAugDataset(name, tensors[0], tensors[1], root_dir=root_dir, img_paths=img_paths)
 
-    def save(self, path: Path, description: str = "tensors"):
+    def save_to_file(self, path: Path, description: str = "tensors"):
         torch.save(self.tensors, path / f"{self.name}_{description}.pt")
         # root dir and img ids are python primitives, should be easier like this
         # since I had some trouble loading the CustomTensorDataset with torch.load
@@ -96,7 +96,7 @@ class CustomTensorDataset(TensorDataset):
 
 def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
                                    name: str = 'gc10',
-                                   true_labels: dict[str, int] = None) -> CustomTensorDataset:
+                                   true_labels: dict[str, int] = None) -> SamplingAugDataset:
     """
         ImageFolder dataset is designed for big datasets that don't fit into RAM (think ImageNet).
         For GC10 we can easily load the whole dataset into RAM transform the ImageDataset into a Tensor-based one
@@ -151,7 +151,7 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
     image_data *= 255  # Now scale by 255
     image_data = image_data.astype(np.uint8)
     image_tensors = torch.from_numpy(image_data)
-    tensor_dataset = CustomTensorDataset(name, image_tensors, label_tensors, img_paths=img_paths, root_dir=root_dir)
+    tensor_dataset = SamplingAugDataset(name, image_tensors, label_tensors, img_paths=img_paths, root_dir=root_dir)
     return tensor_dataset
 
 
@@ -174,19 +174,19 @@ def main():
     if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
         image_dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
         # TODO pass labels.json contents
-        tensor_dataset: CustomTensorDataset = image_folder_to_tensor_dataset(image_dataset)
+        tensor_dataset: SamplingAugDataset = image_folder_to_tensor_dataset(image_dataset)
         del image_dataset
         assert isinstance(tensor_dataset, TensorDataset)
         dataset_dir = Path(project_path('data/interim/', create=True))
-        tensor_dataset.save(dataset_dir)
+        tensor_dataset.save_to_file(dataset_dir)
     else:
-        tensor_dataset = CustomTensorDataset.load(Path(project_path('data/interim/gc10_tensors.pt')))
+        tensor_dataset = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_tensors.pt')))
 
     train_data, val_data, test_data = create_train_val_test_sets(tensor_dataset, random_seed=15)
     del tensor_dataset
-    train_data.save(path=Path(project_path('data/interim/')), description='train')
-    val_data.save(path=Path(project_path('data/interim/')), description='val')
-    test_data.save(path=Path(project_path('data/interim/')), description='test')
+    train_data.save_to_file(path=Path(project_path('data/interim/')), description='train')
+    val_data.save_to_file(path=Path(project_path('data/interim/')), description='val')
+    test_data.save_to_file(path=Path(project_path('data/interim/')), description='test')
 
 
 def test_duplicate_ids():
@@ -200,11 +200,11 @@ def test_duplicate_ids():
         # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     image_dataset = ImageDataset(project_path('data/gc-10-mini'), transform=preprocessing)
-    tensor_dataset: CustomTensorDataset = image_folder_to_tensor_dataset(image_dataset)
+    tensor_dataset: SamplingAugDataset = image_folder_to_tensor_dataset(image_dataset)
     del image_dataset
     assert isinstance(tensor_dataset, TensorDataset)
     dataset_dir = Path(project_path('data/interim/', create=True))
-    tensor_dataset.save(dataset_dir)
+    tensor_dataset.save_to_file(dataset_dir)
 
 
 if __name__ == '__main__':

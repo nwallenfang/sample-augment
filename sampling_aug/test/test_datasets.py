@@ -10,7 +10,7 @@ from torch.utils.data import Subset
 from torchvision.transforms import Normalize, Grayscale, ToTensor, Resize, Compose
 from torchvision.utils import make_grid
 
-from data.dataset import ImageDataset, CustomTensorDataset
+from data.dataset import ImageDataset, SamplingAugDataset
 from data.train_test_split import stratified_split
 from utils.paths import project_path
 from data import dataset as dataset_package
@@ -45,7 +45,7 @@ def create_image_folder_dataset():
 
 
 def test_uniqueness_of_ids():
-    complete = CustomTensorDataset.load(Path(project_path('data/interim/gc10_tensors.pt')))
+    complete = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_tensors.pt')))
     all_ids = [complete.get_img_id(i) for i in range(len(complete))]
     duplicate_ids = set([x for x in all_ids if all_ids.count(x) > 1])
     print()
@@ -60,12 +60,12 @@ def test_train_test_split_load_gc10():
 
     # stylegan training doesn't work after the new train test split
     # might be our dataset or because I'm trying to do transfer learning with a FFHQ checkpoint.
-    train = CustomTensorDataset.load(Path(project_path('data/interim/gc10_train.pt')))
-    complete = CustomTensorDataset.load(Path(project_path('data/interim/gc10_tensors.pt')))
+    train = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
+    complete = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_tensors.pt')))
     n_complete = len(complete)
     del complete
-    test = CustomTensorDataset.load(Path(project_path('data/interim/gc10_test.pt')))
-    val = CustomTensorDataset.load(Path(project_path('data/interim/gc10_val.pt')))
+    test = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_test.pt')))
+    val = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
     n_train, n_test, n_val = len(train), len(test), len(val)
 
     assert n_train + n_test + n_val == n_complete
@@ -132,7 +132,7 @@ def main():
         visual inspection of some images from the TensorDataset
     """
     # make a grid for each class, image IDs could be useful as well, to compare to the unscaled/quantized version
-    dataset = CustomTensorDataset.load(Path(project_path('data/interim/gc10_train.pt')))
+    dataset = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
     _data, _labels = dataset.tensors
     # TODO visual inspection
     for class_idx in range(10):

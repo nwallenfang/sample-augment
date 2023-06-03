@@ -15,7 +15,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
 from tqdm import tqdm
 
-from data.dataset import CustomTensorDataset
+from data.dataset import SamplingAugDataset
 from models.deprecated.DenseNetClassifier import DenseNet201
 from utils.paths import project_path
 
@@ -121,7 +121,7 @@ def main():
     # the classifier. Should add some kind of sanity check to ensure this
     # first steps, see available metrics in torch and calculate total and class-wise accuracy
     # train_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_train.pt')))
-    test_dataset = CustomTensorDataset.load(Path(project_path('data/interim/gc10_test.pt')))
+    test_dataset = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_test.pt')))
     # val_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_val.pt')))
     test_data = preprocess(test_dataset)
     # val_data = preprocess(val_data)
@@ -183,8 +183,8 @@ def run_metrics_on_predictions_file():
     ]
     # TODO probably move to test since this is specific to GC10
 
-    test_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_test.pt')))
-    test_data: CustomTensorDataset = typing.cast(CustomTensorDataset, preprocess(test_data))
+    test_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_test.pt')))
+    test_data: SamplingAugDataset = typing.cast(SamplingAugDataset, preprocess(test_data))
 
     predictions = torch.load(project_path('data/ds_data/predictions_densenet.pt'))
     assert len(predictions) == len(test_data)
