@@ -94,23 +94,52 @@ class CustomTensorDataset(TensorDataset):
             pickle.dump((self.name, root_dir_string, img_paths_strings), meta_file)
 
 
-def image_folder_to_tensor_dataset(image_dataset: ImageDataset, name: str = 'gc10') -> CustomTensorDataset:
+def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
+                                   name: str = 'gc10',
+                                   true_labels: dict[str, int] = None) -> CustomTensorDataset:
     """
         ImageFolder dataset is designed for big datasets that don't fit into RAM (think ImageNet).
         For GC10 we can easily load the whole dataset into RAM transform the ImageDataset into a Tensor-based one
         for this.
     """
     logger.info('loading images into CustomTensorDataset..')
-    label_tensors = torch.tensor(image_dataset.targets, dtype=torch.int)
-    image_tensors = torch.stack([image_dataset[i][0] for i in tqdm(range(len(image_dataset)))])
+    # label_tensors = torch.tensor(image_dataset.targets, dtype=torch.int)
+    # image_tensors = torch.stack([image_dataset[i][0] for i in tqdm(range(len(image_dataset)))])
 
     # save a dictionary pointing from the tensor indices to the image IDs / paths for traceability
     logger.info('reading image paths (metadata)..')
-    root_dir = Path(project_path('data/gc-10'))  # FIXME make independent of gc10 (ImageDataSet might contain the path)
+    root_dir = Path(image_dataset.root)
     img_paths = []
-    for img_path, _img_class in tqdm(image_dataset.imgs):
+
+    # to check for duplicates, since gc10 contains some duplicate images
+    duplicate_dict = {}
+    remove_these_idx = []
+    removed_duplicates = 0
+
+    for i, (img_path, _img_class) in tqdm(enumerate(image_dataset.imgs)):
         path_obj = Path(img_path)
+        # FIXME this way of calculating the ids is gc10 specific..
+        img_id = path_obj.stem[4:]
+
+        if img_id not in duplicate_dict:
+            duplicate_dict[img_id] = i
+        else:
+            # always take the first appearance of an image, might just need to change the class
+            if true_labels:
+                image_dataset.targets[i] = true_labels[img_id]
+            remove_these_idx.append(i)
+            removed_duplicates += 1
+            continue
+
         img_paths.append(path_obj.relative_to(root_dir))
+
+    if removed_duplicates > 0:
+        logger.warning(f'Removed {removed_duplicates} duplicates from the dataset.')
+
+    # filter duplicates
+    unique_indices = list(set(range(len(image_dataset))) - set(remove_these_idx))
+    image_tensors = torch.stack([image_dataset[i][0] for i in tqdm(unique_indices)])
+    label_tensors = torch.tensor([image_dataset.targets[i] for i in tqdm(unique_indices)], dtype=torch.int)
 
     # convert image_tensors to uint8 since that's the format needed for training on StyleGAN
     image_data: np.ndarray = image_tensors.numpy()
@@ -144,6 +173,7 @@ def main():
     # tensor_path
     if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
         image_dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
+        # TODO pass labels.json contents
         tensor_dataset: CustomTensorDataset = image_folder_to_tensor_dataset(image_dataset)
         del image_dataset
         assert isinstance(tensor_dataset, TensorDataset)
@@ -157,6 +187,24 @@ def main():
     train_data.save(path=Path(project_path('data/interim/')), description='train')
     val_data.save(path=Path(project_path('data/interim/')), description='val')
     test_data.save(path=Path(project_path('data/interim/')), description='test')
+
+
+def test_duplicate_ids():
+    preprocessing = Compose([
+        Resize((256, 256), interpolation=torchvision.transforms.InterpolationMode.BICUBIC, antialias=True),
+        ToTensor(),
+        Grayscale(num_output_channels=3),
+        # These normalization factors might be used to bring GC10
+        # to the same distribution as ImageNet since we're using a DenseNet classifier that was pretrained on ImageNet.
+        # Optimally, the Generator should generate images with this distribution as well.
+        # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+    image_dataset = ImageDataset(project_path('data/gc-10-mini'), transform=preprocessing)
+    tensor_dataset: CustomTensorDataset = image_folder_to_tensor_dataset(image_dataset)
+    del image_dataset
+    assert isinstance(tensor_dataset, TensorDataset)
+    dataset_dir = Path(project_path('data/interim/', create=True))
+    tensor_dataset.save(dataset_dir)
 
 
 if __name__ == '__main__':

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+# noinspection PyPep8Naming
 import torchvision.transforms.functional as F
 from torch import Tensor
 from torch.utils.data import Subset
@@ -13,6 +14,15 @@ from data.dataset import ImageDataset, CustomTensorDataset
 from data.train_test_split import stratified_split
 from utils.paths import project_path
 from data import dataset as dataset_package
+
+
+def visualize_class_distribution(complete_dataset: ImageDataset, subset: Subset):
+    labels = np.array([complete_dataset.targets[idx] for idx in subset.indices])
+    classes, counts = np.unique(labels, return_counts=True)
+    print(counts)
+    plt.figure()
+    plt.bar(classes, counts)
+    plt.show()
 
 
 def create_image_folder_dataset():
@@ -34,20 +44,16 @@ def create_image_folder_dataset():
     return dataset
 
 
-def visualize_class_distribution(complete_dataset: ImageDataset, subset: Subset):
-    labels = np.array([complete_dataset.targets[idx] for idx in subset.indices])
-    classes, counts = np.unique(labels, return_counts=True)
-    print(counts)
-    plt.figure()
-    plt.bar(classes, counts)
-    plt.show()
+def test_uniqueness_of_ids():
+    complete = CustomTensorDataset.load(Path(project_path('data/interim/gc10_tensors.pt')))
+    all_ids = [complete.get_img_id(i) for i in range(len(complete))]
+    duplicate_ids = set([x for x in all_ids if all_ids.count(x) > 1])
+    print()
+    print(duplicate_ids)
+    assert duplicate_ids == []
 
 
-def test_loading_imagedataset():
-    create_image_folder_dataset()
-
-
-def test_load_training_set():
+def test_train_test_split_load_gc10():
     if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
         print('initializing DataSets for this test..')
         dataset_package.main()
@@ -61,26 +67,56 @@ def test_load_training_set():
     test = CustomTensorDataset.load(Path(project_path('data/interim/gc10_test.pt')))
     val = CustomTensorDataset.load(Path(project_path('data/interim/gc10_val.pt')))
     n_train, n_test, n_val = len(train), len(test), len(val)
-    del test
-    del val
 
     assert n_train + n_test + n_val == n_complete
-    print()
-    # TODO assert that the sets are disjoint
 
-    example_img: Tensor = train[10][0]
-    _example_label = train[10][1]
+    test_ids = set(test.get_img_id(i) for i in range(len(test)))
+    train_ids = set(train.get_img_id(i) for i in range(len(train)))
+    val_ids = set(val.get_img_id(i) for i in range(len(val)))
 
-    print(f"path: {train.get_img_path(10)}")
-    print(f"shape: {example_img.size()}")
-    plt.imshow(example_img.permute(1, 2, 0))
+    test_train_intersect = test_ids.intersection(train_ids)
+    print(test_train_intersect)
+    test_val_intersect = test_ids.intersection(val_ids)
+    print(test_val_intersect)
+    train_val_intersect = train_ids.intersection(val_ids)
+    print(train_val_intersect)
+    # assert that the three sets are disjoint
+    # for that the intersection between the sets should be the empty set
+    assert test_train_intersect == set()
+    assert test_val_intersect == set()
+    assert train_val_intersect == set()
+
+    # check for class balance in the stratified split
+    train_labels = np.array(train.tensors[1])
+    classes, counts = np.unique(train_labels, return_counts=True)
+    plt.bar(classes, counts)
+    plt.title('train class distribution')
     plt.show()
 
+    test_labels = np.array(test.tensors[1])
+    classes, counts = np.unique(test_labels, return_counts=True)
+    plt.figure()
+    plt.bar(classes, counts)
+    plt.title('test class distribution')
+    plt.show()
 
-plt.rcParams["savefig.bbox"] = 'tight'
+    # visually, the class distributions look similar, though they don't seem to follow
+    # the "true distribution" found in the complete dataset
+    # look at the complete distribution:
+    # TODO ! class distribution test !
+
+    example_img: Tensor = train[10][0]
+
+    print()
+    print(f"path: {train.get_img_path(10)}")
+    print(f"shape: {example_img.size()}")
+    # plt.imshow(example_img.permute(1, 2, 0))
+    # plt.show()
 
 
 def show(imgs):
+    plt.rcParams["savefig.bbox"] = 'tight'
+
     if not isinstance(imgs, list):
         imgs = [imgs]
     fig, axs = plt.subplots(ncols=len(imgs), squeeze=False)
@@ -97,7 +133,8 @@ def main():
     """
     # make a grid for each class, image IDs could be useful as well, to compare to the unscaled/quantized version
     dataset = CustomTensorDataset.load(Path(project_path('data/interim/gc10_train.pt')))
-    data, labels = dataset.tensors
+    _data, _labels = dataset.tensors
+    # TODO visual inspection
     for class_idx in range(10):
         pass
     grid = make_grid()

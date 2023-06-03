@@ -16,6 +16,7 @@ class CustomSubset(CustomTensorDataset):
         tensors_data = dataset.tensors[0][indices]
         tensors_labels = dataset.tensors[1][indices]
         img_paths = list(np.array(dataset.img_paths)[indices])
+        self.indices = indices
         super().__init__(dataset.name, tensors_data, tensors_labels, img_paths, dataset.root_dir)
 
 
@@ -31,7 +32,7 @@ def stratified_split(dataset: ImageFolder | CustomTensorDataset, train_ratio: fl
         min_instances_per_class: Minimum number of instances of each class that will be in the test set
     """
     np.random.seed(random_seed)
-    
+
     if isinstance(dataset, ImageFolder):
         labels = dataset.targets
     else:  # is TensorDataset
@@ -65,6 +66,8 @@ def stratified_split(dataset: ImageFolder | CustomTensorDataset, train_ratio: fl
 
         test_indices = np.append(test_indices, instances_to_move)
         train_indices = np.delete(train_indices, indices_to_move)
+
+    assert set(train_indices).intersection(set(test_indices)) == set()
 
     if type(dataset) is ImageFolder:  # typechecking the other way around (CustomTensor..) doesn't work..
         train_dataset = Subset(dataset, train_indices)
