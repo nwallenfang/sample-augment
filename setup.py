@@ -24,5 +24,6 @@ setup(
         'lightning',
         'psutil',
         'scipy',
+        'pydantic'
     ]
 )
