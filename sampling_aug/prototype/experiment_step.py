@@ -1,4 +1,5 @@
-from __future__ import annotations  # TODO will this work in Python 3.7? (or rather: does this have to work in 3.7?)
+from __future__ import \
+    annotations  # TODO will this work in Python 3.7? (or rather: does this have to work in 3.7?)
 
 from dataclasses import dataclass
 from abc import abstractmethod
@@ -48,8 +49,9 @@ class MissingConfigEntry(DryRunResult):
 
 class ExperimentStep:
     """
-        Class representing a single step in the experiment pipeline. This could for example be a step like like
-        Data Normalization, Visualization, or Model training.
+        Class representing a single step in the experiment pipeline.
+        This could for example be a step like like Data Normalization, Visualization,
+        or Model training.
         TODO: how to support pipelines where one ExperimentStep is run multiple times?
     """
     id: StepID = StepID("abstract-step")
@@ -74,8 +76,8 @@ class ExperimentStep:
     @abstractmethod
     def check_environment() -> Optional[str]:
         """
-            Check if the environment is meeting all requirements to run this step. Could for example check the python
-            version or that some package is available.
+            Check if the environment is meeting all requirements to run this step.
+            Could for example check the python version or that some package is available.
         """
         raise NotImplementedError()
 
@@ -87,7 +89,8 @@ class ExperimentStep:
         # 2. Check step dependencies
         missing_steps = []
         for dependency_id in self.step_dependencies:
-            # TODO is this correct like this? Additionally it should be checked that the step order is correct.
+            # TODO is this correct like this?
+            #  Additionally it should be checked that the step order is correct.
             if dependency_id not in state:
                 missing_steps.append(dependency_id)
         if missing_steps:

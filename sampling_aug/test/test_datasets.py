@@ -131,7 +131,8 @@ def main():
     """
         visual inspection of some images from the TensorDataset
     """
-    # make a grid for each class, image IDs could be useful as well, to compare to the unscaled/quantized version
+    # make a grid for each class, image IDs could be useful as well,
+    # to compare to the unscaled/quantized version
     dataset = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
     _data, _labels = dataset.tensors
     # TODO visual inspection

@@ -4,7 +4,7 @@ from abc import abstractmethod
 from typing import List
 
 from prototype.config import Config
-from prototype.experiment_step import ExperimentStep, DryRunResult, OK, MissingConfigEntry, EnvironmentMismatch, \
+from prototype.experiment_step import ExperimentStep, OK, MissingConfigEntry, EnvironmentMismatch, \
     MissingDependency
 from prototype.state import State
 from utils.logging import logger

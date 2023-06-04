@@ -26,10 +26,12 @@ class ImageDataset(torchvision.datasets.ImageFolder):
 
 class SamplingAugDataset(TensorDataset):
     """
-        PyTorch TensorDataset with the extension that we're also saving the paths to the original images
+        PyTorch TensorDataset with the extension that we're also saving the paths to the
+        original images.
     """
 
-    def __init__(self, name: str, image_tensor: Tensor, label_tensor: Tensor, img_paths: list, root_dir: Path):
+    def __init__(self, name: str, image_tensor: Tensor, label_tensor: Tensor,
+                 img_paths: list, root_dir: Path):
         """
         Args:
             img_paths (list[Path]): list going from Tensor index to relative path of the given image
@@ -55,14 +57,17 @@ class SamplingAugDataset(TensorDataset):
         return Path.joinpath(self.root_dir, self.img_paths[index])
 
     @classmethod
-    def load_from_file(cls, full_path: Path, root_dir_overwrite: Path = None) -> "SamplingAugDataset":
+    def load_from_file(cls, full_path: Path,
+                       root_dir_overwrite: Path = None) -> "SamplingAugDataset":
         tensors = torch.load(full_path)
 
         tensor_filename = full_path.stem
         meta_path: Path = full_path.parents[0] / f"{tensor_filename}_meta.pkl"
         if not meta_path.is_file():
-            logger.error(f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
-            raise ValueError(f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
+            logger.error(
+                f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
+            raise ValueError(
+                f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
         with open(meta_path, 'rb') as meta_file:
             # for now, the img_paths still are OS dependent, so we sometimes struggle
             name, root_dir_string, img_paths = pickle.load(meta_file)
@@ -75,11 +80,13 @@ class SamplingAugDataset(TensorDataset):
             root_dir = Path(root_dir_string)
             if not root_dir.is_dir():
                 logger.error(
-                    f'CustomTensorDataset load(): Invalid root_dir "{root_dir_string}" found in metafile.'
+                    f'CustomTensorDataset load(): Invalid root_dir "{root_dir_string}"'
+                    f' found in metafile.'
                     f' Please provide `root_dir_overwrite` parameter.')
                 sys.exit(-1)
 
-        return SamplingAugDataset(name, tensors[0], tensors[1], root_dir=root_dir, img_paths=img_paths)
+        return SamplingAugDataset(name, tensors[0], tensors[1], root_dir=root_dir,
+                                  img_paths=img_paths)
 
     def save_to_file(self, path: Path, description: str = "tensors"):
         torch.save(self.tensors, path / f"{self.name}_{description}.pt")
@@ -99,8 +106,8 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
                                    true_labels: dict[str, int] = None) -> SamplingAugDataset:
     """
         ImageFolder dataset is designed for big datasets that don't fit into RAM (think ImageNet).
-        For GC10 we can easily load the whole dataset into RAM transform the ImageDataset into a Tensor-based one
-        for this.
+        For GC10 we can easily load the whole dataset into RAM transform the ImageDataset into a
+        Tensor-based one for this.
     """
     logger.info('loading images into CustomTensorDataset..')
     # label_tensors = torch.tensor(image_dataset.targets, dtype=torch.int)
@@ -139,7 +146,8 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
     # filter duplicates
     unique_indices = list(set(range(len(image_dataset))) - set(remove_these_idx))
     image_tensors = torch.stack([image_dataset[i][0] for i in tqdm(unique_indices)])
-    label_tensors = torch.tensor([image_dataset.targets[i] for i in tqdm(unique_indices)], dtype=torch.int)
+    label_tensors = torch.tensor([image_dataset.targets[i] for i in tqdm(unique_indices)],
+                                 dtype=torch.int)
 
     # convert image_tensors to uint8 since that's the format needed for training on StyleGAN
     image_data: np.ndarray = image_tensors.numpy()
@@ -151,7 +159,8 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
     image_data *= 255  # Now scale by 255
     image_data = image_data.astype(np.uint8)
     image_tensors = torch.from_numpy(image_data)
-    tensor_dataset = SamplingAugDataset(name, image_tensors, label_tensors, img_paths=img_paths, root_dir=root_dir)
+    tensor_dataset = SamplingAugDataset(name, image_tensors, label_tensors, img_paths=img_paths,
+                                        root_dir=root_dir)
     return tensor_dataset
 
 
@@ -162,11 +171,13 @@ def main():
         Load GC10 dataset, do label sanitization, do image preprocessing, do train/test/val split.
     """
     preprocessing = Compose([
-        Resize((256, 256), interpolation=torchvision.transforms.InterpolationMode.BICUBIC, antialias=True),
+        Resize((256, 256), interpolation=torchvision.transforms.InterpolationMode.BICUBIC,
+               antialias=True),
         ToTensor(),
         Grayscale(num_output_channels=3),
         # These normalization factors might be used to bring GC10
-        # to the same distribution as ImageNet since we're using a DenseNet classifier that was pretrained on ImageNet.
+        # to the same distribution as ImageNet since we're using a
+        # DenseNet classifier that was pretrained on ImageNet.
         # Optimally, the Generator should generate images with this distribution as well.
         # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
@@ -180,7 +191,8 @@ def main():
         dataset_dir = Path(project_path('data/interim/', create=True))
         tensor_dataset.save_to_file(dataset_dir)
     else:
-        tensor_dataset = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_tensors.pt')))
+        tensor_dataset = SamplingAugDataset.load_from_file(
+            Path(project_path('data/interim/gc10_tensors.pt')))
 
     train_data, val_data, test_data = create_train_val_test_sets(tensor_dataset, random_seed=15)
     del tensor_dataset
@@ -191,11 +203,13 @@ def main():
 
 def test_duplicate_ids():
     preprocessing = Compose([
-        Resize((256, 256), interpolation=torchvision.transforms.InterpolationMode.BICUBIC, antialias=True),
+        Resize((256, 256), interpolation=torchvision.transforms.InterpolationMode.BICUBIC,
+               antialias=True),
         ToTensor(),
         Grayscale(num_output_channels=3),
         # These normalization factors might be used to bring GC10
-        # to the same distribution as ImageNet since we're using a DenseNet classifier that was pretrained on ImageNet.
+        # to the same distribution as ImageNet since we're using a
+        # DenseNet classifier that was pretrained on ImageNet.
         # Optimally, the Generator should generate images with this distribution as well.
         # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])

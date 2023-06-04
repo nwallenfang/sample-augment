@@ -20,7 +20,8 @@ def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_e
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # this DataParallel approach doesn't work on windows. If we want to accelerate with 2 GPUS, we need to use DDP:
+    # this DataParallel approach doesn't work on windows. If we want to accelerate with 2 GPUS,
+    # we need to use DDP:
     # https://cloudblogs.microsoft.com/opensource/2021/08/04/introducing-distributed-data-parallel-support-on-pytorch-windows/
     # if torch.cuda.device_count() > 1:
     #   print("Let's use", torch.cuda.device_count(), "GPUs!")

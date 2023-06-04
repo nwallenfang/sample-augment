@@ -9,7 +9,8 @@ def main():
     """
     generated_dir = project_path('data/generated', create=True)
     gen.generate_images(out_dir=generated_dir, seeds=[i for i in range(3)], class_idx=1,
-                        network_pkl="https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/cifar10.pkl")
+                        network_pkl=
+                        "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/cifar10.pkl")
 
 
 if __name__ == '__main__':

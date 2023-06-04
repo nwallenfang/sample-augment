@@ -7,7 +7,9 @@ class DenseNet201(LightningModule):
     def __init__(self, num_classes=10, lr=1e-3):
         super().__init__()  # use the model pretrained on imagenet
         self.lr = lr
-        self.model = torch.hub.load('pytorch/vision:v0.10.0', 'densenet201', weights='IMAGENET1K_V1')
+        self.model = torch.hub.load('pytorch/vision:v0.10.0',
+                                    'densenet201',
+                                    weights='IMAGENET1K_V1')
         self.criterion = nn.CrossEntropyLoss()
 
         # Freeze early layers

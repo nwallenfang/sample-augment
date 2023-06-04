@@ -45,8 +45,9 @@ def main():
     val_data = preprocess(val_data)
     test_data = preprocess(test_data)
 
+    # 1 worker should suffice since the data is in RAM already
     train_loader = DataLoader(train_data, num_workers=1, pin_memory=True,
-                              persistent_workers=True)  # 1 worker should suffice since the data is in RAM already
+                              persistent_workers=True)
     val_loader = DataLoader(val_data, num_workers=1, pin_memory=True, persistent_workers=True)
     test_loader = DataLoader(test_data, num_workers=1, pin_memory=True, persistent_workers=True)
     model = DenseNet201()

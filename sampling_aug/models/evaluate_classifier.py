@@ -50,7 +50,8 @@ class ConfusionMatrixMetric(Metric):
         predicted_labels = torch.argmax(predictions, dim=1).cpu().numpy()
         targets = labels.cpu().numpy()
 
-        self.display = ConfusionMatrixDisplay.from_predictions(targets, predicted_labels, display_labels=self.labels)
+        self.display = ConfusionMatrixDisplay.from_predictions(targets, predicted_labels,
+                                                               display_labels=self.labels)
         return self
 
     @staticmethod
@@ -111,17 +112,19 @@ def load_densenet(checkpoint_path: str, num_classes: int, device):
 
 def main():
     # should read number of classes from the model, since it might change
-    # But it doesn't seem like there is a canonical way of getting that. Maybe just by passing in an input
+    # But it doesn't seem like there is a canonical way of getting that.
+    # Maybe just by passing in an input
     num_classes = 10
     batch_size = 64
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # we need: train set, validation set, test set, model
     # image preprocessing
-    # important: assert that the validation and test sets are identical to the split that was done when training
-    # the classifier. Should add some kind of sanity check to ensure this
+    # important: assert that the validation and test sets are identical to the split that was
+    # done when training the classifier. Should add some kind of sanity check to ensure this
     # first steps, see available metrics in torch and calculate total and class-wise accuracy
     # train_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_train.pt')))
-    test_dataset = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_test.pt')))
+    test_dataset = SamplingAugDataset.load_from_file(
+        Path(project_path('data/interim/gc10_test.pt')))
     # val_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_val.pt')))
     test_data = preprocess(test_dataset)
     # val_data = preprocess(val_data)
@@ -129,18 +132,23 @@ def main():
     if device == 'cuda:0':
         # if we get the Lightning classifier working instead of the old method,
         # we will need to implement the forward method
-        classifier = load_densenet(project_path('models/checkpoints/densenet201/epoch-18-val-0.111.pt'), num_classes,
-                                   device)
+        classifier = load_densenet(
+            project_path('models/checkpoints/densenet201/epoch-18-val-0.111.pt'),
+            num_classes,
+            device)
     else:  # load to CPU instead
         print("Warning: Using Lightning checkpoint. Doesn't work atm.")
-        classifier = DenseNet201.load_from_checkpoint(project_path('models/checkpoints/first_lightning_training.ckpt'),
-                                                      map_location=torch.device('cpu'))
+        classifier = DenseNet201.load_from_checkpoint(
+            project_path('models/checkpoints/first_lightning_training.ckpt'),
+            map_location=torch.device('cpu'))
 
-    # metric has the option 'average' with values micro, macro, and weighted. Might be worth looking at.
+    # metric has the option 'average' with values micro, macro, and weighted.
+    # Might be worth looking at.
     metric = torchmetrics.classification.MulticlassAccuracy(num_classes=num_classes)
     predictions = torch.empty((test_data.tensors[0].size()[0], num_classes), dtype=torch.float32)
 
-    for i, batch in enumerate(tqdm((DataLoader(TensorDataset(test_data.tensors[0]), batch_size=batch_size)))):
+    for i, batch in enumerate(tqdm((DataLoader(TensorDataset(test_data.tensors[0]),
+                                               batch_size=batch_size)))):
         batch = batch.to(device)
         with torch.no_grad():
             predictions[i * batch_size:(i + 1) * batch_size] = classifier(batch)
@@ -154,7 +162,8 @@ def main():
     # start, n = 20, 1
 
     # look at some random predictions
-    # for image, label in zip(test_data.tensors[0][start:start + n + 1], test_data.tensors[1][start:start + n + 1]):
+    # for image, label in zip(test_data.tensors[0][start:start + n + 1],
+    #                         test_data.tensors[1][start:start + n + 1]):
     #     prediction = classifier(image.unsqueeze(0))
     #     show_image_with_label_and_prediction(image, label, prediction)
 
@@ -189,7 +198,7 @@ def run_metrics_on_predictions_file():
     predictions = torch.load(project_path('data/ds_data/predictions_densenet.pt'))
     assert len(predictions) == len(test_data)
 
-    imgs, labels = test_data.tensors[0], test_data.tensors[1]
+    _imgs, labels = test_data.tensors[0], test_data.tensors[1]
     # ConfusionMatrixMetric().calculate(predictions, labels).show()
 
     # retrieve secondary labels for test instances
@@ -207,18 +216,21 @@ def run_metrics_on_predictions_file():
     #     plt.imshow(test_img)
     #     plt.title(f'{test_img_id} - {test_img_path}')
     #     plt.figtext(0.5, 0.05, f'true: {classes[labels[i]]}, secondary: {secondary} '
-    #                            f'- predicted: {classes[torch.argmax(predictions[i])]}', ha='center', fontsize=9)
+    #                            f'- predicted: {classes[torch.argmax(predictions[i])]}',
+    #                            ha='center', fontsize=9)
     #     plt.show()
 
     # count number of misclassifications
     # calc ratio of predicted labels that are part of secondary labels
-    misclassification_idx = [i for i in range(len(predictions)) if torch.argmax(predictions[i]) != labels[i]]
+    misclassification_idx = [i for i in range(len(predictions)) if
+                             torch.argmax(predictions[i]) != labels[i]]
 
     print(f'test size: {len(predictions)}')
     print(f'number of misses: {len(misclassification_idx)}')
     number_of_secondary_hits = 0
 
-    # let's be lenient towards the model and change all misses with secondary hits to their secondary labels
+    # let's be lenient towards the model and change all misses
+    # with secondary hits to their secondary labels
     for idx in misclassification_idx:
         predicted_label = torch.argmax(predictions[idx])
         true_label = labels[idx]
