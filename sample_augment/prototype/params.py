@@ -2,12 +2,12 @@ import hashlib
 from pathlib import Path
 from typing import Dict, List, ClassVar, Type
 
-from pydantic import BaseSettings, Extra, DirectoryPath, validator, BaseModel, ValidationError
+from pydantic import BaseSettings, Extra, DirectoryPath, validator, BaseModel
 
 from prototype.step_id import StepID
 
 
-class ConfigBundle(BaseSettings, extra=Extra.allow):
+class ParamBundle(BaseSettings, extra=Extra.allow):
     pass
 
 
@@ -24,7 +24,7 @@ class ConfigBundle(BaseSettings, extra=Extra.allow):
 all_step_ids = []
 
 
-class Config(BaseModel, extra=Extra.ignore):
+class Params(BaseModel, extra=Extra.ignore):
     # Experiment-wide parameters
     name: str
     random_seed: int = 42
@@ -39,7 +39,7 @@ class Config(BaseModel, extra=Extra.ignore):
     all_step_ids: ClassVar[StepID]
     step_classes: ClassVar[Dict[StepID, Type]]
 
-    bundles = dict[str, ConfigBundle]
+    bundles = dict[str, ParamBundle]
 
     def get_hash(self):
         json_bytes = self.json(sort_keys=True).encode('utf-8')
@@ -56,7 +56,7 @@ class Config(BaseModel, extra=Extra.ignore):
     @staticmethod
     def create_config_bundles(cls, values):
         # This dict maps class names to their actual class objects.
-        class_name_to_class = {cls.__name__: cls for cls in ConfigBundle.__subclasses__()}
+        class_name_to_class = {cls.__name__: cls for cls in ParamBundle.__subclasses__()}
 
         if 'bundles' in values:
             new_bundles = []
@@ -67,5 +67,8 @@ class Config(BaseModel, extra=Extra.ignore):
                     raise ValueError(f'Unknown bundle type {bundle_name}')
             values['bundles'] = new_bundles
         return values
+
+    def __str__(self):
+        return super.__str__(self)
 
 # TODO add support for "subtasks", where they are given a new name and associated options

@@ -14,7 +14,7 @@ import json
 import numpy as np
 from matplotlib import pyplot as plt
 
-from sampling_aug.utils.paths import project_path
+from sample_augment.utils.paths import project_path
 
 
 def main():

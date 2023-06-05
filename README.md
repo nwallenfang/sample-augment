@@ -23,7 +23,7 @@ Enter this directory and call `pip install -e .`.
 Pytorch installation instructions: TODO
 
 ## Project Organization
-The main Python package is located in [sampling_aug/](sampling_aug). All datasets that are generated in `sampling_aug` get saved under [data/](data).
+The main Python package is located in [sampling_aug/](sample_augment). All datasets that are generated in `sampling_aug` get saved under [data/](data).
 Classifier checkpoints do get saved in [models/](models), though StyleGAN checkpoints might get saved somewhere else depending on their specific output directory.
 
 

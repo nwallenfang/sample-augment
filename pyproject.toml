@@ -9,36 +9,33 @@ readme = "README.md"
 authors = [
   { name = "Nils Wallenfang" },
 ]
-license = "MIT"
-packages = [
-    { include = "sampling_aug" },
-    { include = "sampling_aug.*" },
-    { include = "dnnlib" },
+license = {text = "MIT License"}
+
+requires-python = ">=3.7"
+
+dependencies = [
+    "kaggle",
+    "click",
+    "python-dotenv>=0.5.1",
+    "xmltodict",
+    "matplotlib",
+    "numpy",
+    "torch",  # needs to be installed with conda! see env.yml files
+    "torchvision",
+    "torchmetrics",
+    "tqdm",
+    "pillow",
+    "scikit-learn",
+    "lightning",
+    "psutil",
+    "scipy",
+    "pydantic",
 ]
-package-dir = { "dnnlib" = "sampling_aug/models/generator/stylegan2" }
-dynamic = ["classifiers"]
 
-[project.dependencies]
-kaggle = "*"
-click = "*"
-python-dotenv = ">=0.5.1"
-xmltodict = "*"
-matplotlib = "*"
-numpy = "*"
-torch = "*"  # needs to be installed with conda! see env.yml files
-torchvision = "*"
-torchmetrics = "*"
-tqdm = "*"
-pillow = "*"
-scikit-learn = "*"
-lightning = "*"
-psutil = "*"
-scipy = "*"
-pydantic = "*"
-
-# You can specify python requirements as well
-[project.requires-python]
-python = "^3.7"
 
 [project.scripts]
 sample-augment = "sample_augment.main:main"
+
+[tool.setuptools]
+packages = {find = {include = ["sampling_aug*", "dnnlib"]}}
+package-dir = { "dnnlib" = "sampling_aug/models/generator/stylegan2" }

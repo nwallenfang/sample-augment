@@ -8,7 +8,7 @@ from torch.utils.data import Subset
 from torchvision.datasets import ImageFolder
 
 from data.dataset import SamplingAugDataset
-from utils.logging import logger
+from utils.log import log
 
 
 class CustomSubset(SamplingAugDataset):
@@ -59,8 +59,8 @@ def stratified_split(dataset: ImageFolder | SamplingAugDataset,
         # which all have the label of the needed class
         class_indices = np.argwhere(labels[train_indices] == class_no).flatten()
         if len(class_indices) < number_of_instances:
-            logger.error(f'stratified split: Not enough instances of class with label {class_no} to fulfill '
-                         f'min_instances={min_instances_per_class}')
+            log.error(f'stratified split: Not enough instances of class with label {class_no} to fulfill '
+                      f'min_instances={min_instances_per_class}')
             continue
         # choose the indices that will be moved from train to test randomly
         indices_to_move = np.random.choice(class_indices, number_of_instances, replace=False)

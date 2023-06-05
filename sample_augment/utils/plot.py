@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from sampling_aug.utils.paths import project_path
+from sample_augment.utils.paths import project_path
 
 
 def show_image(img: np.ndarray, title: str, text: str, save_path: str = None):

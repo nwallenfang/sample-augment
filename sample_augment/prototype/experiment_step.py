@@ -5,7 +5,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 
-from prototype.state import State
+from prototype.state import State, ProducedState, ConsumedState
 
 import importlib
 
@@ -99,5 +99,5 @@ class ExperimentStep:
 
     @classmethod
     @abstractmethod
-    def run(cls, state: State):
+    def run(cls, state: ConsumedState) -> ProducedState:
         pass

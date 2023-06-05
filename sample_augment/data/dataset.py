@@ -11,7 +11,7 @@ from torch.utils.data import TensorDataset
 from torchvision.transforms import Resize, Compose, Grayscale, ToTensor
 from tqdm import tqdm
 
-from utils.logging import logger
+from utils.log import log
 from utils.paths import project_path
 
 
@@ -64,7 +64,7 @@ class SamplingAugDataset(TensorDataset):
         tensor_filename = full_path.stem
         meta_path: Path = full_path.parents[0] / f"{tensor_filename}_meta.pkl"
         if not meta_path.is_file():
-            logger.error(
+            log.error(
                 f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
             raise ValueError(
                 f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
@@ -79,7 +79,7 @@ class SamplingAugDataset(TensorDataset):
         else:
             root_dir = Path(root_dir_string)
             if not root_dir.is_dir():
-                logger.error(
+                log.error(
                     f'CustomTensorDataset load(): Invalid root_dir "{root_dir_string}"'
                     f' found in metafile.'
                     f' Please provide `root_dir_overwrite` parameter.')
@@ -109,12 +109,12 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
         For GC10 we can easily load the whole dataset into RAM transform the ImageDataset into a
         Tensor-based one for this.
     """
-    logger.info('loading images into CustomTensorDataset..')
+    log.info('loading images into CustomTensorDataset..')
     # label_tensors = torch.tensor(image_dataset.targets, dtype=torch.int)
     # image_tensors = torch.stack([image_dataset[i][0] for i in tqdm(range(len(image_dataset)))])
 
     # save a dictionary pointing from the tensor indices to the image IDs / paths for traceability
-    logger.info('reading image paths (metadata)..')
+    log.info('reading image paths (metadata)..')
     root_dir = Path(image_dataset.root)
     img_paths = []
 
@@ -141,7 +141,7 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
         img_paths.append(path_obj.relative_to(root_dir))
 
     if removed_duplicates > 0:
-        logger.warning(f'Removed {removed_duplicates} duplicates from the dataset.')
+        log.warning(f'Removed {removed_duplicates} duplicates from the dataset.')
 
     # filter duplicates
     unique_indices = list(set(range(len(image_dataset))) - set(remove_these_idx))

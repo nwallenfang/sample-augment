@@ -2,14 +2,14 @@ import abc
 from abc import abstractmethod
 from pathlib import Path
 
-from prototype.config import Config
+from prototype.params import Params
 from prototype.state import State
 from utils.paths import project_path
 
 
 class StateStore(abc.ABC):
     @abstractmethod
-    def load_from_config(self, config: Config) -> State:
+    def load_from_config(self, config: Params) -> State:
         # we'll have to see, maybe we'll only need the config_id (hash)
         pass
 
@@ -27,7 +27,7 @@ class DiskStateStore(StateStore):
     def save(self, state: State):
         raise NotImplementedError()
 
-    def load_from_config(self, config: Config) -> State:
+    def load_from_config(self, config: Params) -> State:
         # for now, always return an empty state
         # TODO
         return State(config=config)

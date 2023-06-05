@@ -10,9 +10,9 @@ from typing import Dict, List
 import xmltodict
 import matplotlib
 
-from sampling_aug.data.gc10.download import load_gc10_if_missing
-from sampling_aug.utils.paths import project_path
-from sampling_aug.utils.plot import show_image
+from sample_augment.data.gc10.download import load_gc10_if_missing
+from sample_augment.utils.paths import project_path
+from sample_augment.utils.plot import show_image
 
 # from data/gc10/Defect Descriptions.xlsx, which also contains some example images
 LABEL_TO_NAME = {

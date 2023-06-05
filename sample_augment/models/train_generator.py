@@ -6,8 +6,8 @@ import tempfile
 import torch
 # import sys
 
-# sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sampling_aug\\')
-# sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sampling_aug\\models\\stylegan2\\')
+# sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\')
+# sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\models\\stylegan2\\')
 
 import models.stylegan2.dnnlib as dnnlib
 from models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn

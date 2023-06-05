@@ -1,5 +1,6 @@
 from __future__ import annotations
-from pydantic import BaseModel, validator
+
+from pydantic import BaseModel
 
 
 class StepID(BaseModel):

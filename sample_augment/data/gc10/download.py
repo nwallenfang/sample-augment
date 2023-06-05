@@ -1,7 +1,7 @@
 import os.path
 import logging
 
-from sampling_aug.utils.paths import project_path
+from sample_augment.utils.paths import project_path
 
 logging.getLogger().setLevel(logging.INFO)
 
