@@ -1,24 +1,15 @@
 from __future__ import \
     annotations  # TODO will this work in Python 3.7? (or rather: does this have to work in 3.7?)
 
-from dataclasses import dataclass
 from abc import abstractmethod
+from dataclasses import dataclass
 from typing import List, Optional
 
-from prototype.experiment import StateStore
 from prototype.state import State
 
+import importlib
 
-class StepID:
-    """unique identifier for each Step"""
-    id: str
-
-    def __init__(self, _id):
-        self.id = _id
-        # TODO validate that id is in possible StepIDs
-
-    def __eq__(self, other):
-        return self.id == other.id
+from prototype.step_id import StepID
 
 
 # define some rust-like result types, fun :)
@@ -54,7 +45,7 @@ class ExperimentStep:
         or Model training.
         TODO: how to support pipelines where one ExperimentStep is run multiple times?
     """
-    id: StepID = StepID("abstract-step")
+    all_step_ids: List[str] = []
     step_dependencies: List[StepID] = []
     required_configs = []
 
@@ -62,15 +53,13 @@ class ExperimentStep:
         self.state_dependency = state_dependency
         self.env_dependency = env_dependency
 
-    def run(self, state: State):
-        # Run the step's operation
-        pass
-
     @staticmethod
-    @abstractmethod
-    def load_from(self, store: StateStore):
-        # Load state from the store
-        pass
+    def _check_package(package_name: str) -> Optional[str]:
+        try:
+            importlib.import_module(package_name)
+            return None
+        except ImportError:
+            return f"Package {package_name} is missing in environment."
 
     @staticmethod
     @abstractmethod
@@ -107,3 +96,8 @@ class ExperimentStep:
         #   else there is no reason to return the state
         #   maybe change the step_state attribute?
         return OK(state)
+
+    @classmethod
+    @abstractmethod
+    def run(cls, state: State):
+        pass
