@@ -1,7 +1,8 @@
-Thesis Nils
+sample-augment
 ==============================
 
-Thesis Project on Sampling Strategies for Synthetic Data Augmentation.
+Master's Thesis Project exploring Sampling Strategies for Synthetic Data Augmentation based on Generative 
+Models.
 
 ## Installation
 First, initialize an Anaconda environment. You can use one of the `environment.yml` files to replicate a working environment.

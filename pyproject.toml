@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "sample-augment"
+version = "0.1.2"
+description = "Thesis Project on Sampling Strategies for Synthetic Data Augmentation."
+readme = "README.md"
+authors = [
+  { name = "Nils Wallenfang" },
+]
+license = "MIT"
+packages = [
+    { include = "sampling_aug" },
+    { include = "sampling_aug.*" },
+    { include = "dnnlib" },
+]
+package-dir = { "dnnlib" = "sampling_aug/models/generator/stylegan2" }
+dynamic = ["classifiers"]
+
+[project.dependencies]
+kaggle = "*"
+click = "*"
+python-dotenv = ">=0.5.1"
+xmltodict = "*"
+matplotlib = "*"
+numpy = "*"
+torch = "*"  # needs to be installed with conda! see env.yml files
+torchvision = "*"
+torchmetrics = "*"
+tqdm = "*"
+pillow = "*"
+scikit-learn = "*"
+lightning = "*"
+psutil = "*"
+scipy = "*"
+pydantic = "*"
+
+# You can specify python requirements as well
+[project.requires-python]
+python = "^3.7"
+
+[project.scripts]
+sample-augment = "sample_augment.main:main"
