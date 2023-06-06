@@ -2,6 +2,8 @@
     Perform a stratified train test split (balance classes).
 
 """
+from typing import Union
+
 import numpy as np
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Subset
@@ -20,7 +22,7 @@ class CustomSubset(SamplingAugDataset):
         super().__init__(dataset.name, tensors_data, tensors_labels, img_paths, dataset.root_dir)
 
 
-def stratified_split(dataset: ImageFolder | SamplingAugDataset,
+def stratified_split(dataset: Union[ImageFolder, SamplingAugDataset],
                      train_ratio: float = 0.8,
                      random_seed: int = 42,
                      min_instances_per_class: int = 10):

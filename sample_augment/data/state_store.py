@@ -2,8 +2,8 @@ import abc
 from abc import abstractmethod
 from pathlib import Path
 
-from sample_augment.prototype.params import Params
-from sample_augment.prototype.state import State
+from sample_augment.params import Params
+from sample_augment.data.state import State
 from sample_augment.utils.paths import project_path
 
 
@@ -30,4 +30,4 @@ class DiskStateStore(StateStore):
     def load_from_config(self, config: Params) -> State:
         # for now, always return an empty state
         # TODO
-        return State(config=config)
+        return State()

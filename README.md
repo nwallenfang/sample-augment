@@ -24,12 +24,8 @@ Pytorch installation instructions: TODO
 
 ## Project Organization
 The main Python package is located in [sampling_aug/](sample_augment). All datasets that are generated in `sampling_aug` get saved under [data/](data).
-Classifier checkpoints do get saved in [models/](models), though StyleGAN checkpoints might get saved somewhere else depending on their specific output directory.
+Classifier checkpoints do get saved in [models/](data/models), though StyleGAN checkpoints might get saved somewhere else depending on their specific output directory.
 
 
 ## License
 This repository contains a fork of [StyleGAN2-ADA](https://github.com/NVlabs/stylegan2-ada-pytorch), which is released under a license for non-commercial use.
-
---------
-
-<p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>

@@ -27,5 +27,5 @@ class State(BaseModel):
         # TODO
         pass
 
-    def check_if_contains(self, input: InputState):
-       pass
+    def check_if_contains(self, input_state: InputState):
+        pass

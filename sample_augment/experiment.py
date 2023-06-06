@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import List
 
-from sample_augment.prototype.params import Params
-from sample_augment.prototype.step import Step, OK, MissingParameter, EnvironmentMismatch, \
+from sample_augment.params import Params
+from sample_augment.steps.step import Step, OK, MissingParameter, EnvironmentMismatch, \
     MissingDependency, DryRunResult
-from sample_augment.prototype.state import State, InputState
-from sample_augment.prototype.state_store import StateStore, DiskStateStore
+from sample_augment.data.state import State, InputState
+from sample_augment.data.state_store import StateStore, DiskStateStore
 from sample_augment.utils.log import log
 
 

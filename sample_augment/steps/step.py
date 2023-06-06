@@ -1,16 +1,16 @@
 from __future__ import \
     annotations  # TODO will this work in Python 3.7? (or rather: does this have to work in 3.7?)
 
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from typing import List, Optional
 
-from sample_augment.prototype.params import Params
-from sample_augment.prototype.state import State, OutputState, InputState
+from sample_augment.params import Params
+from sample_augment.data.state import State, OutputState, InputState
 
 import importlib
 
-from sample_augment.prototype.step_id import StepID
+from sample_augment.steps.step_id import StepID
 
 
 # define some rust-like result types, fun :)
@@ -39,13 +39,15 @@ class MissingParameter(DryRunResult):
     missing_parameters: List[str]
 
 
-class Step:
+class Step(ABC):
     """
         Class representing a single step in the experiment pipeline.
         This could for example be a step like like Data Normalization, Visualization,
         or Model training.
         TODO: how to support pipelines where one ExperimentStep is run multiple times?
     """
+    # TODO read required parameters automatically from run method signature
+    #  determine step dependencies automatically from this
     step_dependencies: List[StepID] = []
     required_parameters = []
 

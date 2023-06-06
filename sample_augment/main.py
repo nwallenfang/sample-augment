@@ -8,14 +8,14 @@ from pathlib import Path
 import click
 from pydantic import ValidationError
 
-from sample_augment.prototype.experiment import Experiment
-from sample_augment.prototype.params import Params
-from sample_augment.prototype.step_id import StepID
+from sample_augment.experiment import Experiment
+from sample_augment.params import Params
+from sample_augment.steps.step_id import StepID
 from sample_augment.utils.log import log
 
 
 def init():
-    from sample_augment.prototype.step import Step
+    from sample_augment.steps.step import Step
 
     # Load all modules in the "steps" package to have ExperimentStep.__subclasses__ return them all
     # needed for StepID validation (step names provided with the config.json for example)
@@ -38,10 +38,10 @@ def main():
     """
     init()
 
-    # I could see there some arg parsing going on before constructing a full Config isntance.
+    # I could see there some arg parsing going on before constructing a full Config instance.
     # so in the future it won't be like it is now with a whole json file always being parsed
 
-    config_path = Path('config.json')
+    config_path = Path('../config.json')
 
     # config_preprocessing
     try:

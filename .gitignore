@@ -91,9 +91,6 @@ target/
 # raw and processed data (results should be saved somewhere else)
 data/*/*
 
-# models are too large
-/models/
-    
 lightning_logs/
 
 .pytest_cache
