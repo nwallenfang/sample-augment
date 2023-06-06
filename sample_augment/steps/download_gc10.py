@@ -9,8 +9,14 @@ from sample_augment.utils.log import log
 class DownloadGC10(Step):
     required_parameters = []  # ?
 
+    class MyInputState(InputState):
+        pass
+
+    # this nee
+    CustomInputState = MyInputState
+
     @classmethod
-    def run(cls, state: InputState, params: Params):
+    def run(cls, state: CustomInputState, params: Params):
         import kaggle
 
         log.info("Downloading GC10 dataset from kaggle..")
