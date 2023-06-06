@@ -17,7 +17,7 @@ def train_stylegan():
     out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
 
     config_kwargs = {
-        'data': r"H:\thesis\sampling_aug\data\interim\gc10_train.pt",
+        'data_package': r"H:\thesis\sampling_aug\data\interim\gc10_train.pt",
         # 'custom_name' 'gc10_pre_FFHQ'
         'gpus': 2,
         'snap': None,
@@ -44,7 +44,7 @@ def train_stylegan():
         'nhwc': None,
         'nobench': None,
         'allow_tf32': None,
-        'workers': 1  # could try setting number of workers to 1, since the data is fully in RAM
+        'workers': 1  # could try setting number of workers to 1, since the data_package is fully in RAM
     }
     dry_run = False
 
@@ -74,7 +74,7 @@ def train_stylegan():
     print(json.dumps(args, indent=2))
     print()
     print(f'Output directory:   {args.run_dir}')
-    # print(f'Training data:      {args.training_set_kwargs.path}')
+    # print(f'Training data_package:      {args.training_set_kwargs.path}')
     print(f'Training duration:  {args.total_kimg} kimg')
     print(f'Number of GPUs:     {args.num_gpus}')
     print(f'Number of images:   {args.training_set_kwargs.max_size}')

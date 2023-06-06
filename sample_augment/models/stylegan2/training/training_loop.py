@@ -60,7 +60,7 @@ def setup_snapshot_image_grid(training_set, random_seed=0):
             grid_indices += [indices[x % len(indices)] for x in range(gw)]
             label_groups[label] = [indices[(i + gw) % len(indices)] for i in range(len(indices))]
 
-    # Load data.
+    # Load data_package.
     images, labels = zip(*[training_set[i] for i in grid_indices])
     return (gw, gh), np.stack(images), np.stack(labels)
 
@@ -91,7 +91,7 @@ def save_image_grid(img, fname, drange, grid_size):
 def training_loop(
         run_dir='.',  # Output directory.
         training_set_kwargs={},  # Options for training set.
-        data_loader_kwargs={},  # Options for torch.utils.data.DataLoader.
+        data_loader_kwargs={},  # Options for torch.utils.data_package.DataLoader.
         G_kwargs={},  # Options for generator network.
         D_kwargs={},  # Options for discriminator network.
         G_opt_kwargs={},  # Options for generator optimizer.
@@ -271,7 +271,7 @@ def training_loop(
         progress_fn(0, total_kimg)
     while True:
 
-        # Fetch training data.
+        # Fetch training data_package.
         with torch.autograd.profiler.record_function('data_fetch'):
             phase_real_img, phase_real_c = next(training_set_iterator)
             phase_real_img = (phase_real_img.to(device).to(torch.float32) / 127.5 - 1).split(batch_gpu)

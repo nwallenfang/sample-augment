@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Subset
 from torchvision.datasets import ImageFolder
 
-from data.dataset import SamplingAugDataset
+from data_package.dataset import SamplingAugDataset
 from utils.log import log
 
 
@@ -86,7 +86,7 @@ def stratified_split(dataset: ImageFolder | SamplingAugDataset,
 
 def create_train_val_test_sets(dataset: SamplingAugDataset, random_seed=15):
     """
-        Expects data/interim/gc10_tensors.pt to exist.
+        Expects data_package/interim/gc10_tensors.pt to exist.
         Create gc10_train.pt, gc10_val.pt, gc10_test.pt from successive stratified splits.
     """
     train_val_data, test_data = stratified_split(dataset, train_ratio=0.8, random_seed=random_seed)

@@ -1,5 +1,5 @@
 """
-GC10 exploratory data analysis (EDA)
+GC10 exploratory data_package analysis (EDA)
 
 Things I'd like to look at:
 - avg intensity per class
@@ -18,7 +18,7 @@ from sample_augment.utils.paths import project_path
 
 
 def main():
-    with open(project_path('data/interim/labels.json')) as label_file:
+    with open(project_path('data_package/interim/labels.json')) as label_file:
         labels = json.load(label_file)
 
     # how many instances with secondary labels?
@@ -61,7 +61,7 @@ def main():
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
              rotation_mode="anchor")
 
-    # Loop over data dimensions and create text annotations.
+    # Loop over data_package dimensions and create text annotations.
     for i in range(len(classes)):
         for j in range(len(classes)):
             ax.text(j, i, int(label_matrix.T[i, j]),

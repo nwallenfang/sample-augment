@@ -7,7 +7,7 @@ from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch import nn  # All neural network modules
 from torch.utils.data import DataLoader  # Gives easier dataset management
 
-from data.dataset import SamplingAugDataset
+from data_package.dataset import SamplingAugDataset
 from models.deprecated.train_classifier import preprocess
 from utils.paths import project_path
 
@@ -51,7 +51,7 @@ def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_e
         val_accuracy = -1
 
         for batch_idx, (image, label) in enumerate(tqdm(train_loader)):
-            # Get data to cuda if possible
+            # Get data_package to cuda if possible
             image = image.to(device=device)
             label = label.to(device=device)
 
@@ -76,7 +76,7 @@ def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_e
 
         model.eval()
         for batch_idx, (image, label) in enumerate(tqdm(test_loader)):
-            # Get data to cuda if possible
+            # Get data_package to cuda if possible
             image = image.to(device=device)
             label = label.to(device=device)
 
@@ -130,8 +130,8 @@ def main():
         nn.Linear(30, num_classes))
     model.to(device)
 
-    train_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
-    val_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
+    train_data = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_train.pt')))
+    val_data = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_val.pt')))
 
     train_data = preprocess(train_data)
     val_data = preprocess(val_data)

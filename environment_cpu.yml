@@ -158,7 +158,7 @@ dependencies:
   - stack_data=0.2.0=pyhd3eb1b0_0
   - tbb=2021.8.0=hdb19cb5_0
   - tensorboard=2.13.0=pyhd8ed1ab_0
-  - tensorboard-data-server=0.7.0=py310h52d8a92_0
+  - tensorboard-data_package-server=0.7.0=py310h52d8a92_0
   - threadpoolctl=2.2.0=pyh0d69192_0
   - tk=8.6.12=h1ccaba5_0
   - toml=0.10.2=pyhd3eb1b0_0

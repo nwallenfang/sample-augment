@@ -6,7 +6,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-"""Facilities for pickling Python code alongside other data.
+"""Facilities for pickling Python code alongside other data_package.
 
 The pickled code is automatically imported into a separate Python module
 during unpickling. This way, any previously exported pickles will remain

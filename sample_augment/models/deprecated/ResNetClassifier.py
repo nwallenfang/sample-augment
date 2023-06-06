@@ -94,7 +94,7 @@ class ResNetClassifier(pl.LightningModule):
         return loss, acc
 
     def _dataloader(self, data_path, shuffle=False):
-        # values here are specific to pneumonia dataset and should be updated for custom data
+        # values here are specific to pneumonia dataset and should be updated for custom data_package
         transform = transforms.Compose(
             [
                 transforms.Resize((500, 500)),
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("num_epochs", help="""Number of Epochs to Run.""", type=int)
     parser.add_argument(
-        "train_set", help="""Path to training data folder.""", type=Path
+        "train_set", help="""Path to training data_package folder.""", type=Path
     )
     parser.add_argument("val_set", help="""Path to validation set folder.""", type=Path)
     # Optional arguments

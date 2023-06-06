@@ -21,7 +21,7 @@ class StateStore(abc.ABC):
 class DiskStateStore(StateStore):
     root_dir: Path
 
-    def __init__(self, root_dir: Path = project_path('data/store')):
+    def __init__(self, root_dir: Path = project_path('data_package/store')):
         self.root_dir = root_dir
 
     def save(self, state: State):

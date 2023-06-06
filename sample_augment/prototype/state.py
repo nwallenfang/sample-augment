@@ -2,9 +2,6 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from prototype.params import Params
-from prototype.step_id import StepID
-
 
 class InputState(BaseModel):
     """

@@ -143,7 +143,7 @@ def open_cifar10(tarball: str, *, max_images: Optional[int]):
             member = tar.getmember(f'cifar-10-batches-py/data_batch_{batch}')
             with tar.extractfile(member) as file:
                 data = pickle.load(file, encoding='latin1')
-            images.append(data['data'].reshape(-1, 3, 32, 32))
+            images.append(data['data_package'].reshape(-1, 3, 32, 32))
             labels.append(data['labels'])
 
     images = np.concatenate(images)

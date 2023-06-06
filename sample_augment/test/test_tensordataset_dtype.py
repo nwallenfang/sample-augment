@@ -3,12 +3,12 @@ from pathlib import Path
 import torch
 from matplotlib import pyplot as plt
 
-from data.dataset import SamplingAugDataset
+from data_package.dataset import SamplingAugDataset
 from utils.paths import project_path
 
 
 def test_tensor_dataset():
-    dataset = torch.load(project_path('data/interim/gc10_tensors.pt'))
+    dataset = torch.load(project_path('data_package/interim/gc10_tensors.pt'))
     img = dataset.tensors[0][0].permute(1, 2, 0)
     print(img)
     plt.imshow(img)
@@ -16,7 +16,7 @@ def test_tensor_dataset():
 
 
 def test_custom_tensor_dataset():
-    path = Path(project_path('data/interim/'))
+    path = Path(project_path('data_package/interim/'))
     dataset: SamplingAugDataset = SamplingAugDataset.load_from_file(path)
     print()
     print(f"Full path: {dataset.get_img_path(10)}")

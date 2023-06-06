@@ -115,7 +115,7 @@ def setup_training_loop_kwargs(
     args.random_seed = seed
 
     # -----------------------------------
-    # Dataset: data, cond, subset, mirror
+    # Dataset: data_package, cond, subset, mirror
     # -----------------------------------
     assert data is not None
     assert isinstance(data, str)
@@ -140,7 +140,7 @@ def setup_training_loop_kwargs(
         desc = training_set.name
         del training_set  # conserve memory
     except IOError as err:
-        raise UserError(f'--data: {err}')
+        raise UserError(f'--data_package: {err}')
 
     if cond is None:
         cond = False
@@ -452,7 +452,7 @@ class CommaSeparatedList(click.ParamType):
 @click.option('--seed', help='Random seed [default: 0]', type=int, metavar='INT')
 @click.option('-n', '--dry-run', help='Print training options and exit', is_flag=True)
 # Dataset.
-@click.option('--data', help='Training data (directory or zip)', metavar='PATH', required=True)
+@click.option('--data_package', help='Training data_package (directory or zip)', metavar='PATH', required=True)
 @click.option('--cond', help='Train conditional model based on dataset labels [default: false]', type=bool,
               metavar='BOOL')
 @click.option('--subset', help='Train with only N images [default: all]', type=int, metavar='INT')
@@ -486,21 +486,21 @@ def main(ctx, outdir, dry_run, **config_kwargs):
 
     \b
     # Train with custom dataset using 1 GPU.
-    python train_classifier.py --outdir=~/training-runs --data=~/mydataset.zip --gpus=1
+    python train_classifier.py --outdir=~/training-runs --data_package=~/mydataset.zip --gpus=1
 
     \b
     # Train class-conditional CIFAR-10 using 2 GPUs.
-    python train_classifier.py --outdir=~/training-runs --data=~/datasets/cifar10.zip \\
+    python train_classifier.py --outdir=~/training-runs --data_package=~/datasets/cifar10.zip \\
         --gpus=2 --cfg=cifar --cond=1
 
     \b
     # Transfer learn MetFaces from FFHQ using 4 GPUs.
-    python train_classifier.py --outdir=~/training-runs --data=~/datasets/metfaces.zip \\
+    python train_classifier.py --outdir=~/training-runs --data_package=~/datasets/metfaces.zip \\
         --gpus=4 --cfg=paper1024 --mirror=1 --resume=ffhq1024 --snap=10
 
     \b
     # Reproduce original StyleGAN2 config F.
-    python train_classifier.py --outdir=~/training-runs --data=~/datasets/ffhq.zip \\
+    python train_classifier.py --outdir=~/training-runs --data_package=~/datasets/ffhq.zip \\
         --gpus=8 --cfg=stylegan2 --mirror=1 --aug=noaug
 
     \b
@@ -546,7 +546,7 @@ def main(ctx, outdir, dry_run, **config_kwargs):
     print(json.dumps(args, indent=2))
     print()
     print(f'Output directory:   {args.run_dir}')
-    print(f'Training data:      {args.training_set_kwargs.path}')
+    print(f'Training data_package:      {args.training_set_kwargs.path}')
     print(f'Training duration:  {args.total_kimg} kimg')
     print(f'Number of GPUs:     {args.num_gpus}')
     print(f'Number of images:   {args.training_set_kwargs.max_size}')
@@ -583,7 +583,7 @@ def train_stylegan():
     # TODO fix the PATH issues when calling this script from VSCode/shell instead of Pycharm
     # has to do with project_path as well
     config_kwargs = {
-        'data': r"H:\thesis\repos\thesis_nils\data\interim\gc10_train.pt",
+        'data_package': r"H:\thesis\repos\thesis_nils\data\interim\gc10_train.pt",
         # 'custom_name' 'gc10_pre_FFHQ'
         'gpus': 2,
         'snap': None,
@@ -606,7 +606,7 @@ def train_stylegan():
         'nhwc': None,
         'nobench': None,
         'allow_tf32': None,
-        'workers': 1  # could try setting number of workers to 1, since the data is fully in RAM
+        'workers': 1  # could try setting number of workers to 1, since the data_package is fully in RAM
     }
     dry_run = False
 
@@ -635,7 +635,7 @@ def train_stylegan():
     print(json.dumps(args, indent=2))
     print()
     print(f'Output directory:   {args.run_dir}')
-    # print(f'Training data:      {args.training_set_kwargs.path}')
+    # print(f'Training data_package:      {args.training_set_kwargs.path}')
     print(f'Training duration:  {args.total_kimg} kimg')
     print(f'Number of GPUs:     {args.num_gpus}')
     print(f'Number of images:   {args.training_set_kwargs.max_size}')

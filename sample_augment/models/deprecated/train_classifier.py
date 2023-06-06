@@ -2,7 +2,7 @@ import lightning as pl
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from data.dataset import SamplingAugDataset
+from data_package.dataset import SamplingAugDataset
 
 from DenseNetClassifier import DenseNet201
 from utils.paths import project_path
@@ -35,9 +35,9 @@ DEBUG = False
 
 
 def main():
-    train_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
-    val_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
-    test_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_test.pt')))
+    train_data = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_train.pt')))
+    val_data = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_val.pt')))
+    test_data = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_test.pt')))
 
     # train_data is in uint8 format, since that's the expected format for StyleGAN training
     # convert to float format and rescale
@@ -45,7 +45,7 @@ def main():
     val_data = preprocess(val_data)
     test_data = preprocess(test_data)
 
-    # 1 worker should suffice since the data is in RAM already
+    # 1 worker should suffice since the data_package is in RAM already
     train_loader = DataLoader(train_data, num_workers=1, pin_memory=True,
                               persistent_workers=True)
     val_loader = DataLoader(val_data, num_workers=1, pin_memory=True, persistent_workers=True)

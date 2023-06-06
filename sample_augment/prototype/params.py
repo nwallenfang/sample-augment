@@ -2,26 +2,13 @@ import hashlib
 from pathlib import Path
 from typing import Dict, List, ClassVar, Type
 
-from pydantic import BaseSettings, Extra, DirectoryPath, validator, BaseModel
+from pydantic import BaseSettings, Extra, DirectoryPath, BaseModel
 
 from prototype.step_id import StepID
 
 
-class ParamBundle(BaseSettings, extra=Extra.allow):
+class ParamBundle(BaseSettings, extra=Extra.allow, allow_mutation=False):
     pass
-
-
-# TODO dict of ConfigBundles in Config definition
-
-# load subclasses of StepSettings, these are the valid keys for StepSettings in the config file.
-# step_config_classes = {cls.__name__: cls for cls in StepSettings.__subclasses__()}
-# StepConfig = Union[tuple(step_config_classes.values())]
-# might be removable
-
-
-# TODO put validation into step_id script
-"""gets filled from main.py before loading Config"""
-all_step_ids = []
 
 
 class Params(BaseModel, extra=Extra.ignore, allow_mutation=False):
@@ -48,9 +35,8 @@ class Params(BaseModel, extra=Extra.ignore, allow_mutation=False):
 
         return model_hash
 
-
     @staticmethod
-    def create_config_bundles(cls, values):
+    def create_config_bundles(_cls, values):
         # This dict maps class names to their actual class objects.
         class_name_to_class = {cls.__name__: cls for cls in ParamBundle.__subclasses__()}
 

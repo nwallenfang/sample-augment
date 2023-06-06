@@ -8,11 +8,10 @@ from pathlib import Path
 import click
 from pydantic import ValidationError
 
-from prototype.params import Params
-from prototype.experiment import Experiment
-from prototype.state_store import DiskStateStore
-from prototype.step_id import StepID
-from utils.log import log
+from .prototype.experiment import Experiment
+from .prototype.params import Params
+from .prototype.step_id import StepID
+from .utils.log import log
 
 
 def init():
@@ -37,7 +36,6 @@ def main():
     """
         CLI for running experiments concerning
     """
-    # TODO needs to be somewhere else
     init()
 
     # I could see there some arg parsing going on before constructing a full Config isntance.
