@@ -1,4 +1,5 @@
 import json
+import sys
 from abc import abstractmethod, ABC
 from pathlib import Path
 
@@ -16,8 +17,8 @@ from torchvision.transforms import Normalize, ToPILImage
 from tqdm import tqdm
 
 from sample_augment.data.dataset import SamplingAugDataset
-from sample_augment.models.deprecated.DenseNetClassifier import DenseNet201
 from sample_augment.utils.paths import project_path
+from sample_augment.utils import log
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
 _std = torch.tensor([0.229, 0.224, 0.225])
@@ -137,10 +138,8 @@ def main():
             num_classes,
             device)
     else:  # load to CPU instead
-        print("Warning: Using Lightning checkpoint. Doesn't work atm.")
-        classifier = DenseNet201.load_from_checkpoint(
-            project_path('models/checkpoints/first_lightning_training.ckpt'),
-            map_location=torch.device('cpu'))
+        log.error("No CUDA device found. Classifier evaluation only supported on CUDA for now.")
+        sys.exit(-1)
 
     # metric has the option 'average' with values micro, macro, and weighted.
     # Might be worth looking at.

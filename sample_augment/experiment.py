@@ -11,6 +11,9 @@ from sample_augment.utils.log import log
 
 
 class Experiment:
+    """
+        TODO class docs
+    """
     pipeline: List[Step]
     store: StateStore
     state: State
@@ -59,5 +62,5 @@ class Experiment:
     def run(self):
         for step in self.pipeline:
             # TODO extract InputState from whole State
-            output_state = step.run(InputState(), self.params)
+            _output_state = step.run(InputState(), self.params)
             # TODO merge OutputState into whole State

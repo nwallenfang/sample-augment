@@ -2,14 +2,34 @@ from pathlib import Path
 
 import torch
 from torch.utils.data import Dataset
+from torchvision.transforms import transforms
 from tqdm import tqdm  # For nice progress bar!
 from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch import nn  # All neural network modules
 from torch.utils.data import DataLoader  # Gives easier dataset management
 
 from sample_augment.data.dataset import SamplingAugDataset
-from sample_augment.models.deprecated.train_classifier import preprocess
 from sample_augment.utils.paths import project_path
+
+
+def preprocess(dataset):
+    data = dataset.tensors[0]
+
+    if data.dtype == torch.uint8:
+        # convert to float32
+        data = data.float()
+        data /= 255.0
+
+    # might need to preprocess to required resolution
+    transform = transforms.Compose([
+        # transforms.Resize((224, 224)),
+        # ImageNet normalization factors
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    # convert labels to expected Long dtype as well
+    dataset.tensors = (transform(data), dataset.tensors[1].long())
+
+    return dataset
 
 
 def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_epochs=23, batch_size=64,
