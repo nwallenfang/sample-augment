@@ -76,7 +76,7 @@ target/
 # Jupyter NB Checkpoints
 .ipynb_checkpoints/
 
-# exclude data_package from source control by default
+# exclude data from source control by default
 
 # Mac OS-specific storage files
 .DS_Store
@@ -88,7 +88,7 @@ target/
 # Mypy cache
 .mypy_cache/
 
-# raw and processed data_package (results should be saved somewhere else)
+# raw and processed data (results should be saved somewhere else)
 data/*/*
 
 # models are too large

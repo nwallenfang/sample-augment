@@ -1,9 +1,9 @@
 from typing import Optional
 
-from prototype.step import Step
-from prototype.params import Params
-from prototype.state import State, InputState
-from utils.log import log
+from sample_augment.prototype.step import Step
+from sample_augment.prototype.params import Params
+from sample_augment.prototype.state import InputState
+from sample_augment.utils.log import log
 
 
 class DownloadGC10(Step):

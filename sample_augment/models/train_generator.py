@@ -9,15 +9,15 @@ import torch
 # sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\')
 # sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\models\\stylegan2\\')
 
-import models.stylegan2.dnnlib as dnnlib
-from models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn
+import sample_augment.models.stylegan2.dnnlib as dnnlib
+from sample_augment.models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn
 
 
 def train_stylegan():
     out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
 
     config_kwargs = {
-        'data_package': r"H:\thesis\sampling_aug\data\interim\gc10_train.pt",
+        'data': r"H:\thesis\sampling_aug\data\interim\gc10_train.pt",
         # 'custom_name' 'gc10_pre_FFHQ'
         'gpus': 2,
         'snap': None,
@@ -44,7 +44,7 @@ def train_stylegan():
         'nhwc': None,
         'nobench': None,
         'allow_tf32': None,
-        'workers': 1  # could try setting number of workers to 1, since the data_package is fully in RAM
+        'workers': 1  # could try setting number of workers to 1, since the data is fully in RAM
     }
     dry_run = False
 
@@ -74,7 +74,7 @@ def train_stylegan():
     print(json.dumps(args, indent=2))
     print()
     print(f'Output directory:   {args.run_dir}')
-    # print(f'Training data_package:      {args.training_set_kwargs.path}')
+    # print(f'Training data:      {args.training_set_kwargs.path}')
     print(f'Training duration:  {args.total_kimg} kimg')
     print(f'Number of GPUs:     {args.num_gpus}')
     print(f'Number of images:   {args.training_set_kwargs.max_size}')

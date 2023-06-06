@@ -8,7 +8,7 @@ Usage: dataset_tool.py [OPTIONS]
   --source *_lmdb/                - Load LSUN dataset
   --source cifar-10-python.tar.gz - Load CIFAR-10 dataset
   --source path/                  - Recursively load all images from path/
-  --source dataset.zip            - Recursively load all images from dataset.zip
+  --source dataset.zip            - Recursively load all images from sample_augment.dataset.zip
 
   The output dataset format can be either an image folder or a zip archive.
   Specifying the output format and path:

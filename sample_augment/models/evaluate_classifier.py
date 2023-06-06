@@ -15,9 +15,9 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
 from tqdm import tqdm
 
-from data_package.dataset import SamplingAugDataset
-from models.deprecated.DenseNetClassifier import DenseNet201
-from utils.paths import project_path
+from sample_augment.data.dataset import SamplingAugDataset
+from sample_augment.models.deprecated.DenseNetClassifier import DenseNet201
+from sample_augment.utils.paths import project_path
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
 _std = torch.tensor([0.229, 0.224, 0.225])
@@ -122,10 +122,10 @@ def main():
     # important: assert that the validation and test sets are identical to the split that was
     # done when training the classifier. Should add some kind of sanity check to ensure this
     # first steps, see available metrics in torch and calculate total and class-wise accuracy
-    # train_data = CustomTensorDataset.load(Path(project_path('data_package/interim/gc10_train.pt')))
+    # train_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_train.pt')))
     test_dataset = SamplingAugDataset.load_from_file(
-        Path(project_path('data_package/interim/gc10_test.pt')))
-    # val_data = CustomTensorDataset.load(Path(project_path('data_package/interim/gc10_val.pt')))
+        Path(project_path('data/interim/gc10_test.pt')))
+    # val_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_val.pt')))
     test_data = preprocess(test_dataset)
     # val_data = preprocess(val_data)
 
@@ -153,7 +153,7 @@ def main():
         with torch.no_grad():
             predictions[i * batch_size:(i + 1) * batch_size] = classifier(batch)
 
-    torch.save(predictions, project_path('data_package/interim/predictions_densenet.pt'))
+    torch.save(predictions, project_path('data/interim/predictions_densenet.pt'))
 
     targets = test_data.tensors[1]
 
@@ -192,17 +192,17 @@ def run_metrics_on_predictions_file():
     ]
     # TODO probably move to test since this is specific to GC10
 
-    test_data = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_test.pt')))
+    test_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_test.pt')))
     test_data: SamplingAugDataset = typing.cast(SamplingAugDataset, preprocess(test_data))
 
-    predictions = torch.load(project_path('data_package/ds_data/predictions_densenet.pt'))
+    predictions = torch.load(project_path('data/ds_data/predictions_densenet.pt'))
     assert len(predictions) == len(test_data)
 
     _imgs, labels = test_data.tensors[0], test_data.tensors[1]
     # ConfusionMatrixMetric().calculate(predictions, labels).show()
 
     # retrieve secondary labels for test instances
-    with open(project_path('data_package/interim/labels.json', 'r')) as label_json_file:
+    with open(project_path('data/interim/labels.json', 'r')) as label_json_file:
         label_info = json.load(label_json_file)
 
     # for i in range(10):

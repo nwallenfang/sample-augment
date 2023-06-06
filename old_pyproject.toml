@@ -37,5 +37,6 @@ dependencies = [
 sample-augment = "sample_augment.main:main"
 
 [tool.setuptools]
-packages = {find = {include = ["sample_augment*", "dnnlib"]}}
-package-dir = { "dnnlib" = "sample_augment/models/generator/stylegan2" }
+# TODO test if StyleGAN imports still work
+packages = {find = {include = ["sampling_aug*", "dnnlib"]}}
+#package-dir = { "dnnlib" = "sampling_aug/models/generator/stylegan2" }

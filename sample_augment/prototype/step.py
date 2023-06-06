@@ -5,12 +5,12 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 
-from prototype.params import Params
-from prototype.state import State, OutputState, InputState
+from sample_augment.prototype.params import Params
+from sample_augment.prototype.state import State, OutputState, InputState
 
 import importlib
 
-from prototype.step_id import StepID
+from sample_augment.prototype.step_id import StepID
 
 
 # define some rust-like result types, fun :)

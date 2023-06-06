@@ -10,10 +10,10 @@ from torch.utils.data import Subset
 from torchvision.transforms import Normalize, Grayscale, ToTensor, Resize, Compose
 from torchvision.utils import make_grid
 
-from data_package.dataset import ImageDataset, SamplingAugDataset
-from data_package.train_test_split import stratified_split
-from utils.paths import project_path
-from data_package import dataset as dataset_package
+from sample_augment.data.dataset import ImageDataset, SamplingAugDataset
+from sample_augment.data.train_test_split import stratified_split
+from sample_augment.utils.paths import project_path
+from sample_augment.data import dataset as dataset_package
 
 
 def visualize_class_distribution(complete_dataset: ImageDataset, subset: Subset):
@@ -32,7 +32,7 @@ def create_image_folder_dataset():
         Grayscale(num_output_channels=3),
         Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    dataset = ImageDataset(project_path('data_package/gc-10'), transform=preprocessing)
+    dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
     # dataset = GC10InMemoryDataset()
     train_dataset, test_dataset = stratified_split(dataset, train_ratio=0.8)
 
@@ -45,7 +45,7 @@ def create_image_folder_dataset():
 
 
 def test_uniqueness_of_ids():
-    complete = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_tensors.pt')))
+    complete = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_tensors.pt')))
     all_ids = [complete.get_img_id(i) for i in range(len(complete))]
     duplicate_ids = set([x for x in all_ids if all_ids.count(x) > 1])
     print()
@@ -54,18 +54,18 @@ def test_uniqueness_of_ids():
 
 
 def test_train_test_split_load_gc10():
-    if not os.path.exists(project_path('data_package/interim/gc10_tensors.pt')):
+    if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
         print('initializing DataSets for this test..')
         dataset_package.main()
 
     # stylegan training doesn't work after the new train test split
     # might be our dataset or because I'm trying to do transfer learning with a FFHQ checkpoint.
-    train = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_train.pt')))
-    complete = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_tensors.pt')))
+    train = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
+    complete = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_tensors.pt')))
     n_complete = len(complete)
     del complete
-    test = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_test.pt')))
-    val = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_val.pt')))
+    test = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_test.pt')))
+    val = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
     n_train, n_test, n_val = len(train), len(test), len(val)
 
     assert n_train + n_test + n_val == n_complete
@@ -133,7 +133,7 @@ def main():
     """
     # make a grid for each class, image IDs could be useful as well,
     # to compare to the unscaled/quantized version
-    dataset = SamplingAugDataset.load_from_file(Path(project_path('data_package/interim/gc10_train.pt')))
+    dataset = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
     _data, _labels = dataset.tensors
     # TODO visual inspection
     for class_idx in range(10):

@@ -27,7 +27,7 @@ except ImportError:
 class Dataset(torch.utils.data.Dataset):
     def __init__(self,
                  name,  # Name of the dataset.
-                 raw_shape,  # Shape of the raw image data_package (NCHW).
+                 raw_shape,  # Shape of the raw image data (NCHW).
                  max_size=None,  # Artificially limit the size of the dataset. None = no limit. Applied before xflip.
                  use_labels=False,  # Enable conditioning labels? False = label dimension is zero.
                  xflip=False,  # Artificially double the size of the dataset via x-flips. Applied after max_size.
@@ -247,7 +247,7 @@ class StyleGANDataset(Dataset):
     """
 
     def __init__(self, tensor_path, custom_name, resolution=None, **kwargs):
-        # data_package: np.ndarray, labels: np.ndarray
+        # data: np.ndarray, labels: np.ndarray
         tensors = torch.load(tensor_path)
         
         # StyleGAN expects uint8, so we'll need to do some conversions

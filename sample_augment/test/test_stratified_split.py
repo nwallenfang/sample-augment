@@ -3,8 +3,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from data_package.dataset import SamplingAugDataset
-from data_package.train_test_split import stratified_split
+from sample_augment.data.dataset import SamplingAugDataset
+from sample_augment.data.train_test_split import stratified_split
 
 
 def split_dummy_data(n, min_test_instances, number_of_1s=4):

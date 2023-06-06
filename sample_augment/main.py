@@ -8,18 +8,18 @@ from pathlib import Path
 import click
 from pydantic import ValidationError
 
-from .prototype.experiment import Experiment
-from .prototype.params import Params
-from .prototype.step_id import StepID
-from .utils.log import log
+from sample_augment.prototype.experiment import Experiment
+from sample_augment.prototype.params import Params
+from sample_augment.prototype.step_id import StepID
+from sample_augment.utils.log import log
 
 
 def init():
-    from prototype.step import Step
+    from sample_augment.prototype.step import Step
 
     # Load all modules in the "steps" package to have ExperimentStep.__subclasses__ return them all
     # needed for StepID validation (step names provided with the config.json for example)
-    package_name = 'steps'
+    package_name = 'sample_augment.steps'
     package = importlib.import_module(package_name)
 
     for _, module_name, _ in pkgutil.iter_modules(package.__path__):
@@ -44,13 +44,16 @@ def main():
     config_path = Path('config.json')
 
     # config_preprocessing
-    with open(config_path) as json_file:
-        try:
+    try:
+        with open(config_path) as json_file:
             param_dict = json.load(json_file)
-        except JSONDecodeError as err:
-            log.error(str(err))
-            log.error(f"Failed to parse {config_path.name}, exiting.")
-            sys.exit(-1)
+    except FileNotFoundError as err:
+        log.error(str(err))
+        sys.exit(-1)
+    except JSONDecodeError as err:
+        log.error(str(err))
+        log.error(f"Failed to parse {config_path.name}, exiting.")
+        sys.exit(-1)
 
     # some preprocessing to have steps conform to StepID format
     param_dict['steps'] = [{'id': x} for x in param_dict['steps']]

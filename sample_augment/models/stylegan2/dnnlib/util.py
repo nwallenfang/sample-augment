@@ -380,7 +380,7 @@ def is_url(obj: Any, allow_file_urls: bool = False) -> bool:
 
 
 def open_url(url: str, cache_dir: str = None, num_attempts: int = 10, verbose: bool = True, return_filename: bool = False, cache: bool = True) -> Any:
-    """Download the given URL and return a binary-mode file object to access the data_package."""
+    """Download the given URL and return a binary-mode file object to access the data."""
     assert num_attempts >= 1
     assert not (return_filename and (not cache))
 
@@ -432,7 +432,7 @@ def open_url(url: str, cache_dir: str = None, num_attempts: int = 10, verbose: b
                 with session.get(url) as res:
                     res.raise_for_status()
                     if len(res.content) == 0:
-                        raise IOError("No data_package received")
+                        raise IOError("No data received")
 
                     if len(res.content) < 8192:
                         content_str = res.content.decode("utf-8")
@@ -472,6 +472,6 @@ def open_url(url: str, cache_dir: str = None, num_attempts: int = 10, verbose: b
         if return_filename:
             return cache_file
 
-    # Return data_package as file object.
+    # Return data as file object.
     assert not return_filename
     return io.BytesIO(url_data)

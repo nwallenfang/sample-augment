@@ -1,7 +1,7 @@
 from typing import Optional
 
-from prototype.step import Step
-from prototype.state_store import StateStore
+from sample_augment.prototype.step import Step
+from sample_augment.prototype.state_store import StateStore
 
 
 class LoadDataset(Step):

@@ -11,8 +11,8 @@ from torch.utils.data import TensorDataset
 from torchvision.transforms import Resize, Compose, Grayscale, ToTensor
 from tqdm import tqdm
 
-from utils.log import log
-from utils.paths import project_path
+from sample_augment.utils.log import log
+from sample_augment.utils.paths import project_path
 
 
 class ImageDataset(torchvision.datasets.ImageFolder):
@@ -165,9 +165,9 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
 
 
 def main():
-    from data_package.train_test_split import create_train_val_test_sets
+    from sample_augment.data.train_test_split import create_train_val_test_sets
     """
-        Runs the complete data_package processing pipeline.
+        Runs the complete data processing pipeline.
         Load GC10 dataset, do label sanitization, do image preprocessing, do train/test/val split.
     """
     preprocessing = Compose([
@@ -182,23 +182,23 @@ def main():
         # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     # tensor_path
-    if not os.path.exists(project_path('data_package/interim/gc10_tensors.pt')):
-        image_dataset = ImageDataset(project_path('data_package/gc-10'), transform=preprocessing)
+    if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
+        image_dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
         # TODO pass labels.json contents
         tensor_dataset: SamplingAugDataset = image_folder_to_tensor_dataset(image_dataset)
         del image_dataset
         assert isinstance(tensor_dataset, TensorDataset)
-        dataset_dir = Path(project_path('data_package/interim/', create=True))
+        dataset_dir = Path(project_path('data/interim/', create=True))
         tensor_dataset.save_to_file(dataset_dir)
     else:
         tensor_dataset = SamplingAugDataset.load_from_file(
-            Path(project_path('data_package/interim/gc10_tensors.pt')))
+            Path(project_path('data/interim/gc10_tensors.pt')))
 
     train_data, val_data, test_data = create_train_val_test_sets(tensor_dataset, random_seed=15)
     del tensor_dataset
-    train_data.save_to_file(path=Path(project_path('data_package/interim/')), description='train')
-    val_data.save_to_file(path=Path(project_path('data_package/interim/')), description='val')
-    test_data.save_to_file(path=Path(project_path('data_package/interim/')), description='test')
+    train_data.save_to_file(path=Path(project_path('data/interim/')), description='train')
+    val_data.save_to_file(path=Path(project_path('data/interim/')), description='val')
+    test_data.save_to_file(path=Path(project_path('data/interim/')), description='test')
 
 
 def test_duplicate_ids():
@@ -213,15 +213,15 @@ def test_duplicate_ids():
         # Optimally, the Generator should generate images with this distribution as well.
         # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    image_dataset = ImageDataset(project_path('data_package/gc-10-mini'), transform=preprocessing)
+    image_dataset = ImageDataset(project_path('data/gc-10-mini'), transform=preprocessing)
     tensor_dataset: SamplingAugDataset = image_folder_to_tensor_dataset(image_dataset)
     del image_dataset
     assert isinstance(tensor_dataset, TensorDataset)
-    dataset_dir = Path(project_path('data_package/interim/', create=True))
+    dataset_dir = Path(project_path('data/interim/', create=True))
     tensor_dataset.save_to_file(dataset_dir)
 
 
 if __name__ == '__main__':
-    # tensor_dataset: TensorDataset = torch.load(project_path('data_package/interim/gc10_tensors.pt'))
+    # tensor_dataset: TensorDataset = torch.load(project_path('data/interim/gc10_tensors.pt'))
     # create_train_val_test_sets(tensor_dataset)
     main()

@@ -4,7 +4,7 @@ from typing import Dict, List, ClassVar, Type
 
 from pydantic import BaseSettings, Extra, DirectoryPath, BaseModel
 
-from prototype.step_id import StepID
+from sample_augment.prototype.step_id import StepID
 
 
 class ParamBundle(BaseSettings, extra=Extra.allow, allow_mutation=False):
