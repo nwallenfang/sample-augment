@@ -11,11 +11,12 @@ from pydantic import ValidationError
 from prototype.params import Params
 from prototype.experiment import Experiment
 from prototype.state_store import DiskStateStore
+from prototype.step_id import StepID
 from utils.log import log
 
 
-def load_step_classes():
-    from prototype.experiment_step import ExperimentStep
+def init():
+    from prototype.step import Step
 
     # Load all modules in the "steps" package to have ExperimentStep.__subclasses__ return them all
     # needed for StepID validation (step names provided with the config.json for example)
@@ -25,10 +26,10 @@ def load_step_classes():
     for _, module_name, _ in pkgutil.iter_modules(package.__path__):
         # Import each module in the package
         importlib.import_module(f'{package_name}.{module_name}')
-    all_step_classes = {step_class.__name__: step_class for step_class in ExperimentStep.__subclasses__()}
-    all_step_ids = list(all_step_classes.keys())
+    all_step_classes = {step_class.__name__: step_class for step_class in Step.__subclasses__()}
 
-    return all_step_classes, all_step_ids
+    StepID.initialize(possible_ids=list(all_step_classes.keys()))
+    Params.step_classes = all_step_classes
 
 
 @click.command()
@@ -37,7 +38,7 @@ def main():
         CLI for running experiments concerning
     """
     # TODO needs to be somewhere else
-    Params.step_classes, Params.all_step_ids = load_step_classes()
+    init()
 
     # I could see there some arg parsing going on before constructing a full Config isntance.
     # so in the future it won't be like it is now with a whole json file always being parsed

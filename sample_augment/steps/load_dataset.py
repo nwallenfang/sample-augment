@@ -1,10 +1,10 @@
 from typing import Optional
 
-from prototype.experiment_step import ExperimentStep
+from prototype.step import Step
 from prototype.state_store import StateStore
 
 
-class LoadDataset(ExperimentStep):
+class LoadDataset(Step):
     @staticmethod
     def load_from(self, store: StateStore):
         pass

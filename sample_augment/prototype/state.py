@@ -6,18 +6,18 @@ from prototype.params import Params
 from prototype.step_id import StepID
 
 
-class ConsumedState(BaseModel):
+class InputState(BaseModel):
     """
-        Every Step can
+        An instance / subclass of this can be received by any Step in its run() method.
     """
     pass
 
 
-class ProducedState(BaseModel):
+class OutputState(BaseModel):
     """
-        Every Step can
+        An instance / subclass of this can be returned by any Step in its run() method.
     """
-    pass
+    overwrite_existing = True
 
 
 class State(BaseModel):
@@ -25,3 +25,10 @@ class State(BaseModel):
 
     def __len__(self):
         return len(self.state)
+
+    def merge_with_output(self, output: OutputState):
+        # TODO
+        pass
+
+    def check_if_contains(self, input: InputState):
+       pass

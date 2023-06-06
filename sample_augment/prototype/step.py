@@ -5,7 +5,8 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 
-from prototype.state import State, ProducedState, ConsumedState
+from prototype.params import Params
+from prototype.state import State, OutputState, InputState
 
 import importlib
 
@@ -34,20 +35,19 @@ class MissingDependency(DryRunResult):
 
 
 @dataclass
-class MissingConfigEntry(DryRunResult):
-    missing_config_entries: List[str]
+class MissingParameter(DryRunResult):
+    missing_parameters: List[str]
 
 
-class ExperimentStep:
+class Step:
     """
         Class representing a single step in the experiment pipeline.
         This could for example be a step like like Data Normalization, Visualization,
         or Model training.
         TODO: how to support pipelines where one ExperimentStep is run multiple times?
     """
-    all_step_ids: List[str] = []
     step_dependencies: List[StepID] = []
-    required_configs = []
+    required_parameters = []
 
     def __init__(self, state_dependency=None, env_dependency=None):
         self.state_dependency = state_dependency
@@ -70,7 +70,7 @@ class ExperimentStep:
         """
         raise NotImplementedError()
 
-    def dry_run(self, state: State) -> DryRunResult:
+    def dry_run(self, state: State, params: Params) -> DryRunResult:
         # 1. Check environment
         err = self.check_environment()
         if err:
@@ -85,19 +85,20 @@ class ExperimentStep:
         if missing_steps:
             return MissingDependency(missing_steps)
 
-        missing_config_entries = []
-        for required_entry in self.required_configs:
-            if required_entry not in state.config:
-                missing_config_entries.append(required_entry)
-        if missing_config_entries:
-            return MissingConfigEntry(missing_config_entries)
+        missing_parameters = []
+        for required_entry in self.required_parameters:
+            if required_entry not in params:
+                missing_parameters.append(required_entry)
+        if missing_parameters:
+            return MissingParameter(missing_parameters)
 
         # TODO should the state be modified here?
         #   else there is no reason to return the state
         #   maybe change the step_state attribute?
+        # TODO change to OutputState instance, would like to make an empty one
         return OK(state)
 
     @classmethod
     @abstractmethod
-    def run(cls, state: ConsumedState) -> ProducedState:
+    def run(cls, state: InputState, params: Params) -> OutputState:
         pass

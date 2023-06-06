@@ -1,27 +1,24 @@
 from typing import Optional
 
-from prototype.experiment_step import ExperimentStep
-from prototype.state import State, StepState
+from prototype.step import Step
+from prototype.params import Params
+from prototype.state import State, InputState
 from utils.log import log
 
 
-class DownloadGC10State(StepState):
-    pass
-
-
-class DownloadGC10(ExperimentStep):
-    required_configs = []  # ?
+class DownloadGC10(Step):
+    required_parameters = []  # ?
 
     @classmethod
-    def run(cls, state: State):
+    def run(cls, state: InputState, params: Params):
         import kaggle
 
-        log.info("GC10 dataset not found, downloading from kaggle..")
+        log.info("Downloading GC10 dataset from kaggle..")
         kaggle.api.authenticate()  # throws IOError if API key is not configured
         kaggle.api.dataset_download_files('alex000kim/gc10det',
-                                          path=state.config.raw_dataset_path,
+                                          path=params.raw_dataset_path,
                                           unzip=True)
 
     @staticmethod
     def check_environment() -> Optional[str]:
-        return ExperimentStep._check_package('kaggle')
+        return Step._check_package('kaggle')

@@ -24,7 +24,7 @@ class ParamBundle(BaseSettings, extra=Extra.allow):
 all_step_ids = []
 
 
-class Params(BaseModel, extra=Extra.ignore):
+class Params(BaseModel, extra=Extra.ignore, allow_mutation=False):
     # Experiment-wide parameters
     name: str
     random_seed: int = 42
@@ -36,7 +36,8 @@ class Params(BaseModel, extra=Extra.ignore):
     # Step specific settings are saved in the steps dict
     # steps: Dict[str, StepConfig]
     steps: List[StepID]  # StepID get validated manually
-    all_step_ids: ClassVar[StepID]
+
+    """dict from StepID to their step, gets set in main.init()"""
     step_classes: ClassVar[Dict[StepID, Type]]
 
     bundles = dict[str, ParamBundle]
@@ -47,11 +48,6 @@ class Params(BaseModel, extra=Extra.ignore):
 
         return model_hash
 
-    @validator("steps", each_item=True)
-    def validate_step_ids(cls, step):
-        if step not in cls.all_step_ids:
-            raise ValueError(f"Invalid StepID {step} provided.")
-        return step
 
     @staticmethod
     def create_config_bundles(cls, values):
@@ -71,4 +67,4 @@ class Params(BaseModel, extra=Extra.ignore):
     def __str__(self):
         return super.__str__(self)
 
-# TODO add support for "subtasks", where they are given a new name and associated options
+# we could add support for "subtasks", where they are given a new name and associated options
