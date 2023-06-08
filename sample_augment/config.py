@@ -1,13 +1,12 @@
 import hashlib
-from pathlib import Path
 from typing import Dict, List, ClassVar, Type
 
-from pydantic import BaseSettings, Extra, DirectoryPath, BaseModel
+from pydantic import Extra, DirectoryPath, BaseModel
 
 from sample_augment.steps.step_id import StepID
 
 
-class ConfigBundle(BaseSettings, extra=Extra.allow, allow_mutation=False):
+class ConfigBundle(BaseModel, extra=Extra.allow, allow_mutation=False):
     pass
 
 
@@ -19,7 +18,7 @@ class Config(BaseModel, extra=Extra.ignore, allow_mutation=False):
 
     # TODO can we make root_dir os independent? hmm doesn't need to be..
     root_directory: DirectoryPath
-    raw_dataset_path: Path
+    # raw_dataset_path: Path
 
     # Step specific settings are saved in the steps dict
     # steps: Dict[str, StepConfig]

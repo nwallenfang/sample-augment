@@ -36,6 +36,9 @@ class State(BaseModel):
         return self.state[item]
 
     def merge_with_bundle(self, bundle: StateBundle):
+        if not bundle:
+            # skip for empty state
+            return
         bundle_type: Type[StateBundle] = type(bundle)
 
         for field, field_type in bundle_type.__annotations__.items():
@@ -46,7 +49,6 @@ class State(BaseModel):
                 # already exists, should we overwrite?
                 if bundle.overwrite:
                     self.state[field] = bundle.__getattribute__(field)
-        pass
 
     # noinspection PyPep8Naming
     def _is_satisfiable(self, SomeStateBundle: Type[StateBundle]) -> bool:

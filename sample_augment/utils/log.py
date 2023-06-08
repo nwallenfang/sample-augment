@@ -1,4 +1,5 @@
 import logging
+import sys
 
 
 class ColorLogFormatter(logging.Formatter):
@@ -12,6 +13,7 @@ class ColorLogFormatter(logging.Formatter):
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
     format = '%(levelname)s: %(message)s'  # our simplified format
+    # TODO add script location for warnings and errors
     # format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
 
     FORMATS = {
@@ -28,12 +30,12 @@ class ColorLogFormatter(logging.Formatter):
         return formatter.format(record)
 
 
-def get_logger(name: str, level=logging.INFO):
+def get_logger(name: str, level):
     module_logger = logging.getLogger(name)
     module_logger.setLevel(level)
 
     # create console handler and set level that should be printed
-    handler = logging.StreamHandler()
+    handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(level)
 
     formatter = ColorLogFormatter()
@@ -43,4 +45,5 @@ def get_logger(name: str, level=logging.INFO):
     return module_logger
 
 
-log = get_logger('main logger')
+log_level = logging.INFO
+log = get_logger('main logger', log_level)

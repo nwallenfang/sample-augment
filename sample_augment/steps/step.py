@@ -1,113 +1,78 @@
-from __future__ import \
-    annotations  # TODO will this work in Python 3.7? (or rather: does this have to work in 3.7?)
+from __future__ import annotations
 
-from abc import abstractmethod, ABC
-from dataclasses import dataclass
-from typing import List, Optional
+import inspect
+from typing import Type, Dict, Any, Callable
 
 from pydantic import BaseModel
 
-from sample_augment.config import Config
-from sample_augment.data.state import State, StateBundle
-
-import importlib
-
-from sample_augment.steps.step_id import StepID
+from sample_augment.data.state import StateBundle
 from sample_augment.utils import log
 
 
-# define some rust-like result types, fun :)
-@dataclass
-class DryRunResult:
-    pass
+# Function to convert snake_case names to CamelCase
+def snake_to_camel(word):
+    return ''.join(x.capitalize() or '_' for x in word.split('_'))
 
 
-@dataclass
-class OK(DryRunResult):
-    state: State
+class Step(Callable, BaseModel):
+    name: str
+    func: Callable
+    input_state_class: Type[StateBundle]
+    required_config: Dict[str, Type[Any]]
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
+    def __repr__(self):
+        return self.name + "Step"
 
 
-@dataclass
-class EnvironmentMismatch(DryRunResult):
-    mismatch_details: str
+class StepManager:
+    # TODO document this class well since the code is complex
+    def __init__(self):
+        self.all_steps = {}
+
+    def get_all_steps(self):
+        return self.all_steps
+
+    # TODO env_check callable as optional parameter
+    def step(self, name=None):
+        def decorator(func):
+            # Default step_id is the function name converted to CamelCase
+            nonlocal name
+            if name is None:
+                name = snake_to_camel(func.__name__)
+
+            if name in self.all_steps:
+                raise ValueError(
+                    f"Step ID '{name}' is already registered. Please choose a different step ID.")
+
+            sig = inspect.signature(func)
+            # TODO don't force the user to call this 'state'. instead check each argument if it's a subclass
+            #   of StateBundle
+            input_state_class = sig.parameters['state'].annotation
+            required_config = {name: param.annotation for name, param in sig.parameters.items() if
+                               name != 'state'}
+
+            self.all_steps[name] = Step(
+                name=name,
+                func=func,
+                input_state_class=input_state_class,
+                required_config=required_config
+            )
+            log.debug(f'Registered step {name}.')
+            return func
+
+        return decorator
+
+    def get_step(self, name) -> Step:
+        if name not in self.all_steps:
+            raise ValueError(f"Step with name {name} is not registered in StepManager.")
+        return self.all_steps[name]
 
 
-@dataclass
-class MissingDependency(DryRunResult):
-    missing_steps: List[StepID]
-
-
-@dataclass
-class MissingConfigEntry(DryRunResult):
-    missing_entries: List[str]
-
-
-class Step(ABC):
-    """
-        Class representing a single step in the experiment pipeline.
-        This could for example be a step like like Data Normalization, Visualization,
-        or Model training.
-        TODO: how to support pipelines where one ExperimentStep is run multiple times?
-    """
-    # TODO read required parameters automatically from run method signature
-    #  determine step dependencies automatically from this
-    step_dependencies: List[StepID] = []
-    required_parameters = []
-
-    def __init__(self, state_dependency=None, env_dependency=None):
-        self.state_dependency = state_dependency
-        self.env_dependency = env_dependency
-
-    @staticmethod
-    def _check_package(package_name: str) -> Optional[str]:
-        try:
-            importlib.import_module(package_name)
-            return None
-        except ImportError:
-            return f"Package {package_name} is missing in environment."
-
-    @staticmethod
-    @abstractmethod
-    def check_environment() -> Optional[str]:
-        """
-            Check if the environment is meeting all requirements to run this step.
-            Could for example check the python version or that some package is available.
-        """
-        raise NotImplementedError()
-
-    @classmethod
-    def get_input_state_bundle(cls):
-        if cls != Step:
-            log.warn(f"{cls.__name__} has no custom InputState (overwrite get_input_state_class())")
-
-        # this method should be overridden by subclasses
-        return StateBundle
-
-    def dry_run(self, state: State, params: Config) -> DryRunResult:
-        # 1. Check environment
-        err = self.check_environment()
-        if err:
-            return EnvironmentMismatch(err)
-        # 2. Check step dependencies
-        missing_steps = []
-        for dependency_id in self.step_dependencies:
-            # TODO is this correct like this?
-            #  Additionally it should be checked that the step order is correct.
-            if dependency_id not in state:
-                missing_steps.append(dependency_id)
-        if missing_steps:
-            return MissingDependency(missing_steps)
-
-        missing_parameters = []
-        for required_entry in self.required_parameters:
-            if required_entry not in params:
-                missing_parameters.append(required_entry)
-        if missing_parameters:
-            return MissingConfigEntry(missing_parameters)
-
-        return OK(state)
-
-    @classmethod
-    @abstractmethod
-    def run(cls, state: StateBundle, params: Config) -> StateBundle:
-        pass
+# step manager singleton instance for accessing all steps.
+_step_manager = StepManager()
+# redeclare the step decorator so it's easily importable
+step = _step_manager.step
+get_step = _step_manager.get_step

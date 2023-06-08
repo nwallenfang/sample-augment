@@ -1,8 +1,7 @@
 {
   "name": "gc10",
-  "root_directory": "/home/nils/thesis/sample-augment/data",
-  "raw_dataset_path":"/home/nils/thesis/sample-augment/data/gc10",
+  "root_directory": "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data",
   "steps": [
-    "DummyStep"
+    "Dummy"
   ]
 }

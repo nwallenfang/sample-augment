@@ -1,13 +1,7 @@
 from pathlib import Path
-from typing import Optional
 
-from pydantic import FilePath
-
-from sample_augment.config import Config
 from sample_augment.data.state import StateBundle
-from sample_augment.steps.step import Step
-from sample_augment.steps.step_decorator import step
-from sample_augment.utils.log import log
+from sample_augment.steps.step import step
 
 
 class DummyOutput(StateBundle):
@@ -16,21 +10,9 @@ class DummyOutput(StateBundle):
     maybe_a_file: Path
 
 
-class DummyStep(Step):
-    @classmethod
-    def get_input_state_bundle(cls):
-        # doesn't need specific InputState
-        return StateBundle
-
-    @classmethod
-    def run(cls, state: StateBundle, config: Config) -> DummyOutput:
-        return DummyOutput(important_state=42, maybe_a_file=Path('relative/madlad.txt'))
-
-    @staticmethod
-    def check_environment() -> Optional[str]:
-        return Step._check_package('kaggle')
-
-
-@step
-def dummy_step(state: StateBundle, ):
-    pass
+@step()
+def dummy(state: StateBundle, random_seed: float):
+    # error when replacing with DummyOutput (makes sense :)
+    print("hello world!")
+    print(random_seed)
+    print(state)
