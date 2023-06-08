@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class StepID(BaseModel):
     """unique identifier for each Step"""
     id: str
+
     # _possible_ids: List[str] = None
 
     def __eq__(self, other: str | StepID):
@@ -29,4 +30,8 @@ class StepID(BaseModel):
     # def initialize(cls, possible_ids: List[str]):
     #     cls._possible_ids = possible_ids
 
+    def __str__(self):
+        return self.id
 
+    def __repr__(self):
+        return f"'{self.id}'"

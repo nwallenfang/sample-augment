@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import List
+from typing import List, Set, Dict
 
 from sample_augment.config import Config
 from sample_augment.data.state import State, StateBundle
@@ -9,12 +9,15 @@ from sample_augment.data.state_store import StateStore, DiskStateStore
 from sample_augment.steps.step import Step, get_step
 from sample_augment.utils.log import log
 
+# from sample_augment.steps import dummy_step
+
 
 class Experiment:
     """
         TODO class docs
     """
     pipeline: List[Step]
+
     store: StateStore
     state: State
     config: Config
@@ -69,19 +72,19 @@ class Experiment:
             # it's a subset of the State
             # and a subclass of StateBundle
             # noinspection PyPep8Naming
-            InputStateBundle = step.input_state_class
+            state_args_filled: Dict[str, StateBundle] = {}
+            for arg_name, arg_type in step.state_args.items():
+                try:
+                    artifact = self.state.extract_bundle(arg_type)
+                    state_args_filled[arg_name] = artifact
+                except ValueError as err:
+                    log.error(str(err))
+                    sys.exit(-1)
 
-            try:
-                state_bundle = self.state.extract_bundle(InputStateBundle)
-            except ValueError as err:
-                log.error(str(err))
-                sys.exit(-1)
-            config_kwargs = {}
-            required_config_keys = step.required_config.keys()
             # TODO type checking, satsifiability
-            # extract required ones from config
-            config_kwargs = {key: self.config.__getattribute__(key) for key in required_config_keys}
-            output_state: StateBundle = step(state_bundle, **config_kwargs)
+            # extract required entries from config
+            config_args_filled = {key: self.config.__getattribute__(key) for key in step.config_args.keys()}
+            output_state: StateBundle = step(**state_args_filled, **config_args_filled)
 
             self.state.completed_steps.append(type(step).__name__)
             self.state.merge_with_bundle(output_state)

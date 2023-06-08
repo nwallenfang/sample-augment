@@ -6,15 +6,16 @@ from pydantic import Extra, DirectoryPath, BaseModel
 from sample_augment.steps.step_id import StepID
 
 
-class ConfigBundle(BaseModel, extra=Extra.allow, allow_mutation=False):
+class SubConfig(BaseModel, extra=Extra.allow, allow_mutation=False):
     pass
 
 
-class Config(BaseModel, extra=Extra.ignore, allow_mutation=False):
+class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     # Experiment-wide parameters
     name: str
     random_seed: int = 42
     debug = True
+    cache = False
 
     # TODO can we make root_dir os independent? hmm doesn't need to be..
     root_directory: DirectoryPath
@@ -27,7 +28,7 @@ class Config(BaseModel, extra=Extra.ignore, allow_mutation=False):
     """dict from StepID to their step, gets set in main.init()"""
     step_classes: ClassVar[Dict[StepID, Type]]
 
-    bundles = dict[str, ConfigBundle]
+    bundles = dict[str, SubConfig]
 
     def get_hash(self):
         json_bytes = self.json(sort_keys=True).encode('utf-8')
@@ -38,7 +39,7 @@ class Config(BaseModel, extra=Extra.ignore, allow_mutation=False):
     @staticmethod
     def create_config_bundles(_cls, values):
         # This dict maps class names to their actual class objects.
-        class_name_to_class = {cls.__name__: cls for cls in ConfigBundle.__subclasses__()}
+        class_name_to_class = {cls.__name__: cls for cls in SubConfig.__subclasses__()}
 
         if 'bundles' in values:
             new_bundles = []

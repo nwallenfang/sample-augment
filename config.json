@@ -1,7 +1,9 @@
 {
+  "random_seed2": 41,
   "name": "gc10",
   "root_directory": "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data",
   "steps": [
+    "DummyProducer",
     "Dummy"
   ]
 }

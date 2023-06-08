@@ -85,8 +85,9 @@ class State(BaseModel):
                 field_dict[field] = self.state[field]
         else:
             if SomeStateBundle.__annotations__:  # else it's empty State that is always satisfiable :)
-                log.error(f"StateBundle {SomeStateBundle.__name__} is unsatisfiable from current State.")
-                sys.exit(-1)
+                state_bundle: SomeStateBundle = SomeStateBundle.parse_obj(field_dict)
+                return state_bundle
+        log.error(f"StateBundle {SomeStateBundle.__name__} is unsatisfiable from current State.")
+        sys.exit(-1)
 
-        state_bundle: SomeStateBundle = SomeStateBundle.parse_obj(field_dict)
-        return state_bundle
+

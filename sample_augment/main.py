@@ -8,13 +8,14 @@ from pydantic import ValidationError
 
 from sample_augment.experiment import Experiment
 from sample_augment.config import Config
+from sample_augment.steps.step import import_step_modules
 from sample_augment.utils.log import log
-import sample_augment.steps.dummy_step
+
 
 def read_config(arg_config: Path = None) -> Config:
     if arg_config is None:
         config_path = Path(__file__).parent.parent / 'config.json'
-        log.info(f"Using default config path {config_path.absolute()}")
+        log.debug(f"Using default config path {config_path.absolute()}")
     else:
         config_path = Path(arg_config)
 
@@ -56,6 +57,10 @@ def main(arg_config: Path = None):
     # I could see there some arg parsing going on before constructing a full Config instance.
     # so in the future it won't be like it is now with a whole json file always being parsed
     config = read_config(arg_config)
+
+    steps = import_step_modules(root_modules=['steps'])
+
+    # log.debug(steps)
 
     # create Experiment instance
     experiment = Experiment(config)

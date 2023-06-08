@@ -1,18 +1,22 @@
-from pathlib import Path
-
 from sample_augment.data.state import StateBundle
 from sample_augment.steps.step import step
 
 
-class DummyOutput(StateBundle):
+class DummyState(StateBundle):
     important_state: int
-    # TODO test relative paths across OS with pydantic
-    maybe_a_file: Path
 
 
 @step()
-def dummy(state: StateBundle, random_seed: float):
+def dummy(state: DummyState, random_seed: float):
     # error when replacing with DummyOutput (makes sense :)
     print("hello world!")
-    print(random_seed)
-    print(state)
+    print(f"important state: {state.important_state}")
+    print(f"random_seed: {random_seed}")
+
+
+# TODO fix the factory thingy
+@step()
+def dummy_producer() -> DummyState:
+    return DummyState(
+        important_state=11
+    )
