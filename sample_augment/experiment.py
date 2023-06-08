@@ -4,8 +4,8 @@ import sys
 from typing import List, Set, Dict
 
 from sample_augment.config import Config
-from sample_augment.data.state import State, StateBundle
-from sample_augment.data.state_store import StateStore, DiskStateStore
+from sample_augment.data.artifact import ArtifactStore, Artifact
+from sample_augment.data.persistent_store import PersistentStore, DiskPersistentStore
 from sample_augment.steps.step import Step, get_step
 from sample_augment.utils.log import log
 
@@ -18,15 +18,15 @@ class Experiment:
     """
     pipeline: List[Step]
 
-    store: StateStore
-    state: State
+    store: PersistentStore
+    state: ArtifactStore
     config: Config
 
     def __init__(self, config: Config):
         self.config = config
 
         # create StateStore instance pointing to directory from config file
-        self.store = DiskStateStore(config.root_directory)
+        self.store = DiskPersistentStore(config.root_directory)
 
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
@@ -72,7 +72,7 @@ class Experiment:
             # it's a subset of the State
             # and a subclass of StateBundle
             # noinspection PyPep8Naming
-            state_args_filled: Dict[str, StateBundle] = {}
+            state_args_filled: Dict[str, Artifact] = {}
             for arg_name, arg_type in step.state_args.items():
                 try:
                     artifact = self.state.extract_bundle(arg_type)
@@ -84,9 +84,9 @@ class Experiment:
             # TODO type checking, satsifiability
             # extract required entries from config
             config_args_filled = {key: self.config.__getattribute__(key) for key in step.config_args.keys()}
-            output_state: StateBundle = step(**state_args_filled, **config_args_filled)
+            output_state: Artifact = step(**state_args_filled, **config_args_filled)
 
             self.state.completed_steps.append(type(step).__name__)
-            self.state.merge_with_bundle(output_state)
+            self.state.merge_artifact_into(output_state)
 
         self.store.save(self.state, self.config)

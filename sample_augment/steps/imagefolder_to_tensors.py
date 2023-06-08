@@ -9,7 +9,7 @@ from torch import Tensor
 from torch.utils.data import TensorDataset
 
 from sample_augment.config import Config
-from sample_augment.data.state import StateBundle
+from sample_augment.data.artifact import Artifact
 from sample_augment.steps.step import Step
 from sample_augment.utils import log
 
@@ -97,6 +97,6 @@ class ImageFolderToTensors(Step):
         return None
 
     @classmethod
-    def run(cls, state: StateBundle, params: Config) -> StateBundle:
+    def run(cls, state: Artifact, params: Config) -> Artifact:
         # TODO
-        return StateBundle()
+        return Artifact()

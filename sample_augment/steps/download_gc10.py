@@ -1,13 +1,13 @@
 from pathlib import Path
 from typing import Optional
 
-from sample_augment.data.state import StateBundle
+from sample_augment.data.artifact import Artifact
 from sample_augment.steps.step import Step
 from sample_augment.config import Config
 from sample_augment.utils.log import log
 
 
-class GC10Folder(StateBundle):
+class GC10Folder(Artifact):
     imagefolder_path: Path
     gc10_label_dir: Path
 
@@ -16,10 +16,10 @@ class DownloadGC10(Step):
     @classmethod
     def get_input_state_bundle(cls):
         # doesn't need specific InputState
-        return StateBundle
+        return Artifact
 
     @classmethod
-    def run(cls, state: StateBundle, config: Config) -> GC10Folder:
+    def run(cls, state: Artifact, config: Config) -> GC10Folder:
         import kaggle
         import shutil
 

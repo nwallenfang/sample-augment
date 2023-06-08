@@ -7,7 +7,7 @@ from typing import Type, Dict, Any, Callable, List
 
 from pydantic import BaseModel
 
-from sample_augment.data.state import StateBundle
+from sample_augment.data.artifact import Artifact
 from sample_augment.utils import log
 
 
@@ -20,7 +20,7 @@ class Step(Callable, BaseModel):
     name: str
     func: Callable
 
-    state_args: Dict[str, Type[StateBundle]]
+    state_args: Dict[str, Type[Artifact]]
     config_args: Dict[str, Type[Any]]
 
     def __call__(self, *args, **kwargs):
@@ -77,7 +77,7 @@ class StepDecorator:
             state_kwargs = {}
             # input_state_class = sig.parameters['state'].annotation if 'state' in sig.parameters else None
             for param_name, param in sig.parameters.items():
-                if issubclass(param.annotation, StateBundle):
+                if issubclass(param.annotation, Artifact):
                     state_kwargs[param_name] = param.annotation
                 else:
                     # assert somehow that this is a config

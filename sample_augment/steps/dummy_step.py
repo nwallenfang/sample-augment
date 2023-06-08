@@ -1,8 +1,8 @@
-from sample_augment.data.state import StateBundle
+from sample_augment.data.artifact import Artifact
 from sample_augment.steps.step import step
 
 
-class DummyState(StateBundle):
+class DummyState(Artifact):
     important_state: int
 
 
