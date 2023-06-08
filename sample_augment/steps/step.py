@@ -5,12 +5,15 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from typing import List, Optional
 
-from sample_augment.params import Params
-from sample_augment.data.state import State, OutputState, InputState
+from pydantic import BaseModel
+
+from sample_augment.config import Config
+from sample_augment.data.state import State, StateBundle
 
 import importlib
 
 from sample_augment.steps.step_id import StepID
+from sample_augment.utils import log
 
 
 # define some rust-like result types, fun :)
@@ -35,8 +38,8 @@ class MissingDependency(DryRunResult):
 
 
 @dataclass
-class MissingParameter(DryRunResult):
-    missing_parameters: List[str]
+class MissingConfigEntry(DryRunResult):
+    missing_entries: List[str]
 
 
 class Step(ABC):
@@ -72,7 +75,15 @@ class Step(ABC):
         """
         raise NotImplementedError()
 
-    def dry_run(self, state: State, params: Params) -> DryRunResult:
+    @classmethod
+    def get_input_state_bundle(cls):
+        if cls != Step:
+            log.warn(f"{cls.__name__} has no custom InputState (overwrite get_input_state_class())")
+
+        # this method should be overridden by subclasses
+        return StateBundle
+
+    def dry_run(self, state: State, params: Config) -> DryRunResult:
         # 1. Check environment
         err = self.check_environment()
         if err:
@@ -92,15 +103,11 @@ class Step(ABC):
             if required_entry not in params:
                 missing_parameters.append(required_entry)
         if missing_parameters:
-            return MissingParameter(missing_parameters)
+            return MissingConfigEntry(missing_parameters)
 
-        # TODO should the state be modified here?
-        #   else there is no reason to return the state
-        #   maybe change the step_state attribute?
-        # TODO change to OutputState instance, would like to make an empty one
         return OK(state)
 
     @classmethod
     @abstractmethod
-    def run(cls, state: InputState, params: Params) -> OutputState:
+    def run(cls, state: StateBundle, params: Config) -> StateBundle:
         pass

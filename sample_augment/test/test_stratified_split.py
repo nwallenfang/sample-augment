@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from sample_augment.data.dataset import SamplingAugDataset
+from sample_augment.steps.imagefolder_to_tensors import SamplingAugDataset
 from sample_augment.data.train_test_split import stratified_split
 
 

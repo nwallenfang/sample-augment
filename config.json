@@ -1,18 +1,8 @@
 {
   "name": "gc10",
-  "root_directory": "C:/Users/Nils/Documents/Masterarbeit/sample-augment/data/store",
-  "raw_dataset_path":"../data/store/gc10",
+  "root_directory": "/home/nils/thesis/sample-augment/data",
+  "raw_dataset_path":"/home/nils/thesis/sample-augment/data/gc10",
   "steps": [
-    "DownloadGC10"
-  ],
-  "bundles": {
-    "bundle1": {
-      "entry1": "hello",
-      "entry_value2": -1.0
-    },
-    "bundle2": {
-      "entry3": "hello2",
-      "entry_value4": -1.0
-    }
-  }
+    "DummyStep"
+  ]
 }

@@ -10,7 +10,8 @@ from torch.utils.data import Subset
 from torchvision.transforms import Normalize, Grayscale, ToTensor, Resize, Compose
 from torchvision.utils import make_grid
 
-from sample_augment.data.dataset import ImageDataset, SamplingAugDataset
+from sample_augment.data.dataset import ImageDataset
+from sample_augment.steps.imagefolder_to_tensors import SamplingAugDataset
 from sample_augment.data.train_test_split import stratified_split
 from sample_augment.utils.paths import project_path
 from sample_augment.data import dataset as dataset_package
@@ -32,7 +33,7 @@ def create_image_folder_dataset():
         Grayscale(num_output_channels=3),
         Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
+    dataset = ImageDataset(project_path('data/gc10'), transform=preprocessing)
     # dataset = GC10InMemoryDataset()
     train_dataset, test_dataset = stratified_split(dataset, train_ratio=0.8)
 

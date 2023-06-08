@@ -1,16 +1,14 @@
 import os.path
-import pickle
-import sys
 from pathlib import Path
 
 import numpy as np
 import torch
 import torchvision
-from torch import Tensor
 from torch.utils.data import TensorDataset
 from torchvision.transforms import Resize, Compose, Grayscale, ToTensor
 from tqdm import tqdm
 
+from sample_augment.steps.imagefolder_to_tensors import SamplingAugDataset
 from sample_augment.utils.log import log
 from sample_augment.utils.paths import project_path
 
@@ -22,83 +20,6 @@ class ImageDataset(torchvision.datasets.ImageFolder):
         Could for example also manage the secondary labels we have in GC-10.
     """
     pass
-
-
-class SamplingAugDataset(TensorDataset):
-    """
-        PyTorch TensorDataset with the extension that we're also saving the paths to the
-        original images.
-    """
-
-    def __init__(self, name: str, image_tensor: Tensor, label_tensor: Tensor,
-                 img_paths: list, root_dir: Path):
-        """
-        Args:
-            img_paths (list[Path]): list going from Tensor index to relative path of the given image
-            root_dir (Path): for resolving the relative paths from img_ids
-        """
-        super().__init__(image_tensor, label_tensor)
-        self.name = name
-        self.root_dir = root_dir
-        self.img_paths: list = img_paths
-
-    def get_img_id(self, index: int) -> str:
-        """
-            img_id is just the filename without the file ending and the redundant `img_` prefix
-        """
-        if isinstance(self.img_paths[index], Path):
-            img_id = str(self.img_paths[index].name)
-            img_id = img_id.split('.')[0][4:]
-        else:
-            img_id = self.img_paths[index]
-        return str(img_id)
-
-    def get_img_path(self, index: int) -> Path:
-        return Path.joinpath(self.root_dir, self.img_paths[index])
-
-    @classmethod
-    def load_from_file(cls, full_path: Path,
-                       root_dir_overwrite: Path = None) -> "SamplingAugDataset":
-        tensors = torch.load(full_path)
-
-        tensor_filename = full_path.stem
-        meta_path: Path = full_path.parents[0] / f"{tensor_filename}_meta.pkl"
-        if not meta_path.is_file():
-            log.error(
-                f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
-            raise ValueError(
-                f"CustomTensorDataset: meta file belonging to {tensor_filename} can't be found")
-        with open(meta_path, 'rb') as meta_file:
-            # for now, the img_paths still are OS dependent, so we sometimes struggle
-            name, root_dir_string, img_paths = pickle.load(meta_file)
-            # img_paths are relative so resolving these should always work
-            img_paths = [Path(path_string) for path_string in img_paths]
-
-        if root_dir_overwrite:
-            root_dir = root_dir_overwrite
-        else:
-            root_dir = Path(root_dir_string)
-            if not root_dir.is_dir():
-                log.error(
-                    f'CustomTensorDataset load(): Invalid root_dir "{root_dir_string}"'
-                    f' found in metafile.'
-                    f' Please provide `root_dir_overwrite` parameter.')
-                sys.exit(-1)
-
-        return SamplingAugDataset(name, tensors[0], tensors[1], root_dir=root_dir,
-                                  img_paths=img_paths)
-
-    def save_to_file(self, path: Path, description: str = "tensors"):
-        torch.save(self.tensors, path / f"{self.name}_{description}.pt")
-        # root dir and img ids are python primitives, should be easier like this
-        # since I had some trouble loading the CustomTensorDataset with torch.load
-
-        # make the Paths portable to other OS
-        img_paths_strings = [str(path) for path in self.img_paths]
-        root_dir_string = str(self.root_dir)
-
-        with open(path / f"{self.name}_{description}_meta.pkl", 'wb') as meta_file:
-            pickle.dump((self.name, root_dir_string, img_paths_strings), meta_file)
 
 
 def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
@@ -183,7 +104,7 @@ def main():
     ])
     # tensor_path
     if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
-        image_dataset = ImageDataset(project_path('data/gc-10'), transform=preprocessing)
+        image_dataset = ImageDataset(project_path('data/gc10'), transform=preprocessing)
         # TODO pass labels.json contents
         tensor_dataset: SamplingAugDataset = image_folder_to_tensor_dataset(image_dataset)
         del image_dataset
@@ -213,7 +134,7 @@ def test_duplicate_ids():
         # Optimally, the Generator should generate images with this distribution as well.
         # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    image_dataset = ImageDataset(project_path('data/gc-10-mini'), transform=preprocessing)
+    image_dataset = ImageDataset(project_path('data/gc10-mini'), transform=preprocessing)
     tensor_dataset: SamplingAugDataset = image_folder_to_tensor_dataset(image_dataset)
     del image_dataset
     assert isinstance(tensor_dataset, TensorDataset)

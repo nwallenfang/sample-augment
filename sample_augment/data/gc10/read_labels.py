@@ -65,7 +65,7 @@ def read_xml_labels() -> Dict:
     """
     load_gc10_if_missing()
 
-    label_directory = project_path('data/gc-10/lable')
+    label_directory = project_path('data/gc10/lable')
     id_to_labels = {}
 
     for filename in os.listdir(label_directory):
@@ -99,7 +99,7 @@ def read_directory_labels() -> Dict:
     """
     id_to_labels = {}
     for label in range(1, 11):
-        for filename in os.listdir(project_path(f'data/gc-10/{label}')):
+        for filename in os.listdir(project_path(f'data/gc10/{label}')):
             image_id = filename.split('.')[0][4:]  # cut out 'img_'
             id_to_labels[image_id] = label
 
@@ -139,7 +139,7 @@ def compare_dir_and_xml_labels(xml_labels: Dict, dir_labels: Dict):
         dir_label, xml_label = dir_labels[name], xml_labels[name]['y']
         if xml_label == 'all':
             continue  # skip these for now
-        path = project_path(f"data/gc-10/{dir_label}/img_{name}.jpg")
+        path = project_path(f"data/gc10/{dir_label}/img_{name}.jpg")
         img = matplotlib.image.imread(path)
 
         secondary_labels = [LABEL_TO_NAME[label] for label in xml_labels[name]['secondary']]

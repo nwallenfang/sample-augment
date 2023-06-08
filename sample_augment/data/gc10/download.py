@@ -15,7 +15,7 @@ def download_gc10(path):
 
 
 def load_gc10_if_missing():
-    gc10_path = project_path("data/gc-10")
+    gc10_path = project_path("data/gc10")
 
     if not os.path.exists(gc10_path):
         download_gc10(gc10_path)

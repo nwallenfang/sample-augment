@@ -9,7 +9,7 @@ import click
 from pydantic import ValidationError
 
 from sample_augment.experiment import Experiment
-from sample_augment.params import Params
+from sample_augment.config import Config
 from sample_augment.steps.step_id import StepID
 from sample_augment.utils.log import log
 
@@ -25,14 +25,17 @@ def init():
     for _, module_name, _ in pkgutil.iter_modules(package.__path__):
         # Import each module in the package
         importlib.import_module(f'{package_name}.{module_name}')
+    # TODO assert there are no duplicate subclasses!
     all_step_classes = {step_class.__name__: step_class for step_class in Step.__subclasses__()}
 
     StepID.initialize(possible_ids=list(all_step_classes.keys()))
-    Params.step_classes = all_step_classes
+    Config.step_classes = all_step_classes
 
 
 @click.command()
-def main():
+@click.option('arg_config', '--config', default=None, type=click.Path(), help='Path to the configuration '
+                                                                              'file.')
+def main(arg_config):
     """
         CLI for running experiments concerning
     """
@@ -41,7 +44,12 @@ def main():
     # I could see there some arg parsing going on before constructing a full Config instance.
     # so in the future it won't be like it is now with a whole json file always being parsed
 
-    config_path = Path('../config.json')
+    # TODO
+    if arg_config is None:
+        config_path = Path(__file__).parent.parent / 'config.json'
+        log.info(f"Using default config path {config_path.absolute()}")
+    else:
+        config_path = Path(arg_config)
 
     # config_preprocessing
     try:
@@ -61,10 +69,10 @@ def main():
     # try reading config file
     try:
         # maybe add command line args to config.json as well
-        params = Params.parse_obj(param_dict)
+        params = Config.parse_obj(param_dict)
     except ValidationError as e:
-        print(str(e))
-        print(f"Validation failed for {config_path.name}, exiting.")
+        log.error(str(e))
+        log.error(f"Validation failed for {config_path.name}, exiting.")
         sys.exit(1)
 
     # create Experiment instance
