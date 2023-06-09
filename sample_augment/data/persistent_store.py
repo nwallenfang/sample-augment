@@ -55,7 +55,7 @@ class DiskPersistentStore(PersistentStore):
                 state = ArtifactStore.parse_file(state_path)
             except ValidationError as err:
                 log.error(str(err))
-                log.warning(f"Failed to parse {state_path.name}, starting with empty State.")
+                log.warning(f"Failed to parse {state_path.name}, starting with empty ArtifactStore.")
                 return ArtifactStore()
             # TODO verify that State is valid, i.e. all file handles exist
             #  in theory this would

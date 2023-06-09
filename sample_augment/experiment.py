@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import sys
-from typing import List, Set, Dict
+from typing import List, Dict
 
 from sample_augment.config import Config
 from sample_augment.data.artifact import ArtifactStore, Artifact
 from sample_augment.data.persistent_store import PersistentStore, DiskPersistentStore
 from sample_augment.steps.step import Step, get_step
 from sample_augment.utils.log import log
-
-# from sample_augment.steps import dummy_step
 
 
 class Experiment:
@@ -75,7 +73,7 @@ class Experiment:
             state_args_filled: Dict[str, Artifact] = {}
             for arg_name, arg_type in step.state_args.items():
                 try:
-                    artifact = self.state.extract_bundle(arg_type)
+                    artifact = self.state[arg_type]
                     state_args_filled[arg_name] = artifact
                 except ValueError as err:
                     log.error(str(err))
@@ -86,7 +84,7 @@ class Experiment:
             config_args_filled = {key: self.config.__getattribute__(key) for key in step.config_args.keys()}
             output_state: Artifact = step(**state_args_filled, **config_args_filled)
 
-            self.state.completed_steps.append(type(step).__name__)
+            self.state.completed_steps.append(step.name)
             self.state.merge_artifact_into(output_state)
 
         self.store.save(self.state, self.config)

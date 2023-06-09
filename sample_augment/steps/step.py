@@ -54,49 +54,43 @@ class StepDecorator:
         return self.all_steps
 
     # TODO env_check callable as optional parameter
-    def step(self, name=None):
-        def decorator(func):
-            # Default step_id is the function name converted to CamelCase
+    def step(self, func_or_name=None):
+        if callable(func_or_name):  # If used as a simple decorator, arg is the decorated function
+            return self._register_step(func_or_name)
 
-            nonlocal name
-            if name is None:
-                name = _snake_to_camel(func.__name__)
+        else:  # If used as a decorator factory, arg is the argument passed to the factory
+            def decorator(func):
+                return self._register_step(func, func_or_name)
+            return decorator
 
-            if name in self.all_steps:
-                raise ValueError(
-                    f"Step ID '{name}' is already registered. Please choose a different step ID.")
+    def _register_step(self, func, name=None):
+        # Default step_id is the function name converted to CamelCase
+        if name is None:
+            name = _snake_to_camel(func.__name__)
 
-            sig = inspect.signature(func)
-            # TODO don't force the user to call this 'state'. instead check each argument if it's a subclass
-            #   of StateBundle
-            # TODO be more flexible, make accepting a state optional and allow for acceptance of multiple
-            #  different states
-            # TODO allow returning a tuple of State
+        if name in self.all_steps:
+            raise ValueError(
+                f"Step ID '{name}' is already registered. Please choose a different step ID.")
 
-            config_kwargs = {}
-            state_kwargs = {}
-            # input_state_class = sig.parameters['state'].annotation if 'state' in sig.parameters else None
-            for param_name, param in sig.parameters.items():
-                if issubclass(param.annotation, Artifact):
-                    state_kwargs[param_name] = param.annotation
-                else:
-                    # assert somehow that this is a config
-                    config_kwargs[param_name] = param.annotation
+        sig = inspect.signature(func)
 
-            # input_states = []
-            # if input_state_class:
-            #     input_states.append(input_state_class)
+        config_kwargs = {}
+        state_kwargs = {}
+        for param_name, param in sig.parameters.items():
+            if issubclass(param.annotation, Artifact):
+                state_kwargs[param_name] = param.annotation
+            else:
+                # assert somehow that this is a config
+                config_kwargs[param_name] = param.annotation
 
-            self.all_steps[name] = Step(
-                name=name,
-                func=func,
-                state_args=state_kwargs,
-                config_args=config_kwargs
-            )
-            log.debug(f'Registered step {name}.')
-            return func
-
-        return decorator
+        self.all_steps[name] = Step(
+            name=name,
+            func=func,
+            state_args=state_kwargs,
+            config_args=config_kwargs
+        )
+        log.debug(f'Registered step {name}.')
+        return func
 
     def get_step(self, name) -> Step:
         if name not in self.all_steps:
