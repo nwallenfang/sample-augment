@@ -19,3 +19,15 @@ def dummy_producer() -> DummyState:
         important_state=11,
         overwrite=True
     )
+
+
+def test_dummy_step():
+    # TODO run dummy step with some simple interface
+    #  like Experiment.run("Dummy", config=Config.test_default)
+    #  either passing an InputState like this
+    #  Experiment.run("Dummy",
+    #                  config=Config.test_default,
+    #                  input_artifact=DummyState(..)
+    #  or else automatically resolve the producers that are needed to
+    #  provide the input artifact.
+    pass

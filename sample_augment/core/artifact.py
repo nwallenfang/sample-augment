@@ -7,6 +7,7 @@ from sample_augment.utils import log
 
 class Artifact(BaseModel):
     """
+        TODO update docs
         Represents a subset of the State. Any Step instance expects a StateBundle instance
         in its run() method.
         This base class is basically an empty state.
@@ -16,6 +17,9 @@ class Artifact(BaseModel):
 
 
 class ArtifactStore(BaseModel):
+    """
+        TODO docs
+    """
     artifacts: Dict[str, Artifact] = {}
     completed_steps: List[str] = []
 
