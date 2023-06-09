@@ -11,7 +11,7 @@ from torchvision.transforms import Normalize, Grayscale, ToTensor, Resize, Compo
 from torchvision.utils import make_grid
 
 from sample_augment.data.dataset import ImageDataset
-from sample_augment.steps.imagefolder_to_tensors import SamplingAugDataset
+from sample_augment.data.imagefolder_to_tensors import SamplingAugDataset
 from sample_augment.data.train_test_split import stratified_split
 from sample_augment.utils.paths import project_path
 from sample_augment.data import dataset as dataset_package

@@ -1,5 +1,5 @@
-from sample_augment.data.artifact import Artifact
-from sample_augment.steps.step import step
+from sample_augment.core.artifact import Artifact
+from sample_augment.core.step import step
 
 
 class DummyState(Artifact):

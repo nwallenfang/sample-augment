@@ -6,9 +6,9 @@ from pathlib import Path
 import click
 from pydantic import ValidationError
 
-from sample_augment.experiment import Experiment
-from sample_augment.config import Config
-from sample_augment.steps.step import import_step_modules
+from sample_augment.core.experiment import Experiment
+from sample_augment.core.config import Config
+from sample_augment.core.step import import_step_modules
 from sample_augment.utils.log import log
 
 
@@ -58,7 +58,7 @@ def main(arg_config: Path = None):
     # so in the future it won't be like it is now with a whole json file always being parsed
     config = read_config(arg_config)
 
-    steps = import_step_modules(root_modules=['steps'])
+    import_step_modules(root_modules=['test', 'data'])
 
     # log.debug(steps)
 

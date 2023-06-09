@@ -5,8 +5,8 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from sample_augment.config import Config
-from sample_augment.data.artifact import ArtifactStore
+from sample_augment.core.config import Config
+from sample_augment.core.artifact import ArtifactStore
 from sample_augment.utils import log
 
 

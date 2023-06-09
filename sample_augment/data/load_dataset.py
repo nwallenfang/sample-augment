@@ -1,9 +1,9 @@
 from typing import Optional
 
-from sample_augment.config import Config
-from sample_augment.data.artifact import Artifact
-from sample_augment.data.persistent_store import PersistentStore
-from sample_augment.steps.step import Step
+from sample_augment.core.config import Config
+from sample_augment.core.artifact import Artifact
+from sample_augment.core.persistent_store import PersistentStore
+from sample_augment.core.step import Step
 
 
 class LoadDataset(Step):

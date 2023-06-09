@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Subset
 from torchvision.datasets import ImageFolder
 
-from sample_augment.steps.imagefolder_to_tensors import SamplingAugDataset
+from sample_augment.data.imagefolder_to_tensors import SamplingAugDataset
 from sample_augment.utils.log import log
 
 

@@ -3,7 +3,7 @@ from pathlib import Path
 import torch
 from matplotlib import pyplot as plt
 
-from sample_augment.steps.imagefolder_to_tensors import SamplingAugDataset
+from sample_augment.data.imagefolder_to_tensors import SamplingAugDataset
 from sample_augment.utils.paths import project_path
 
 

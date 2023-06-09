@@ -3,7 +3,7 @@ from typing import Dict, List, ClassVar, Type
 
 from pydantic import Extra, DirectoryPath, BaseModel
 
-from sample_augment.steps.step_id import StepID
+from sample_augment.core.step_id import StepID
 
 
 class SubConfig(BaseModel, extra=Extra.allow, allow_mutation=False):

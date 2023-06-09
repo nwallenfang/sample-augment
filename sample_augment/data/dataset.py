@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset
 from torchvision.transforms import Resize, Compose, Grayscale, ToTensor
 from tqdm import tqdm
 
-from sample_augment.steps.imagefolder_to_tensors import SamplingAugDataset
+from sample_augment.data.imagefolder_to_tensors import SamplingAugDataset
 from sample_augment.utils.log import log
 from sample_augment.utils.paths import project_path
 

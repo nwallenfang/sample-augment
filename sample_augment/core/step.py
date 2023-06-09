@@ -7,7 +7,7 @@ from typing import Type, Dict, Any, Callable, List
 
 from pydantic import BaseModel
 
-from sample_augment.data.artifact import Artifact
+from sample_augment.core.artifact import Artifact
 from sample_augment.utils import log
 
 
@@ -44,8 +44,7 @@ class Step(Callable, BaseModel):
 class StepDecorator:
     # TODO document this class well since the code is complex
     # TODO maybe this class can then be removed. Would be good to remove this state
-    def __init__(self):
-        self.all_steps = {}
+    all_steps = {}
 
     def __repr__(self):
         return f"{str(self.all_steps)}"

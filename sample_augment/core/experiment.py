@@ -3,10 +3,10 @@ from __future__ import annotations
 import sys
 from typing import List, Dict
 
-from sample_augment.config import Config
-from sample_augment.data.artifact import ArtifactStore, Artifact
-from sample_augment.data.persistent_store import PersistentStore, DiskPersistentStore
-from sample_augment.steps.step import Step, get_step
+from sample_augment.core.config import Config
+from sample_augment.core.artifact import ArtifactStore, Artifact
+from sample_augment.core.persistent_store import PersistentStore, DiskPersistentStore
+from sample_augment.core.step import Step, get_step
 from sample_augment.utils.log import log
 
 
