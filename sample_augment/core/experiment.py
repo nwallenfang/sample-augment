@@ -3,10 +3,9 @@ from __future__ import annotations
 import sys
 from typing import List, Dict
 
-from sample_augment.core.config import Config
-from sample_augment.core.artifact import ArtifactStore, Artifact
-from sample_augment.core.persistent_store import PersistentStore, DiskPersistentStore
-from sample_augment.core.step import Step, get_step
+from sample_augment.core import Config
+from sample_augment.core import Store, Artifact
+from sample_augment.core import Step, get_step
 from sample_augment.utils.log import log
 
 
@@ -14,22 +13,17 @@ class Experiment:
     """
         TODO class docs
     """
-    pipeline: List[Step]
-
-    store: PersistentStore
-    state: ArtifactStore
+    pipeline: List[Step]  # maybe replace with target: Step and the pipeline gets built dynamically?
+    store: Store
     config: Config
 
     def __init__(self, config: Config):
         self.config = config
 
-        # create StateStore instance pointing to directory from config file
-        self.store = DiskPersistentStore(config.root_directory)
-
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
-        state = self.store.load_from_config(config)
-        self.state = state
+        # state = self.store.load_from_config(config)
+        self.store = Store()  # TODO load from config
 
         # build Pipeline by instantiating the ExperimentSteps that are declared in the `steps` config entry.
         self.pipeline = []
@@ -73,7 +67,7 @@ class Experiment:
             state_args_filled: Dict[str, Artifact] = {}
             for arg_name, arg_type in step.state_args.items():
                 try:
-                    artifact = self.state[arg_type]
+                    artifact = self.store[arg_type]
                     state_args_filled[arg_name] = artifact
                 except ValueError as err:
                     log.error(str(err))
@@ -84,7 +78,8 @@ class Experiment:
             config_args_filled = {key: self.config.__getattribute__(key) for key in step.config_args.keys()}
             output_state: Artifact = step(**state_args_filled, **config_args_filled)
 
-            self.state.completed_steps.append(step.name)
-            self.state.merge_artifact_into(output_state)
+            self.store.completed_steps.append(step.name)
+            self.store.merge_artifact_into(output_state)
 
-        self.store.save(self.state, self.config)
+        # TODO save ArtifactStore
+        # self.store.save(self.state, self.config)
