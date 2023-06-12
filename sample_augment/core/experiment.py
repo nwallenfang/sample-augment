@@ -3,9 +3,10 @@ from __future__ import annotations
 import sys
 from typing import List, Dict
 
-from sample_augment.core import Config
+from sample_augment.core import Config, get_step
 from sample_augment.core import Store, Artifact
-from sample_augment.core import Step, get_step
+from sample_augment.core import Step
+from sample_augment.core.step import step_registry
 from sample_augment.utils.log import log
 
 
@@ -13,7 +14,6 @@ class Experiment:
     """
         TODO class docs
     """
-    pipeline: List[Step]  # maybe replace with target: Step and the pipeline gets built dynamically?
     store: Store
     config: Config
 
@@ -23,63 +23,42 @@ class Experiment:
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
         # state = self.store.load_from_config(config)
-        self.store = Store()  # TODO load from config
-
-        # build Pipeline by instantiating the ExperimentSteps that are declared in the `steps` config entry.
-        self.pipeline = []
-
-        for step_id in config.steps:
-            self.pipeline.append(get_step(step_id))
-
-    # def dry_run(self) -> List[DryRunResult]:
-    #     dry_run_state = self.state.copy()  # maybe need to do a deep copy
-    #     errors: List[DryRunResult] = []
-    #     for step in self.pipeline:
-    #         result = step.dry_run(dry_run_state, self.config)
-    #         if isinstance(result, OK):
-    #             # TODO merge states
-    #             dry_run_state = result.state
-    #             continue
-    #         elif isinstance(result, EnvironmentMismatch):
-    #             log.error(f'EnvironmentMismatch in step {step}. Error message: "{result.mismatch_details}"')
-    #         elif isinstance(result, MissingConfigEntry):
-    #             log.error(f'Required config entry missing in step {type(step).__name__}. '
-    #                       f'Missing entries: {result.missing_entries}')
-    #         else:
-    #             assert isinstance(result, MissingDependency)
-    #             log.error(f'Required dependency steps have not run yet for step {step}. '
-    #                       f'Missing dependencies: {result.missing_steps}')
-    #
-    #         errors.append(result)
-    #
-    #     return errors
+        self.store = Store()  # TODO load cached Store from config (check hash)
 
     def __repr__(self):
         return f"Experiment_{self.config.name}_{self.config.get_hash()[:3]}"
 
-    def run(self):
-        for step in self.pipeline:
-            log.info(f"Running step {step.name}.")
+    def run_step(self, step: Step):
+        state_args_filled: Dict[str, Artifact] = {}
+        for arg_name, arg_type in step.state_args.items():
+            try:
+                artifact = self.store[arg_type]
+                state_args_filled[arg_name] = artifact
+            except ValueError as err:
+                log.error(str(err))
+                sys.exit(-1)
+
+        # TODO type checking, satsifiability
+        # extract required entries from config
+        config_args_filled = {key: self.config.__getattribute__(key) for key in step.config_args.keys()}
+        output_state: Artifact = step(**state_args_filled, **config_args_filled)
+
+        self.store.completed_steps.append(step.name)
+        self.store.merge_artifact_into(output_state)
+
+    def run(self, target_name: str):
+        target = get_step(target_name)
+        dependencies = step_registry.resolve_dependencies(target)
+        for step in dependencies:
+            log.info(f"Running dependency {step.name}.")
             # get the StateBundle model this step expects to receive
             # it's a subset of the State
             # and a subclass of StateBundle
             # noinspection PyPep8Naming
-            state_args_filled: Dict[str, Artifact] = {}
-            for arg_name, arg_type in step.state_args.items():
-                try:
-                    artifact = self.store[arg_type]
-                    state_args_filled[arg_name] = artifact
-                except ValueError as err:
-                    log.error(str(err))
-                    sys.exit(-1)
+            self.run_step(step)
 
-            # TODO type checking, satsifiability
-            # extract required entries from config
-            config_args_filled = {key: self.config.__getattribute__(key) for key in step.config_args.keys()}
-            output_state: Artifact = step(**state_args_filled, **config_args_filled)
-
-            self.store.completed_steps.append(step.name)
-            self.store.merge_artifact_into(output_state)
-
+        # run target
+        log.info(f"Running target {target.name}.")
+        self.run_step(target)
         # TODO save ArtifactStore
-        # self.store.save(self.state, self.config)
+        self.store.save(self.config.root_directory)

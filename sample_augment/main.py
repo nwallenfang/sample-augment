@@ -31,9 +31,6 @@ def read_config(arg_config: Path = None) -> Config:
         log.error(f"Failed to parse {config_path.name}, exiting.")
         sys.exit(-1)
 
-    # some preprocessing to have steps conform to StepID format
-    param_dict['steps'] = [{'id': x} for x in param_dict['steps']]
-
     # try reading config file
     try:
         # maybe add command line args to config.json as well

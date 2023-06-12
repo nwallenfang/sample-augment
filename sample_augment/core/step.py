@@ -41,10 +41,12 @@ class Step(Callable, BaseModel):
         pass
 
 
-class StepDecorator:
+class StepRegistry:
     # TODO document this class well since the code is complex
     # TODO maybe this class can then be removed. Would be good to remove this state
     all_steps = {}
+    producers: Dict[Type[Artifact], List[Step]] = {}
+    consumers: Dict[Type[Artifact], List[Step]] = {}
 
     def __repr__(self):
         return f"{str(self.all_steps)}"
@@ -82,12 +84,25 @@ class StepDecorator:
                 # assert somehow that this is a config
                 config_kwargs[param_name] = param.annotation
 
-        self.all_steps[name] = Step(
+        new_step = Step(
             name=name,
             func=func,
             state_args=state_kwargs,
             config_args=config_kwargs
         )
+
+        for artifact in new_step.state_args.values():
+            self.consumers.setdefault(artifact, []).append(new_step)
+
+        # if this function returns something it should be an Artifact, and it will get added to producers
+        if 'return' in func.__annotations__:
+            produced_artifact = func.__annotations__['return']
+            if not issubclass(produced_artifact, Artifact):
+                raise ValueError(
+                    f"Return type {produced_artifact} of step '{name}' is not a subclass of Artifact.")
+            self.producers.setdefault(produced_artifact, []).append(new_step)
+
+        self.all_steps[name] = new_step
         log.debug(f'Registered step {name}.')
         return func
 
@@ -96,6 +111,16 @@ class StepDecorator:
             raise ValueError(f"Step with name {name} is not registered in StepManager. Available steps: "
                              f"{self.all_steps}")
         return self.all_steps[name]
+
+    def resolve_dependencies(self, target_step: Step):
+        deps = []
+        for artifact in target_step.state_args.values():
+            if artifact not in self.producers:
+                raise ValueError(f"No step found that produces {artifact}")
+            for producer in self.producers[artifact]:
+                deps.append(producer)
+                deps.extend(self.resolve_dependencies(producer))
+        return deps
 
 
 def import_step_modules(root_modules: List[str]):
@@ -112,9 +137,7 @@ def import_step_modules(root_modules: List[str]):
 
 
 # step manager singleton instance for accessing all steps.
-_step_decorator = StepDecorator()
+step_registry = StepRegistry()
 # redeclare the step decorator so it's easily importable
-step = _step_decorator.step
-
-# TODO needed? remove
-get_step = _step_decorator.get_step
+step = step_registry.step
+get_step = step_registry.get_step

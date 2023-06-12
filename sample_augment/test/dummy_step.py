@@ -1,5 +1,9 @@
+from pathlib import Path
+
+from sample_augment.core import Experiment
 from sample_augment.core.artifact import Artifact
 from sample_augment.core.step import step
+from sample_augment.main import read_config
 
 
 class DummyState(Artifact):
@@ -8,7 +12,6 @@ class DummyState(Artifact):
 
 @step
 def dummy(state: DummyState, random_seed: float):
-    print("hello world!")
     print(f"important state: {state.important_state}")
     print(f"random_seed: {random_seed}")
 
@@ -16,8 +19,7 @@ def dummy(state: DummyState, random_seed: float):
 @step
 def dummy_producer() -> DummyState:
     return DummyState(
-        important_state=11,
-        overwrite=True
+        important_state=11
     )
 
 
@@ -30,4 +32,7 @@ def test_dummy_step():
     #                  input_artifact=DummyState(..)
     #  or else automatically resolve the producers that are needed to
     #  provide the input artifact.
-    pass
+    config = read_config(Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\config.json"))
+    experiment = Experiment(config=config)
+    experiment.run(target_name="Dummy")
+
