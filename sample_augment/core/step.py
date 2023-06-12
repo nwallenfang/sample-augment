@@ -55,19 +55,21 @@ class StepRegistry:
         return self.all_steps
 
     # TODO env_check callable as optional parameter
-    def step(self, func_or_name=None):
-        if callable(func_or_name):  # If used as a simple decorator, arg is the decorated function
-            return self._register_step(func_or_name)
+    def step(self, name=None):
+        if callable(name):  # if used without name argument the "name" is function being decorated
+            return self._register_step(name)
 
-        else:  # If used as a decorator factory, arg is the argument passed to the factory
+        else:
+            # if using the name argument, this method @step() is what's called a decorator factory
+            # we inject the function name into the decorator and return it
             def decorator(func):
-                return self._register_step(func, func_or_name)
+                return self._register_step(func, name)
             return decorator
 
     def _register_step(self, func, name=None):
         # Default step_id is the function name converted to CamelCase
         if name is None:
-            name = _snake_to_camel(func.__name__)
+            name = _snake_to_camel(func.__name__)  # maybe we should skip the snake to camel
 
         if name in self.all_steps:
             raise ValueError(

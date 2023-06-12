@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import sys
-from typing import List, Dict
+from typing import Dict
 
-from sample_augment.core import Config, get_step
-from sample_augment.core import Store, Artifact
-from sample_augment.core import Step
+from sample_augment.core import Step, Config, get_step, Store, Artifact
 from sample_augment.core.step import step_registry
 from sample_augment.utils.log import log
 
@@ -16,6 +14,8 @@ class Experiment:
     """
     store: Store
     config: Config
+    CONFIG_HASH_CUTOFF: int = 5
+
 
     def __init__(self, config: Config):
         self.config = config
@@ -23,7 +23,7 @@ class Experiment:
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
         # state = self.store.load_from_config(config)
-        self.store = Store()  # TODO load cached Store from config (check hash)
+        self.store = Store(root_directory=config.root_directory)
 
     def __repr__(self):
         return f"Experiment_{self.config.name}_{self.config.get_hash()[:3]}"
@@ -47,6 +47,10 @@ class Experiment:
         self.store.merge_artifact_into(output_state)
 
     def run(self, target_name: str):
+        # TODO load ArtifactStore.
+        # The ArtifactStore should be located under the root dir and have a name f"store_{config.get_hash()}".
+        # if the ArtifactStore already contains the needed Artifact, we can skip the dependency step.
+
         target = get_step(target_name)
         dependencies = step_registry.resolve_dependencies(target)
         for step in dependencies:
@@ -60,5 +64,5 @@ class Experiment:
         # run target
         log.info(f"Running target {target.name}.")
         self.run_step(target)
-        # TODO save ArtifactStore
-        self.store.save(self.config.root_directory)
+
+        self.store.save(self.config.get_hash()[:self.CONFIG_HASH_CUTOFF])

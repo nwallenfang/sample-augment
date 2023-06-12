@@ -25,32 +25,46 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
     def fully_qualified_name(self):
         return f'{self.__module__}.{self.__class__.__name__}'
 
-    def save(self, path: Path) -> Dict:
+    def to_dict(self, root_directory: Path) -> Dict:
         # rename since save is not a fitting name anymore
         # TODO docs
         data = {}
 
         for field_name, field_type in self.__annotations__.items():
-            value = getattr(self, field_name)
+            field = getattr(self, field_name)
 
+            # Tensors and Arrays should get saved to external files (large binary blobs)
+            #
             if issubclass(field_type, torch.Tensor):
-                torch.save(value, str(path / f'{self.__class__.__name__}_{field_name}.pt'))
+                save_path = root_directory / f'{self.__class__.__name__}_{field_name}.pt'
+
+                torch.save(field, str(save_path))
                 data[field_name] = {'type': 'torch.Tensor',
-                                    'path': f'{self.__class__.__name__}_{field_name}.pt'}
+                                    'path': f'{str(save_path.relative_to(root_directory))}'}
             elif issubclass(field_type, np.ndarray):
-                np.save(str(path / f'{self.__class__.__name__}_{field_name}.npy'), value)
+                save_path = root_directory / f'{self.__class__.__name__}_{field_name}.npy'
+                np.save(str(save_path), field)
                 data[field_name] = {'type': 'numpy.ndarray',
-                                    'path': f'{self.__class__.__name__}_{field_name}.npy'}
+                                    'path': f'{str(save_path.relative_to(root_directory))}'}
             elif issubclass(field_type, Artifact):
-                subartifact_dict = value.save(path)
+                # field is a sub-artifact. Recursively save it.
+                subartifact_dict = field.to_dict(root_directory)
                 data[field_name] = subartifact_dict
+            # TODO
+            elif issubclass(field_type, Path):
+                # make Path instances relative to config.root_dir
+                relative_path = field.relative_to(root_directory)
+                data[field_name] = {
+                    'type': 'pathlib.Path',  # might rather be purepath or something
+                    'path': str(relative_path)
+                }
             else:
-                data[field_name] = value
+                data[field_name] = field
 
         return data
 
     @classmethod
-    def load(cls, data: Dict, root_dir: Path):
+    def from_dict(cls, data: Dict, root_dir: Path):
         # with open(os.path.join(path, f'{cls.__name__}_data.json'), 'r') as f:
         #     data = json.load(f)
 
@@ -68,12 +82,16 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         return parse_obj_as(cls, data)
 
 
-class Store(BaseModel):
+class Store:
     """
         TODO docs
     """
+    root_directory: Path
     artifacts: Dict[str, Artifact] = {}
     completed_steps: List[str] = []
+
+    def __init__(self, root_directory: Path):
+        self.root_directory = root_directory
 
     def __len__(self):
         return len(self.artifacts)
@@ -110,21 +128,21 @@ class Store(BaseModel):
 
         return self.artifacts[artifact_type.__name__]
 
-    # TODO with this, persistent store class might not be needed anymore
-    def save(self, path: Path):
-        os.makedirs(path, exist_ok=True)
+    def save(self, run_identifier: str):
+        os.makedirs(self.root_directory, exist_ok=True)
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
             log.info(f"Saving {artifact_name}")
-            artifact_dict = artifact.save(path)
+            artifact_dict = artifact.to_dict(self.root_directory)
             data[artifact.fully_qualified_name] = artifact_dict
 
-        with open(path / 'data.json', 'w') as f:
-            json.dump(data, f)
+        with open(self.root_directory / f'store_{run_identifier}.json', 'w') as f:
+            json.dump(data, f, indent=4)
 
     @classmethod
-    def load_from(cls, path: str):
+    def load_from(cls, path: str):  # TODO maybe pass dependencies instead
+        # TODO should this be a class method? hmm
         with open(os.path.join(path, 'data.json'), 'r') as f:
             data = json.load(f)
 
@@ -134,6 +152,6 @@ class Store(BaseModel):
             # module_name, class_name = artifact_data['__class__'].rsplit('.', 1)
             module_name, class_name = artifact_name.rsplit('.', 1)
             ArtifactSubclass = getattr(import_module(module_name), class_name)
-            artifacts[class_name] = ArtifactSubclass.load(artifact_data, path)
+            artifacts[class_name] = ArtifactSubclass.from_dict(artifact_data, path)
 
         return cls(artifacts=artifacts)

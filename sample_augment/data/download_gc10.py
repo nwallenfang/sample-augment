@@ -1,9 +1,8 @@
+import shutil
+import sys
 from pathlib import Path
-from typing import Optional
 
-from sample_augment.core.artifact import Artifact
-from sample_augment.core.step import Step
-from sample_augment.core.config import Config
+from sample_augment.core import step, Artifact
 from sample_augment.utils.log import log
 
 
@@ -12,38 +11,33 @@ class GC10Folder(Artifact):
     gc10_label_dir: Path
 
 
-class DownloadGC10(Step):
-    @classmethod
-    def get_input_state_bundle(cls):
-        # doesn't need specific InputState
-        return Artifact
+@step(name="DownloadGC10")  # using custom name, since it's not quite camel case
+def download_gc10(root_directory: Path) -> GC10Folder:
+    import kaggle
+    # TODO check if dataset is present
+    gc10_path = root_directory / 'gc10'
+    lable_dir = gc10_path / 'lable'
+    new_lable_dir = root_directory / 'gc10_labels'
 
-    @classmethod
-    def run(cls, state: Artifact, config: Config) -> GC10Folder:
-        import kaggle
-        import shutil
-
+    if not gc10_path.is_dir():
         log.info("Downloading GC10 dataset from kaggle..")
         kaggle.api.authenticate()  # throws IOError if API key is not configured
-        kaggle.api.dataset_download_files('alex000kim/gc10det',
-                                          path=config.raw_dataset_path,
-                                          unzip=True)
-        # move lable dir to
-        lable_dir = config.raw_dataset_path / 'lable'
-        new_lable_dir = config.root_directory / 'gc10_labels'
+        # noinspection PyBroadException
+        try:
+            kaggle.api.dataset_download_files('alex000kim/gc10det',
+                                              path=gc10_path,
+                                              unzip=True)
+        except Exception as err:  # should catch kaggle's ApiExcpetion, which is not importable.
+            log.error(str(err))
+            log.error("kaggle APIError while trying to Download GC10. Make sure your access token is valid.")
+            sys.exit(-1)
 
+        # move lable (sic) dir outside the gc10 dir to make it easily readable by PyTorch ImageFolder
+        # (which expects each class to have its own subdir)
         shutil.move(lable_dir, new_lable_dir)
+    else:
+        log.debug("Skipping GC10 since dir exists.")
 
-        return GC10Folder(imagefolder_path=config.raw_dataset_path, gc10_label_dir=new_lable_dir)
-
-    @staticmethod
-    def check_environment() -> Optional[str]:
-        return Step._check_package('kaggle')
-
-
-if __name__ == '__main__':
-    # DownloadGC10().run(DownloadGC10.DownloadGC10InputState())
-    # TODO the current method signature makes it pretty difficult to run a step individually
-    #   I would prefer if there was a Config subset and maybe even a way of calling the method
-    #   just by passing the state parameters individually
-    pass
+    assert gc10_path.is_dir()
+    assert new_lable_dir.is_dir()
+    return GC10Folder(imagefolder_path=gc10_path, gc10_label_dir=new_lable_dir)

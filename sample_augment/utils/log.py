@@ -25,6 +25,8 @@ class ColorLogFormatter(logging.Formatter):
     }
 
     def format(self, record):
+        # Pad the level name with spaces to a length of 7 (length of 'WARNING')
+        record.levelname = f"{record.levelname:<7}"
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
