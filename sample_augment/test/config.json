@@ -1,6 +1,6 @@
 {
   "random_seed": 41,
-  "name": "gc10-mini-test",
+  "name": "test",
   "root_directory": "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data",
   "target": "ImageFolderToTensors"
 }

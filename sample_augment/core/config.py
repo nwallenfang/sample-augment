@@ -49,4 +49,8 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     def __str__(self):
         return super.__str__(self)
 
-# we could add support for "subtasks", where they are given a new name and associated options
+    CONFIG_HASH_CUTOFF: int = 5
+
+    @property
+    def run_identifier(self):
+        return f"{self.name}_{self.get_hash()[:self.CONFIG_HASH_CUTOFF]}"

@@ -14,23 +14,25 @@ class Experiment:
     """
     store: Store
     config: Config
-    CONFIG_HASH_CUTOFF: int = 5
 
     def __init__(self, config: Config):
+        # TODO root_directory through .env file or sys env
         self.config = config
 
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
         # state = self.store.load_from_config(config)
-        store_file_path = config.root_directory / f"store_{config.get_hash()[:self.CONFIG_HASH_CUTOFF]}.json"
+        store_file_path = config.root_directory / f"store_{config.run_identifier}.json"
         if store_file_path.exists():
-            log.info(f"Loading store {store_file_path.name}")
             self.store = Store.load_from(store_file_path)
+            log.info(f"Loading store {store_file_path.name} with artifacts "
+                     f"{[a for a in self.store.artifacts]}")
+
         else:
             self.store = Store(config.root_directory)
 
     def __repr__(self):
-        return f"Experiment_{self.config.name}_{self.config.get_hash()[:self.CONFIG_HASH_CUTOFF]}"
+        return f"Experiment_{self.config.run_identifier}"
 
     def _run_step(self, step: Step):
         """
@@ -68,10 +70,13 @@ class Experiment:
         # The ArtifactStore should be located under the root dir and have a name f"store_{config.get_hash()}".
         # if the ArtifactStore already contains the needed Artifact, we can skip the dependency step.
         target = get_step(target_name)
+        # TODO ouput smth like either provide this artifact or ???
         pipeline = step_registry.resolve_dependencies(target)
         log.debug(f"{target_name} pipeline: {pipeline}")
-        pipeline = step_registry.filter_steps(pipeline, [type(artifact) for artifact in initial_artifacts])
-        log.debug(f"{target_name} filtered pipeline: {pipeline}")
+        if initial_artifacts:
+            pipeline = step_registry.reduce_steps(pipeline, [type(artifact) for artifact in
+                                                             initial_artifacts])
+            log.debug(f"{target_name} reduced pipeline: {pipeline}")
 
         if initial_artifacts:
             for artifact in initial_artifacts:
@@ -81,4 +86,9 @@ class Experiment:
             log.info(f"Running step {step.name}.")
             self._run_step(step)
 
-        self.store.save(self.config.get_hash()[:self.CONFIG_HASH_CUTOFF])
+        # Pipeline run is complete, save the produced artifacts and the config that was used
+        self.store.save(run_identifier=self.config.run_identifier)
+
+        with open(self.config.root_directory / f"config_{self.config.run_identifier}.json", 'w') as config_f:
+            config_f.write(self.config.json(indent=4))
+

@@ -1,7 +1,8 @@
 import numpy as np
 import torch
 
-from sample_augment.core.artifact import Artifact, Store
+from sample_augment.core.artifact import Artifact
+from sample_augment.core import Store
 
 
 class SimpleArtifact(Artifact):

@@ -4,7 +4,7 @@ import importlib
 import inspect
 import pkgutil
 import sys
-from typing import Type, Dict, Any, Callable, List
+from typing import Type, Dict, Any, Callable, List, Optional
 
 from pydantic import BaseModel
 
@@ -23,7 +23,7 @@ class Step(Callable, BaseModel):
 
     state_args: Dict[str, Type[Artifact]]
     config_args: Dict[str, Type[Any]]
-    produces: Type[Artifact]
+    produces: Optional[Type[Artifact]]
 
     # TODO add a method to easily get all consumed/produced Artifacts
 

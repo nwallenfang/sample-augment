@@ -11,7 +11,7 @@ def test_pipeline_with_gc10_mini():
     # maybe pass explicit pipeline as well
     # TODO see in dependency management that only the necessary steps get run
     # TODO get proper testing config, maybe use testing fixture for it
-    config = read_config(Path("test_config.json"))
+    config = read_config(Path("config.json"))
 
     import_step_modules(root_modules=['test', 'data'])
 
