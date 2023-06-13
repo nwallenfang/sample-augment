@@ -2,7 +2,7 @@ from pathlib import Path
 
 from sample_augment.core import Experiment
 from sample_augment.core.step import import_step_modules
-from sample_augment.data.imagefolder_to_tensors import ImageFolderPath
+from sample_augment.data.dataset import ImageFolderPath
 from sample_augment.main import read_config
 
 

@@ -4,7 +4,7 @@ import sys
 from typing import Dict, List
 
 from sample_augment.core import Step, Config, get_step, Store, Artifact
-from sample_augment.core.step import step_registry
+from sample_augment.core.step import step_registry, StepRegistry
 from sample_augment.utils.log import log
 
 
@@ -74,8 +74,8 @@ class Experiment:
         pipeline = step_registry.resolve_dependencies(target)
         log.debug(f"{target_name} pipeline: {pipeline}")
         if initial_artifacts:
-            pipeline = step_registry.reduce_steps(pipeline, [type(artifact) for artifact in
-                                                             initial_artifacts])
+            pipeline = StepRegistry.reduce_steps(pipeline, [type(artifact) for artifact in
+                                                            initial_artifacts])
             log.debug(f"{target_name} reduced pipeline: {pipeline}")
 
         if initial_artifacts:
@@ -91,4 +91,3 @@ class Experiment:
 
         with open(self.config.root_directory / f"config_{self.config.run_identifier}.json", 'w') as config_f:
             config_f.write(self.config.json(indent=4))
-

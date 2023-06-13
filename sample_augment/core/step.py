@@ -160,7 +160,7 @@ class StepRegistry:
         return step_stack
 
     @staticmethod
-    def filter_steps(pipeline: List[Step], initial_artifacts: List[Type[Artifact]]):
+    def reduce_steps(pipeline: List[Step], initial_artifacts: List[Type[Artifact]]):
         # remove all steps from pipeline whose produced artifacts are contained in initial artifacts
         filtered_pipeline = []
         for pipeline_step in pipeline:
