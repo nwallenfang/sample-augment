@@ -16,19 +16,27 @@ class Experiment:
     config: Config
     CONFIG_HASH_CUTOFF: int = 5
 
-
     def __init__(self, config: Config):
         self.config = config
 
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
         # state = self.store.load_from_config(config)
-        self.store = Store(root_directory=config.root_directory)
+        store_file_path = config.root_directory / f"store_{config.get_hash()[:self.CONFIG_HASH_CUTOFF]}.json"
+        if store_file_path.exists():
+            log.info(f"Loading store {store_file_path.name}")
+            self.store = Store.load_from(store_file_path)
+        else:
+            self.store = Store(config.root_directory)
 
     def __repr__(self):
         return f"Experiment_{self.config.name}_{self.config.get_hash()[:3]}"
 
-    def run_step(self, step: Step):
+    def _run_step(self, step: Step):
+        """
+            Run passed step, this method doesn't do error checking and
+             fails if the store/config doesn't contain necessary artifacts!
+        """
         state_args_filled: Dict[str, Artifact] = {}
         for arg_name, arg_type in step.state_args.items():
             try:
@@ -47,22 +55,18 @@ class Experiment:
         self.store.merge_artifact_into(output_state)
 
     def run(self, target_name: str):
-        # TODO load ArtifactStore.
         # The ArtifactStore should be located under the root dir and have a name f"store_{config.get_hash()}".
         # if the ArtifactStore already contains the needed Artifact, we can skip the dependency step.
-
         target = get_step(target_name)
         dependencies = step_registry.resolve_dependencies(target)
         for step in dependencies:
             log.info(f"Running dependency {step.name}.")
             # get the StateBundle model this step expects to receive
-            # it's a subset of the State
-            # and a subclass of StateBundle
-            # noinspection PyPep8Naming
-            self.run_step(step)
+            # it's a subset of the State and a subclass of StateBundle
+            self._run_step(step)
 
-        # run target
+        # now that all dependencies have run, run target
         log.info(f"Running target {target.name}.")
-        self.run_step(target)
+        self._run_step(target)
 
         self.store.save(self.config.get_hash()[:self.CONFIG_HASH_CUTOFF])

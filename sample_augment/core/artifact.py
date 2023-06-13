@@ -74,6 +74,8 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                     data[field] = torch.load(os.path.join(root_dir, value['path']))
                 elif value['type'] == 'numpy.ndarray':
                     data[field] = np.load(os.path.join(root_dir, value['path']))
+                elif value['type'] == 'pathlib.Path':
+                    data[field] = root_dir.joinpath(value['path'])
                 else:  # Artifact type (subartifact)
                     module_name, class_name = field.rsplit('.', 1)
                     ArtifactSubclass = getattr(import_module(module_name), class_name)
@@ -133,17 +135,18 @@ class Store:
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
-            log.info(f"Saving {artifact_name}")
+            log.debug(f"Saving artifact {artifact_name}")
             artifact_dict = artifact.to_dict(self.root_directory)
             data[artifact.fully_qualified_name] = artifact_dict
 
+        log.info(f"Saving store to store_{run_identifier}.json")
         with open(self.root_directory / f'store_{run_identifier}.json', 'w') as f:
             json.dump(data, f, indent=4)
 
     @classmethod
-    def load_from(cls, path: str):  # TODO maybe pass dependencies instead
+    def load_from(cls, path: Path):  # TODO maybe pass dependencies instead
         # TODO should this be a class method? hmm
-        with open(os.path.join(path, 'data.json'), 'r') as f:
+        with open(path, 'r') as f:
             data = json.load(f)
 
         artifacts = {}
@@ -154,4 +157,6 @@ class Store:
             ArtifactSubclass = getattr(import_module(module_name), class_name)
             artifacts[class_name] = ArtifactSubclass.from_dict(artifact_data, path)
 
-        return cls(artifacts=artifacts)
+        store = cls(path.parent)
+        store.artifacts = artifacts
+        return store
