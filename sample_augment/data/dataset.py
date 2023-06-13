@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset
 from torchvision.transforms import Resize, Compose, Grayscale, ToTensor
 from tqdm import tqdm
 
-from sample_augment.data.imagefolder_to_tensors import SamplingAugDataset
+from sample_augment.data.imagefolder_to_tensors import SampleAugmentDataset
 from sample_augment.utils.log import log
 from sample_augment.utils.paths import project_path
 
@@ -24,7 +24,7 @@ class ImageDataset(torchvision.datasets.ImageFolder):
 
 def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
                                    name: str = 'gc10',
-                                   true_labels: dict[str, int] = None) -> SamplingAugDataset:
+                                   true_labels: dict[str, int] = None) -> SampleAugmentDataset:
     """
         ImageFolder dataset is designed for big datasets that don't fit into RAM (think ImageNet).
         For GC10 we can easily load the whole dataset into RAM transform the ImageDataset into a
@@ -80,8 +80,8 @@ def image_folder_to_tensor_dataset(image_dataset: ImageDataset,
     image_data *= 255  # Now scale by 255
     image_data = image_data.astype(np.uint8)
     image_tensors = torch.from_numpy(image_data)
-    tensor_dataset = SamplingAugDataset(name, image_tensors, label_tensors, img_paths=img_paths,
-                                        root_dir=root_dir)
+    tensor_dataset = SampleAugmentDataset(name, image_tensors, label_tensors, img_ids=img_paths,
+                                          root_dir=root_dir)
     return tensor_dataset
 
 
@@ -106,13 +106,13 @@ def main():
     if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
         image_dataset = ImageDataset(project_path('data/gc10'), transform=preprocessing)
         # TODO pass labels.json contents
-        tensor_dataset: SamplingAugDataset = image_folder_to_tensor_dataset(image_dataset)
+        tensor_dataset: SampleAugmentDataset = image_folder_to_tensor_dataset(image_dataset)
         del image_dataset
         assert isinstance(tensor_dataset, TensorDataset)
         dataset_dir = Path(project_path('data/interim/', create=True))
         tensor_dataset.save_to_file(dataset_dir)
     else:
-        tensor_dataset = SamplingAugDataset.load_from_file(
+        tensor_dataset = SampleAugmentDataset.load_from_file(
             Path(project_path('data/interim/gc10_tensors.pt')))
 
     train_data, val_data, test_data = create_train_val_test_sets(tensor_dataset, random_seed=15)
@@ -135,7 +135,7 @@ def test_duplicate_ids():
         # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     image_dataset = ImageDataset(project_path('data/gc10-mini'), transform=preprocessing)
-    tensor_dataset: SamplingAugDataset = image_folder_to_tensor_dataset(image_dataset)
+    tensor_dataset: SampleAugmentDataset = image_folder_to_tensor_dataset(image_dataset)
     del image_dataset
     assert isinstance(tensor_dataset, TensorDataset)
     dataset_dir = Path(project_path('data/interim/', create=True))

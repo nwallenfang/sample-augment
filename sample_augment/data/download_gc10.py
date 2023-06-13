@@ -7,7 +7,7 @@ from sample_augment.utils.log import log
 
 
 class GC10Folder(Artifact):
-    imagefolder_path: Path
+    image_folder_path: Path
     gc10_label_dir: Path
 
 
@@ -40,4 +40,4 @@ def download_gc10(root_directory: Path) -> GC10Folder:
 
     assert gc10_path.is_dir()
     assert new_lable_dir.is_dir()
-    return GC10Folder(imagefolder_path=gc10_path, gc10_label_dir=new_lable_dir)
+    return GC10Folder(image_folder_path=gc10_path, gc10_label_dir=new_lable_dir)

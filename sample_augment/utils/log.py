@@ -13,20 +13,21 @@ class ColorLogFormatter(logging.Formatter):
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
     format = '%(levelname)s: %(message)s'  # our simplified format
-    # TODO add script location for warnings and errors
+    script_location = " (%(filename)s:%(lineno)d)"  # add script location for warnings/errors
     # format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
 
     FORMATS = {
         logging.DEBUG: grey + format + reset,
         logging.INFO: grey + format + reset,
-        logging.WARNING: yellow + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: bold_red + format + reset
+        logging.WARNING: yellow + format + script_location + reset,
+        logging.ERROR: red + format + script_location + reset,
+        logging.CRITICAL: bold_red + format + script_location + reset
     }
 
     def format(self, record):
         # Pad the level name with spaces to a length of 7 (length of 'WARNING')
         record.levelname = f"{record.levelname:<7}"
+
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)

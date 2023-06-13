@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from sample_augment.data.imagefolder_to_tensors import SamplingAugDataset
+from sample_augment.data.imagefolder_to_tensors import SampleAugmentDataset
 from sample_augment.data.train_test_split import stratified_split
 
 
@@ -14,7 +14,7 @@ def split_dummy_data(n, min_test_instances, number_of_1s=4):
     dummy_labels[:number_of_1s + 1] = 1
     # shuffle labels
     dummy_labels = dummy_labels[torch.randperm(dummy_labels.shape[0])]
-    dataset = SamplingAugDataset('dummy', dummy_data, dummy_labels, ['/'] * n, Path('/'))
+    dataset = SampleAugmentDataset('dummy', dummy_data, dummy_labels, ['/'] * n, Path('/'))
 
     train, test = stratified_split(dataset, random_seed=42, min_instances_per_class=min_test_instances)
 
@@ -38,8 +38,8 @@ def test_repeated_split():
     for i in range(n):
         dummy_data[i] = i
 
-    dataset = SamplingAugDataset(image_tensor=dummy_data, label_tensor=dummy_labels,
-                                 img_paths=[Path() for _ in range(n)], root_dir=Path(), name='test')
+    dataset = SampleAugmentDataset(image_tensor=dummy_data, label_tensor=dummy_labels,
+                                   img_ids=[Path() for _ in range(n)], root_dir=Path(), name='test')
 
     train_val, test = stratified_split(dataset, random_seed=42, min_instances_per_class=0)
     train, val = stratified_split(train_val, random_seed=42, min_instances_per_class=0)
@@ -73,8 +73,8 @@ def test_split_determinism():
     for i in range(n):
         dummy_data[i][:] = i
     dummy_labels = torch.zeros(n, dtype=torch.long)
-    dataset = SamplingAugDataset(image_tensor=dummy_data, label_tensor=dummy_labels,
-                                 img_paths=[Path() for _ in range(n)], root_dir=Path(), name='test')
+    dataset = SampleAugmentDataset(image_tensor=dummy_data, label_tensor=dummy_labels,
+                                   img_ids=[Path() for _ in range(n)], root_dir=Path(), name='test')
 
     train_1, test_1 = stratified_split(dataset, random_seed=42)
     train_2, test_2 = stratified_split(dataset, random_seed=42)

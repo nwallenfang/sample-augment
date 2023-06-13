@@ -4,6 +4,7 @@ from pydantic import Extra, DirectoryPath, BaseModel, Field
 
 
 class SubConfig(BaseModel, extra=Extra.allow, allow_mutation=False):
+    # not being used atm
     pass
 
 
@@ -14,7 +15,6 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     debug = True
     cache = False
 
-    # TODO can we make root_dir os independent? hmm doesn't need to be..
     root_directory: DirectoryPath = Field(exclude=True)
     # TODO maybe validate -> StepID
     target: str
@@ -27,7 +27,6 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
 
     def get_hash(self):
         json_bytes = self.json(sort_keys=True).encode('utf-8')
-        # TODO verify that
         model_hash = hashlib.sha256(json_bytes).hexdigest()
 
         return model_hash

@@ -1,5 +1,7 @@
+import inspect
 import json
 import os
+import typing
 from importlib import import_module
 from pathlib import Path
 from typing import Any, Union, List, Type, Dict
@@ -19,47 +21,71 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         This base class is basically an empty state.
         Subclasses will extend StateBundle and fill it with the state they need.
     """
-    overwrite = False
 
     @property
     def fully_qualified_name(self):
         return f'{self.__module__}.{self.__class__.__name__}'
 
+    @staticmethod
+    def _is_tuple_of_tensors(field_type):
+        if typing.get_origin(field_type) is tuple:
+            element_type = typing.get_args(field_type)[0]
+            return element_type is torch.Tensor
+        return False
+
+    def _serialize_field(self, field, field_name, field_type, root_directory):
+        # TODO we could maybe reduce some duplications here with some smart method extractions
+        if self._is_tuple_of_tensors(field_type):
+            serialized_tensor_strings = []
+            # hard-coded specifically for SampleAugmentDataset tensors
+            tensors = typing.cast(typing.Tuple[torch.Tensor, ...], field)
+
+            for idx, tensor in enumerate(tensors):
+                # serialize each tensor the same way we do it for individual tensors
+                save_path = root_directory / f'{self.__class__.__name__}_{field_name}{idx}.pt'
+                torch.save(tensor, str(save_path))
+                serialized_tensor_strings.append({
+                    "type": torch.Tensor,
+                    "path": Path("").relative_to(root_directory)
+                })
+            return serialized_tensor_strings
+        if not inspect.isclass(field_type):
+            # it's a primitive type or a list
+            # simply assign
+            return field
+
+        # Tensors and Arrays should get saved to external files (large binary blobs)
+        if issubclass(field_type, torch.Tensor):
+            save_path = root_directory / f'{self.__class__.__name__}_{field_name}.pt'
+            torch.save(field, str(save_path))
+            return {'type': 'torch.Tensor',
+                    'path': f'{str(save_path.relative_to(root_directory))}'}
+        elif issubclass(field_type, np.ndarray):
+            save_path = root_directory / f'{self.__class__.__name__}_{field_name}.npy'
+            np.save(str(save_path), field)
+            return {'type': 'numpy.ndarray',
+                    'path': f'{str(save_path.relative_to(root_directory))}'}
+        elif issubclass(field_type, Artifact):
+            # field is a sub-artifact. Recursively save it.
+            return field.to_dict(root_directory)
+        # TODO
+        elif issubclass(field_type, Path):
+            # make Path instances relative to config.root_dir
+            relative_path = field.relative_to(root_directory)
+            return {
+                'type': 'pathlib.Path',  # might rather be purepath or something
+                'path': str(relative_path)
+            }
+
+        return field
+
     def to_dict(self, root_directory: Path) -> Dict:
-        # rename since save is not a fitting name anymore
         # TODO docs
         data = {}
 
         for field_name, field_type in self.__annotations__.items():
             field = getattr(self, field_name)
-
-            # Tensors and Arrays should get saved to external files (large binary blobs)
-            #
-            if issubclass(field_type, torch.Tensor):
-                save_path = root_directory / f'{self.__class__.__name__}_{field_name}.pt'
-
-                torch.save(field, str(save_path))
-                data[field_name] = {'type': 'torch.Tensor',
-                                    'path': f'{str(save_path.relative_to(root_directory))}'}
-            elif issubclass(field_type, np.ndarray):
-                save_path = root_directory / f'{self.__class__.__name__}_{field_name}.npy'
-                np.save(str(save_path), field)
-                data[field_name] = {'type': 'numpy.ndarray',
-                                    'path': f'{str(save_path.relative_to(root_directory))}'}
-            elif issubclass(field_type, Artifact):
-                # field is a sub-artifact. Recursively save it.
-                subartifact_dict = field.to_dict(root_directory)
-                data[field_name] = subartifact_dict
-            # TODO
-            elif issubclass(field_type, Path):
-                # make Path instances relative to config.root_dir
-                relative_path = field.relative_to(root_directory)
-                data[field_name] = {
-                    'type': 'pathlib.Path',  # might rather be purepath or something
-                    'path': str(relative_path)
-                }
-            else:
-                data[field_name] = field
+            data[field_name] = self._serialize_field(field, field_name, field_type, root_directory)
 
         return data
 
@@ -109,19 +135,19 @@ class Store:
     def __getitem__(self, item: Type[Artifact]) -> Any:
         return self.artifacts[item.__name__]
 
-    def merge_artifact_into(self, artifact: Artifact):
+    def merge_artifact_into(self, artifact: Artifact, overwrite=True):
         name = type(artifact).__name__
 
         if not artifact:
             # skip for empty state
             return
 
-        # iterate over all fields of the artifact type
-        if name not in self.artifacts or artifact.overwrite:
+        if name not in self.artifacts or overwrite:
             self.artifacts[name] = artifact
-        elif name in self.artifacts and not artifact.overwrite:
-            log.warning(f'Artifact {type(artifact).__name__} {artifact} getting lost since its type '
-                        f'already exists in the Store and overwrite=False.')
+        elif name in self.artifacts and not overwrite:
+            # if not overwrite and this artifact exists already, we'll ignore it
+            # (this is not default behavior and I don't know if it has any use)
+            log.debug(f'Dropped produced {type(artifact).__name__}.')
 
     # noinspection PyPep8Naming
     def __geitem__(self, artifact_type: Type[Artifact]) -> Artifact:
@@ -138,6 +164,8 @@ class Store:
             log.debug(f"Saving artifact {artifact_name}")
             artifact_dict = artifact.to_dict(self.root_directory)
             data[artifact.fully_qualified_name] = artifact_dict
+
+        # TODO muy importante save config along with state
 
         log.info(f"Saving store to store_{run_identifier}.json")
         with open(self.root_directory / f'store_{run_identifier}.json', 'w') as f:

@@ -8,7 +8,7 @@ from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch import nn  # All neural network modules
 from torch.utils.data import DataLoader  # Gives easier dataset management
 
-from sample_augment.data.imagefolder_to_tensors import SamplingAugDataset
+from sample_augment.data.imagefolder_to_tensors import SampleAugmentDataset
 from sample_augment.utils.paths import project_path
 
 
@@ -150,8 +150,8 @@ def main():
         nn.Linear(30, num_classes))
     model.to(device)
 
-    train_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
-    val_data = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
+    train_data = SampleAugmentDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
+    val_data = SampleAugmentDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
 
     train_data = preprocess(train_data)
     val_data = preprocess(val_data)

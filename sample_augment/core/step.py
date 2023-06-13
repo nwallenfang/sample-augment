@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import pkgutil
+import sys
 from typing import Type, Dict, Any, Callable, List
 
 from pydantic import BaseModel
@@ -22,6 +23,9 @@ class Step(Callable, BaseModel):
 
     state_args: Dict[str, Type[Artifact]]
     config_args: Dict[str, Type[Any]]
+    produces: Type[Artifact]
+
+    # TODO add a method to easily get all consumed/produced Artifacts
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
@@ -29,9 +33,17 @@ class Step(Callable, BaseModel):
     def __repr__(self):
         return self.name + "Step"
 
-    # def __eq__(self, other: Step):
-    #     # TODO check what happens when creating two steps with the same name
-    #     return self.name == other.name
+    def __eq__(self, other):
+        if isinstance(other, Step):
+            return other.name == self.name
+        elif callable(other):
+            return other == self.func
+        else:
+            return False
+
+    def __hash__(self):
+        # name is unique and immutable
+        return hash(self.name)
 
     def validate_config(self):
         # TODO the config types a step method can receive are either *top-level* config entries or
@@ -43,7 +55,6 @@ class Step(Callable, BaseModel):
 
 class StepRegistry:
     # TODO document this class well since the code is complex
-    # TODO maybe this class can then be removed. Would be good to remove this state
     all_steps = {}
     producers: Dict[Type[Artifact], List[Step]] = {}
     consumers: Dict[Type[Artifact], List[Step]] = {}
@@ -64,6 +75,7 @@ class StepRegistry:
             # we inject the function name into the decorator and return it
             def decorator(func):
                 return self._register_step(func, name)
+
             return decorator
 
     def _register_step(self, func, name=None):
@@ -72,8 +84,10 @@ class StepRegistry:
             name = _snake_to_camel(func.__name__)  # maybe we should skip the snake to camel
 
         if name in self.all_steps:
-            raise ValueError(
-                f"Step ID '{name}' is already registered. Please choose a different step ID.")
+            # raise ValueError(
+            #     f"Step ID '{name}' is already registered. Please choose a different step ID.")
+            log.warn(f"Step {name} is already registered.")
+            return
 
         sig = inspect.signature(func)
 
@@ -86,22 +100,30 @@ class StepRegistry:
                 # assert somehow that this is a config
                 config_kwargs[param_name] = param.annotation
 
-        new_step = Step(
-            name=name,
-            func=func,
-            state_args=state_kwargs,
-            config_args=config_kwargs
-        )
-
-        for artifact in new_step.state_args.values():
-            self.consumers.setdefault(artifact, []).append(new_step)
-
+        produced_artifact = None
         # if this function returns something it should be an Artifact, and it will get added to producers
         if 'return' in func.__annotations__:
             produced_artifact = func.__annotations__['return']
             if not issubclass(produced_artifact, Artifact):
                 raise ValueError(
                     f"Return type {produced_artifact} of step '{name}' is not a subclass of Artifact.")
+
+        new_step = Step(
+            name=name,
+            func=func,
+            state_args=state_kwargs,
+            config_args=config_kwargs,
+            produces=produced_artifact
+        )
+
+        # TODO differentiate between "producer" and "transformer" steps
+        #   this could be relevant for when we have say a preprocessing step that takes a Dataset and
+        #   returns it as well. Don't know if it should really return a new Artifact
+
+        for artifact in new_step.state_args.values():
+            self.consumers.setdefault(artifact, []).append(new_step)
+
+        if produced_artifact:
             self.producers.setdefault(produced_artifact, []).append(new_step)
 
         self.all_steps[name] = new_step
@@ -114,28 +136,58 @@ class StepRegistry:
                              f"{self.all_steps}")
         return self.all_steps[name]
 
-    def resolve_dependencies(self, target_step: Step):
-        deps = []
-        for artifact in target_step.state_args.values():
-            if artifact not in self.producers:
-                raise ValueError(f"No step found that produces {artifact}")
-            for producer in self.producers[artifact]:
-                deps.append(producer)
-                deps.extend(self.resolve_dependencies(producer))
-        return deps
+    def resolve_dependencies(self, target_step: Step) -> List[Step]:
+        """
+            basically depth-first search topological sort
+            TODO document (no cycles, example, produced_artifacts)
+        """
+        visited = set()
+        step_stack = []
+
+        def add_dependencies(node):
+            visited.add(node)
+            for artifact in node.state_args.values():
+                if artifact not in self.producers:
+                    raise ValueError(f"No step found that produces {artifact}")
+
+                for producer in self.producers[artifact]:
+                    if producer not in visited:
+                        add_dependencies(producer)
+            step_stack.append(node)
+
+        add_dependencies(target_step)
+
+        return step_stack
+
+    @staticmethod
+    def filter_steps(pipeline: List[Step], initial_artifacts: List[Type[Artifact]]):
+        # remove all steps from pipeline whose produced artifacts are contained in initial artifacts
+        filtered_pipeline = []
+        for pipeline_step in pipeline:
+            # for now this expects every step to only produce a single Artifact!
+            if not pipeline_step.produces:
+                log.debug(f"skipped step {pipeline_step.name}")
+                continue  # step not producing anything
+            if pipeline_step.produces in initial_artifacts:
+                log.debug(f"Filtered step {pipeline_step.name}")
+                continue
+            else:
+                filtered_pipeline.append(pipeline_step)
+
+        return filtered_pipeline
 
 
 def import_step_modules(root_modules: List[str]):
     """
     @param root_modules: List of root modules to search for @step methods recursively.
-    @return: List of Step instances constructed from found methods decorated with @step.
     """
     for root_module in root_modules:
         # Recursively import all submodules in the package
         package = importlib.import_module(root_module)
         prefix = package.__name__ + "."
         for _importer, modname, _ispkg in pkgutil.walk_packages(package.__path__, prefix):
-            _module = importlib.import_module(modname)
+            if modname not in sys.modules:
+                _module = importlib.import_module(modname)
 
 
 # step manager singleton instance for accessing all steps.

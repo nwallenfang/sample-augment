@@ -11,7 +11,7 @@ from torchvision.transforms import Normalize, Grayscale, ToTensor, Resize, Compo
 from torchvision.utils import make_grid
 
 from sample_augment.data.dataset import ImageDataset
-from sample_augment.data.imagefolder_to_tensors import SamplingAugDataset
+from sample_augment.data.imagefolder_to_tensors import SampleAugmentDataset
 from sample_augment.data.train_test_split import stratified_split
 from sample_augment.utils.paths import project_path
 from sample_augment.data import dataset as dataset_package
@@ -46,7 +46,7 @@ def create_image_folder_dataset():
 
 
 def test_uniqueness_of_ids():
-    complete = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_tensors.pt')))
+    complete = SampleAugmentDataset.load_from_file(Path(project_path('data/interim/gc10_tensors.pt')))
     all_ids = [complete.get_img_id(i) for i in range(len(complete))]
     duplicate_ids = set([x for x in all_ids if all_ids.count(x) > 1])
     print()
@@ -61,12 +61,12 @@ def test_train_test_split_load_gc10():
 
     # stylegan training doesn't work after the new train test split
     # might be our dataset or because I'm trying to do transfer learning with a FFHQ checkpoint.
-    train = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
-    complete = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_tensors.pt')))
+    train = SampleAugmentDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
+    complete = SampleAugmentDataset.load_from_file(Path(project_path('data/interim/gc10_tensors.pt')))
     n_complete = len(complete)
     del complete
-    test = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_test.pt')))
-    val = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
+    test = SampleAugmentDataset.load_from_file(Path(project_path('data/interim/gc10_test.pt')))
+    val = SampleAugmentDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
     n_train, n_test, n_val = len(train), len(test), len(val)
 
     assert n_train + n_test + n_val == n_complete
@@ -134,7 +134,7 @@ def main():
     """
     # make a grid for each class, image IDs could be useful as well,
     # to compare to the unscaled/quantized version
-    dataset = SamplingAugDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
+    dataset = SampleAugmentDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
     _data, _labels = dataset.tensors
     # TODO visual inspection
     for class_idx in range(10):
