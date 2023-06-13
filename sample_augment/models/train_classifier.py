@@ -8,7 +8,7 @@ from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch import nn  # All neural network modules
 from torch.utils.data import DataLoader  # Gives easier dataset management
 
-from sample_augment.data.imagefolder_to_tensors import AugmentDataset
+from sample_augment.data.dataset import AugmentDataset
 from sample_augment.utils.paths import project_path
 
 

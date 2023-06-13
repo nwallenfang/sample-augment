@@ -16,7 +16,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
 from tqdm import tqdm
 
-from sample_augment.data.imagefolder_to_tensors import AugmentDataset
+from sample_augment.data.dataset import AugmentDataset
 from sample_augment.utils.paths import project_path
 from sample_augment.utils import log
 
