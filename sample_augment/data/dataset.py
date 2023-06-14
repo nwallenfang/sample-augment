@@ -140,7 +140,7 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath,
     remove_these_idx = []
     removed_duplicates = 0
 
-    for i, (img_path, _img_class) in tqdm(enumerate(image_dataset.imgs)):
+    for i, (img_path, _img_class) in tqdm(enumerate(image_dataset.imgs), file=sys.stdout):
         path_obj = Path(img_path)
         # FIXME this way of calculating the ids is gc10 specific..
         img_id = path_obj.stem[4:]
