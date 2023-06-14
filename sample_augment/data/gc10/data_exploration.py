@@ -8,19 +8,18 @@ Things I'd like to look at:
 - class instance counts and compare with Excel file
 - look at the whole training set with a dimension reduction method such as UMAP
 """
-
-import json
+from pathlib import Path
 
 import numpy as np
 from matplotlib import pyplot as plt
 
-from sample_augment.utils.paths import project_path
+from sample_augment.core import step
+from sample_augment.data.gc10.read_labels import GC10Labels
 
 
-def main():
-    with open(project_path('data/interim/labels.json')) as label_file:
-        labels = json.load(label_file)
-
+@step
+def gc10_data_exploration(labels_artifact: GC10Labels, figure_directory: Path):
+    labels = labels_artifact.labels
     # how many instances with secondary labels?
     total_count = len(labels)
     secondary_count = sum(labels[img_id]['secondary'] != [] for img_id in labels)
@@ -72,9 +71,5 @@ def main():
     ax.set_title("Occurrences of secondary class labels per primary class")
     fig.tight_layout()
 
-    plt.savefig(project_path('reports/figures/label-exploration/secondary_labels.pdf'))
+    plt.savefig(figure_directory / 'secondary_labels.pdf')
     plt.show()
-
-
-if __name__ == '__main__':
-    main()

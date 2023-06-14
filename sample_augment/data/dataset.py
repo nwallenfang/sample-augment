@@ -12,7 +12,7 @@ from torchvision.transforms import Resize, Compose, Grayscale, ToTensor
 from tqdm import tqdm
 
 from sample_augment.core import Artifact, step
-from sample_augment.data.download_gc10 import GC10Folder
+from sample_augment.data.gc10.download_gc10 import GC10Folder
 from sample_augment.utils.log import log
 from sample_augment.utils.paths import project_path
 
@@ -106,16 +106,16 @@ def test_duplicate_ids():
 
 
 class ImageFolderPath(Artifact):
-    image_folder_path: Path
+    image_dir: Path
 
 
 @step
 def gc10_adapter(gc10_data: GC10Folder) -> ImageFolderPath:
-    return ImageFolderPath(image_folder_path=gc10_data.image_folder_path)
+    return ImageFolderPath(image_dir=gc10_data.image_dir)
 
 
 # meta: don't really like having to create an artifact for single attributes but fine
-@step(name="ImageFolderToTensors")
+@step()
 def imagefolder_to_tensors(image_folder_path: ImageFolderPath,
                            name: str,  # true_labels: dict[str, int] = None
                            ) -> AugmentDataset:
@@ -136,7 +136,7 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath,
         # Optimally, the Generator should generate images with this distribution as well.
         # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    image_dataset = ImageFolder(str(image_folder_path.image_folder_path), transform=preprocessing)
+    image_dataset = ImageFolder(str(image_folder_path.image_dir), transform=preprocessing)
 
     log.info('Converting ImageFolder to  SampleAugmentDataset..')
     # label_tensors = torch.tensor(image_dataset.targets, dtype=torch.int)

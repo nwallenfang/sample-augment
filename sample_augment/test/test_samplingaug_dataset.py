@@ -26,5 +26,5 @@ def test_pipeline_with_gc10_mini(experiment):
     # TODO get proper testing config, maybe use testing fixture for it
     experiment.run("ImageFolderToTensors",
                    additional_artifacts=[ImageFolderPath(
-                       image_folder_path=Path(
+                       image_dir=Path(
                            r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\gc10-mini"))])

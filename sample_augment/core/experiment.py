@@ -30,7 +30,7 @@ class Experiment:
         store_file_path = config.root_directory / f"store_{config.run_identifier}.json"
         if store_file_path.exists() and self.load_store:
             self.store = Store.load_from(store_file_path)
-            log.info(f"Loading store {store_file_path.name} with artifacts "
+            log.info(f"Store has artifacts: {store_file_path.name} "
                      f"{[a for a in self.store.artifacts]}")
         else:
             self.store = Store(config.root_directory)
@@ -72,7 +72,7 @@ class Experiment:
     def run(self, target_name: str, additional_artifacts: List[Artifact] = None):
         target = get_step(target_name)
         full_pipeline = step_registry.resolve_dependencies(target)
-        log.debug(f"{target_name} full pipeline: {full_pipeline}")
+        log.debug(f"Pre-Reduce Pipeline: {full_pipeline}")
 
         if additional_artifacts:
             for artifact in additional_artifacts:
@@ -81,10 +81,15 @@ class Experiment:
         # removes the Steps that are not necessary (since their produced Artifacts are already in the Store)
         pipeline = StepRegistry.reduce_steps(full_pipeline, [type(artifact) for artifact in
                                                              self.store.artifacts.values()])
-        log.info(f"{target_name} pipeline: {pipeline}")
+        if pipeline:
+            log.info(f"Running pipeline: {pipeline}")
+        else:
+            # pipeline empty, so only run the target
+            # because doing nothing shouldn't be intended :)
+            pipeline.append(target)
 
         for step in pipeline:
-            log.info(f"Running step {step.name}.")
+            log.info(f"--- {step.name}() ---")
             self._run_step(step)
 
         if self.save_store:

@@ -1,6 +1,8 @@
 import hashlib
+import os
+from pathlib import Path
 
-from pydantic import Extra, DirectoryPath, BaseModel, Field
+from pydantic import Extra, DirectoryPath, BaseModel, Field, validator
 
 
 class SubConfig(BaseModel, extra=Extra.allow, allow_mutation=False):
@@ -21,8 +23,12 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     train_ratio: float = 0.8,
     min_instances_per_class: int = 10
 
+    target: str = Field(exclude=True)
+
+    figure_directory: Path
+
     def get_hash(self):
-        json_bytes = self.json(sort_keys=True).encode('utf-8')
+        json_bytes = self.json(sort_keys=True, exclude={'name': True, 'target': True}).encode('utf-8')
         model_hash = hashlib.sha256(json_bytes).hexdigest()
 
         return model_hash
@@ -50,3 +56,12 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     @property
     def run_identifier(self):
         return f"{self.name}_{self.get_hash()[:self.CONFIG_HASH_CUTOFF]}"
+
+    @validator('figure_directory', pre=True)
+    def assemble_figure_path(cls, v, values):
+        if 'root_directory' in values and isinstance(v, str):
+            fig_dir: Path = values['root_directory'] / v
+            fig_dir.mkdir(exist_ok=True)
+
+            return fig_dir.resolve()
+        return v

@@ -5,11 +5,14 @@ The final result of this script is a combined label file `labels.json`.
 """
 import collections
 import os
-import json
+from pathlib import Path
 from typing import Dict, List
-import xmltodict
-import matplotlib
 
+import matplotlib
+import xmltodict
+
+from sample_augment.core import step, Artifact
+from sample_augment.data.gc10.download_gc10 import GC10Folder
 # from sample_augment.data.gc10.download import load_gc10_if_missing
 from sample_augment.utils.paths import project_path
 from sample_augment.utils.plot import show_image
@@ -59,14 +62,11 @@ def xml_to_labels(xml: Dict) -> Dict:
     return {'y': primary_label, 'secondary': secondary}
 
 
-def read_xml_labels() -> Dict:
+def read_xml_labels(label_directory: Path) -> Dict:
     """
         Create interim/xml_labels.json file. Get label info from the xml files
     """
-    # load_gc10_if_missing()
-
-    label_directory = project_path('data/gc10/lable')
-    id_to_labels = {}
+    xml_labels = {}
 
     for filename in os.listdir(label_directory):
         # the beginning 'img_' is redundant, so cut it
@@ -75,7 +75,7 @@ def read_xml_labels() -> Dict:
             raw_xml = xml_file.read()
             xml_dict = xmltodict.parse(raw_xml)
         labels = xml_to_labels(xml_dict)
-        id_to_labels[image_id] = labels
+        xml_labels[image_id] = labels
 
     # some xml files contain the directory 'all' as their label
     # replace these labels with their respective directory
@@ -86,29 +86,24 @@ def read_xml_labels() -> Dict:
     # that matches number of xml files, but doesn't match number of image files which is 2300
     # so there are 6 images missing
 
-    interim_dir = project_path('data/interim', create=True)
-    with open(f"{interim_dir}/xml_labels.json", "w") as json_file:
-        json.dump(id_to_labels, json_file, indent=2)
+    # interim_dir = project_path('data/interim', create=True)
+    # with open(f"{interim_dir}/xml_labels.json", "w") as json_file:
+    #     json.dump(id_to_labels, json_file, indent=2)
 
-    return id_to_labels
+    return xml_labels
 
 
-def read_directory_labels() -> Dict:
+def read_image_dir_labels(image_dir: Path) -> Dict:
     """
         Create interim/labels_dir.json. Get label info from the subdirectories
     """
-    id_to_labels = {}
+    image_dir_labels = {}
     for label in range(1, 11):
-        for filename in os.listdir(project_path(f'data/gc10/{label}')):
+        for filename in os.listdir(image_dir / str(label)):
             image_id = filename.split('.')[0][4:]  # cut out 'img_'
-            id_to_labels[image_id] = label
+            image_dir_labels[image_id] = label
 
-    interim_dir = project_path('data/interim', create=True)
-
-    with open(f"{interim_dir}/dir_labels.json", "w") as json_file:
-        json.dump(id_to_labels, json_file, indent=2)
-
-    return id_to_labels
+    return image_dir_labels
 
 
 def compare_dir_and_xml_labels(xml_labels: Dict, dir_labels: Dict):
@@ -176,10 +171,19 @@ def remove_duplicates(primary: int, secondary: List[int]):
     return secondary
 
 
-def construct_processed_labels(xml_labels, dir_labels):
+class GC10Labels(Artifact):
+    labels: Dict
+
+
+@step
+def construct_processed_labels(gc10: GC10Folder) -> GC10Labels:
     """
         combine xml labels and dir labels to construct the final label file
     """
+
+    xml_labels = read_xml_labels(gc10.label_dir)
+    dir_labels = read_image_dir_labels(gc10.image_dir)
+
     labels = dir_labels.copy()
 
     for img_id in dir_labels:
@@ -202,17 +206,4 @@ def construct_processed_labels(xml_labels, dir_labels):
                 'y': y, 'secondary': secondary
             }
 
-    interim_dir = project_path('data/interim', create=True)
-    with open(f"{interim_dir}/labels.json", "w") as json_file:
-        json.dump(labels, json_file, indent=2)
-
-
-def main():
-    xml_labels = read_xml_labels()
-    dir_labels = read_directory_labels()
-    compare_dir_and_xml_labels(xml_labels, dir_labels)
-    construct_processed_labels(xml_labels, dir_labels)
-
-
-if __name__ == '__main__':
-    main()
+    return GC10Labels(labels=labels)

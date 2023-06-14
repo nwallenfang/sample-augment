@@ -31,7 +31,7 @@ class Step(Callable, BaseModel):
         return self.func(*args, **kwargs)
 
     def __repr__(self):
-        return self.name + "Step"
+        return self.name
 
     def __eq__(self, other):
         if isinstance(other, Step):
@@ -79,9 +79,8 @@ class StepRegistry:
             return decorator
 
     def _register_step(self, func, name=None):
-        # Default step_id is the function name converted to CamelCase
         if name is None:
-            name = _snake_to_camel(func.__name__)  # maybe we should skip the snake to camel
+            name = func.__name__  # used to be camel case, but it was confusing
 
         if name in self.all_steps:
             # raise ValueError(
