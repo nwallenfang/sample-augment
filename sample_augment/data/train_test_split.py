@@ -2,34 +2,35 @@
     Perform a stratified train test split (balance classes).
 
 """
-from typing import Union
+import typing
 
 import numpy as np
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Subset
 from torchvision.datasets import ImageFolder
 
+from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.utils.log import log
 
 
-class CustomSubset(AugmentDataset):
-    def __init__(self, dataset: AugmentDataset, indices):
-        tensors_data = dataset.tensors[0][indices]
-        tensors_labels = dataset.tensors[1][indices]
-        img_paths = list(np.array(dataset.img_ids)[indices])
-        self.indices = indices
-        super().__init__(dataset.name, tensors_data, tensors_labels, img_ids, dataset.root_dir)
+# class CustomSubset(AugmentDataset):
+#     def __init__(self, dataset: AugmentDataset, indices):
+#         tensors_data = dataset.tensors[0][indices]
+#         tensors_labels = dataset.tensors[1][indices]
+#         img_paths = list(np.array(dataset.img_ids)[indices])
+#         self.indices = indices
+#         super().__init__(dataset.name, tensors_data, tensors_labels, img_ids, dataset.root_dir)
 
 
-def stratified_split(dataset: Union[ImageFolder, AugmentDataset],
+def stratified_split(dataset: AugmentDataset,
                      train_ratio: float = 0.8,
                      random_seed: int = 42,
                      min_instances_per_class: int = 10):
     """
         Perform a random stratified split of a Dataset into two Datasets (called train and test set).
     Args:
-        dataset(ImageFolder | AugmentDataset): Dataset instance to split,
+        dataset(AugmentDataset): Dataset instance to split,
             can be an instance of type CustomTensorDataset.
         train_ratio: Ratio of training set size in relation to total size
         random_seed:
@@ -75,31 +76,61 @@ def stratified_split(dataset: Union[ImageFolder, AugmentDataset],
 
     assert set(train_indices).intersection(set(test_indices)) == set()
 
-    if type(dataset) is ImageFolder:  # typechecking the other way around (CustomTensor..) doesn't work..
-        train_dataset = Subset(dataset, train_indices)
-        test_dataset = Subset(dataset, test_indices)
-    else:
-        # take metadata (img paths) from sample_augment.dataset into Subsets
-        train_dataset = CustomSubset(dataset, train_indices)
-        test_dataset = CustomSubset(dataset, test_indices)
+    # if type(dataset) is ImageFolder:  # typechecking the other way around (CustomTensor..) doesn't work..
+    #     train_dataset = Subset(dataset, train_indices)
+    #     test_dataset = Subset(dataset, test_indices)
+    # else:
+    # take metadata (img paths) from sample_augment.dataset into subsets
+    train_dataset = dataset.subset(train_indices)
+    test_dataset = dataset.subset(test_indices)
 
     return train_dataset, test_dataset
 
 
-def create_train_val_test_sets(dataset: AugmentDataset, random_seed=15):
-    """
-        Expects data/interim/gc10_tensors.pt to exist.
-        Create gc10_train.pt, gc10_val.pt, gc10_test.pt from successive stratified splits.
-    """
-    train_val_data, test_data = stratified_split(dataset, train_ratio=0.8, random_seed=random_seed)
+class TrainTestValBundle(Artifact):
+    train: AugmentDataset
+    val: AugmentDataset
+    test: AugmentDataset
+    _serialize_this = False
+
+
+# helper classes and steps to have clean interfaces
+# since currently the steps API only supports returning a single Artifact
+class TrainSet(AugmentDataset):
+    pass
+
+
+class ValSet(AugmentDataset):
+    pass
+
+
+class TestSet(AugmentDataset):
+    pass
+
+
+@step
+def extract_train_set(bundle: TrainTestValBundle) -> TrainSet:
+    return typing.cast(TrainSet, bundle.train)
+
+
+@step
+def extract_val_set(bundle: TrainTestValBundle) -> ValSet:
+    return typing.cast(ValSet, bundle.val)
+
+
+@step
+def extract_test_set(bundle: TrainTestValBundle) -> TestSet:
+    return typing.cast(TestSet, bundle.test)
+
+
+@step
+def create_train_val_test(dataset: AugmentDataset, random_seed: int,
+                          test_ratio: float, val_ratio: float) -> TrainTestValBundle:
+    train_val_data, test_data = stratified_split(dataset, train_ratio=(1.0 - test_ratio),
+                                                 random_seed=random_seed)
     # stratified split returns Subsets, turn train_val_data into a TensorDataset to split it again
-    # train_data, val_data = stratified_split(TensorDataset(
-    #                                         dataset.tensors[0][train_val_data.indices],
-    #                                         dataset.tensors[1][train_val_data.indices].type(LongTensor)),
-    #                                         random_seed=15,
-    #                                         train_ratio=0.9)
     train_data, val_data = stratified_split(train_val_data,
                                             random_seed=random_seed,
-                                            train_ratio=0.9)
+                                            train_ratio=(1.0 - val_ratio))
 
-    return train_data, val_data, test_data
+    return TrainTestValBundle(train=train_data, val=val_data, test=test_data)

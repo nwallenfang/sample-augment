@@ -60,9 +60,10 @@ class Store:
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
-            log.debug(f"Saving artifact {artifact_name}")
             artifact_dict = artifact.serialize(self.root_directory, run_identifier)
-            data[artifact.fully_qualified_name] = artifact_dict
+            if artifact_dict:
+                log.debug(f"Saving artifact {artifact_name}")
+                data[artifact.fully_qualified_name] = artifact_dict
 
         # TODO muy importante save config along with state
 

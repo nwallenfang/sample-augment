@@ -16,14 +16,10 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     cache = False
 
     root_directory: DirectoryPath = Field(exclude=True)
-    # TODO maybe validate -> StepID
-    target: str
 
-    # Step specific settings are saved in the steps dict
-    # steps: Dict[str, StepConfig]
-    # steps: List[StepID]  # StepID get validated manually
-
-    # bundles = dict[str, SubConfig]
+    # train test split params
+    train_ratio: float = 0.8,
+    min_instances_per_class: int = 10
 
     def get_hash(self):
         json_bytes = self.json(sort_keys=True).encode('utf-8')

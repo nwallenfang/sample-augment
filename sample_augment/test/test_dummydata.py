@@ -54,6 +54,9 @@ def test_uniqueness_of_ids():
 
 
 def test_train_test_split_load_gc10():
+    # First run/load an experiment that has access to CompleteDataset and to Train/Test/Val.. but I'm not
+    # quite there yet to refactor this test.
+
     if not os.path.exists(project_path('data/interim/gc10_tensors.pt')):
         print('initializing DataSets for this test..')
         dataset_package.main()

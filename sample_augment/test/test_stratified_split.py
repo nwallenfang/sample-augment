@@ -1,47 +1,53 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import stratified_split
 
 
-def split_dummy_data(n, min_test_instances, number_of_1s=4):
+def create_dummy_dataset(n, number_of_1s):
     dummy_data = torch.ones([n, 1, 1])
+
+    for i in range(n):
+        dummy_data[i] = i
+
     dummy_labels = torch.zeros(n, dtype=torch.long)
     assert number_of_1s < n
     dummy_labels[:number_of_1s + 1] = 1
     # shuffle labels
     dummy_labels = dummy_labels[torch.randperm(dummy_labels.shape[0])]
-    dataset = AugmentDataset('dummy', dummy_data, dummy_labels, ['/'] * n, Path('/'))
+    dataset = AugmentDataset(name='dummy', tensors=(dummy_data, dummy_labels), img_ids=['/'] * n,
+                             root_dir=Path(
+                                 '/'))
+    assert len(dataset) == n
+    return dataset
 
-    train, test = stratified_split(dataset, random_seed=42, min_instances_per_class=min_test_instances)
 
-    test_labels = dataset.tensors[1][test.indices].numpy()
-    train_labels = dataset.tensors[1][train.indices].numpy()
+@pytest.mark.parametrize("n, number_of_1s, min_test_instances", [
+    (20, 4, 3),
+    (100, 13, 10),
+])
+def test_split_dummy_data(min_test_instances, n, number_of_1s):
+    dummy_dataset = create_dummy_dataset(n=n, number_of_1s=number_of_1s)
+    train, test = stratified_split(dummy_dataset, random_seed=42, min_instances_per_class=min_test_instances)
+
+    test_labels = test.label_tensor.numpy()
+    train_labels = train.label_tensor.numpy()
 
     test_counts = np.bincount(test_labels)
     train_counts = np.bincount(train_labels)
 
-    assert len(dataset) == n
     assert len(test_labels) + len(train_labels) == n
-    assert len(train.indices) + len(test.indices) == n
     assert test_counts[1] >= min_test_instances
     assert train_counts[1] <= min_test_instances
 
 
-def test_repeated_split():
-    n = 1000
-    dummy_data = torch.ones([n, 1, 1])
-    dummy_labels = torch.zeros(n, dtype=torch.long)
-    for i in range(n):
-        dummy_data[i] = i
-
-    dataset = AugmentDataset(image_tensor=dummy_data, label_tensor=dummy_labels,
-                             img_ids=[Path() for _ in range(n)], root_dir=Path(), name='test')
-
-    train_val, test = stratified_split(dataset, random_seed=42, min_instances_per_class=0)
+def test_repeated_split(n=100):
+    dummy_dataset = create_dummy_dataset(n, n//5)
+    train_val, test = stratified_split(dummy_dataset, random_seed=42, min_instances_per_class=0)
     train, val = stratified_split(train_val, random_seed=42, min_instances_per_class=0)
 
     # check that every label can be found in either train, val, or test
@@ -68,16 +74,9 @@ def test_repeated_split():
 
 
 def test_split_determinism():
-    n = 1000
-    dummy_data = torch.ones([n, 1, 1])
-    for i in range(n):
-        dummy_data[i][:] = i
-    dummy_labels = torch.zeros(n, dtype=torch.long)
-    dataset = AugmentDataset(image_tensor=dummy_data, label_tensor=dummy_labels,
-                             img_ids=[Path() for _ in range(n)], root_dir=Path(), name='test')
-
-    train_1, test_1 = stratified_split(dataset, random_seed=42)
-    train_2, test_2 = stratified_split(dataset, random_seed=42)
+    dummy_dataset = create_dummy_dataset(n=1000, number_of_1s=400)
+    train_1, test_1 = stratified_split(dummy_dataset, random_seed=42)
+    train_2, test_2 = stratified_split(dummy_dataset, random_seed=42)
 
     some_data_1 = [train_1[i] for i in range(20)]
     some_data_2 = [train_2[i] for i in range(20)]
@@ -88,8 +87,8 @@ def test_split_determinism():
     assert some_data_1 == some_data_2
     assert some_test_data_1 == some_test_data_2
 
-    train_1, test_1 = stratified_split(dataset, random_seed=42)
-    train_2, test_2 = stratified_split(dataset, random_seed=43)
+    train_1, test_1 = stratified_split(dummy_dataset, random_seed=42)
+    train_2, test_2 = stratified_split(dummy_dataset, random_seed=43)
 
     some_data_1 = [train_1[i] for i in range(20)]
     some_data_2 = [train_2[i] for i in range(20)]
@@ -99,10 +98,3 @@ def test_split_determinism():
 
     assert some_data_1 != some_data_2
     assert some_test_data_1 != some_test_data_2
-
-
-def test_stratified_split():
-    split_dummy_data(n=20, min_test_instances=3, number_of_1s=4)
-    split_dummy_data(n=100, min_test_instances=10, number_of_1s=13)
-    # fails and should print an error message
-    # run_test(n=100, min_test_instances=10, number_of_1s=5)

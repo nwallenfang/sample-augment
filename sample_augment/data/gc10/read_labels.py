@@ -10,7 +10,7 @@ from typing import Dict, List
 import xmltodict
 import matplotlib
 
-from sample_augment.data.gc10.download import load_gc10_if_missing
+# from sample_augment.data.gc10.download import load_gc10_if_missing
 from sample_augment.utils.paths import project_path
 from sample_augment.utils.plot import show_image
 
@@ -63,7 +63,7 @@ def read_xml_labels() -> Dict:
     """
         Create interim/xml_labels.json file. Get label info from the xml files
     """
-    load_gc10_if_missing()
+    # load_gc10_if_missing()
 
     label_directory = project_path('data/gc10/lable')
     id_to_labels = {}

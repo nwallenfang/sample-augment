@@ -2,5 +2,7 @@
   "random_seed": 41,
   "name": "gc10",
   "root_directory": "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data",
-  "target": "ImageFolderToTensors"
+  "target": "ImageFolderToTensors",
+  "test_ratio": 0.2,
+  "val_ratio": 0.1
 }

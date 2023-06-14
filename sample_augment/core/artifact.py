@@ -6,7 +6,9 @@ from typing import Dict
 
 import numpy as np
 import torch
-from pydantic import BaseModel, parse_obj_as
+from pydantic import BaseModel, parse_obj_as, ValidationError
+
+from sample_augment.utils import log
 
 
 class Artifact(BaseModel, arbitrary_types_allowed=True):
@@ -17,6 +19,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         This base class is basically an empty state.
         Subclasses will extend StateBundle and fill it with the state they need.
     """
+    _serialize_this = True
 
     @property
     def fully_qualified_name(self):
@@ -68,7 +71,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                     'path': f'{save_path.relative_to(root_directory).as_posix()}'}
         elif issubclass(field_type, Artifact):
             # field is a sub-artifact. Recursively save it.
-            return field.serialize(root_directory)
+            return field.serialize(root_directory, run_identifier)
         elif issubclass(field_type, Path):
             # make Path instances relative to config.root_dir
             relative_path = field.relative_to(root_directory).as_posix()
@@ -83,6 +86,8 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
     def _deserialize_field(field_name: str, value: typing.Any, root_dir: Path) -> typing.Any:
         if isinstance(value, dict) and 'path' in value:
             if value['type'] == 'torch.Tensor':
+                # TODO down the line it could be good/performant to do "lazy loading", so only load once
+                #   this artifact is actually being used
                 return torch.load(root_dir / value['path'])
             elif value['type'] == 'numpy.ndarray':
                 return np.load(root_dir / value['path'])
@@ -110,11 +115,13 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             return value
 
     def serialize(self, root_directory: Path, run_identifier: str) -> Dict:
+        if not self._serialize_this:
+            return {}
         # TODO docs
         data = {}
-
         for field_name, field_type in self.__annotations__.items():
             field = getattr(self, field_name)
+
             data[field_name] = self._serialize_field(field, field_name, field_type, root_directory,
                                                      run_identifier)
 
@@ -128,4 +135,20 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         for field_name, value in data.items():
             data[field_name] = Artifact._deserialize_field(field_name, value, root_dir)
 
-        return parse_obj_as(cls, data)
+        try:
+            return parse_obj_as(cls, data)
+        except ValidationError as e:
+            # failed to validate our deserialized model, something went wrong
+            # build a nice error message
+            error_messages = e.errors()
+            formatted_errors = []
+
+            for error in error_messages:
+                path = " -> ".join(str(p) for p in error['loc'])
+                # Replace '__root__' with 'MainModel'
+                path = path.replace('__root__', cls.__name__)
+                msg = error['msg']
+                formatted_errors.append(f"  In '{path}', {msg}")
+
+            user_friendly_error_message = "\n".join(formatted_errors)
+            log.error(f"Validation errors from deserialization:\n{user_friendly_error_message}")

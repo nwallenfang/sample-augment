@@ -165,9 +165,9 @@ class StepRegistry:
         filtered_pipeline = []
         for pipeline_step in pipeline:
             # for now this expects every step to only produce a single Artifact!
-            if not pipeline_step.produces:
-                log.debug(f"skipped step {pipeline_step.name}")
-                continue  # step not producing anything
+            # if not pipeline_step.produces:
+            #     log.debug(f"skipped step {pipeline_step.name}")
+            #     continue  # step not producing anything
             if pipeline_step.produces in initial_artifacts:
                 log.debug(f"Filtered step {pipeline_step.name}")
                 continue

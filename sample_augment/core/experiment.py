@@ -14,8 +14,13 @@ class Experiment:
     """
     store: Store
     config: Config
+    load_store: bool
+    save_store: bool
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, load_store: bool = True, save_store: bool = True):
+        self.load_store = load_store
+        self.save_store = save_store
+
         # TODO root_directory through .env file or sys env
         self.config = config
 
@@ -23,11 +28,10 @@ class Experiment:
         # the state contains the config file
         # state = self.store.load_from_config(config)
         store_file_path = config.root_directory / f"store_{config.run_identifier}.json"
-        if store_file_path.exists():
+        if store_file_path.exists() and self.load_store:
             self.store = Store.load_from(store_file_path)
             log.info(f"Loading store {store_file_path.name} with artifacts "
                      f"{[a for a in self.store.artifacts]}")
-
         else:
             self.store = Store(config.root_directory)
 
@@ -65,29 +69,28 @@ class Experiment:
         self.store.completed_steps.append(step.name)
         self.store.merge_artifact_into(output_state)
 
-    def run(self, target_name: str, initial_artifacts: List[Artifact] = None):
-        # TODO allow for passing a "starting artefact"
-        # The ArtifactStore should be located under the root dir and have a name f"store_{config.get_hash()}".
-        # if the ArtifactStore already contains the needed Artifact, we can skip the dependency step.
+    def run(self, target_name: str, additional_artifacts: List[Artifact] = None):
         target = get_step(target_name)
-        # TODO ouput smth like either provide this artifact or ???
-        pipeline = step_registry.resolve_dependencies(target)
-        log.debug(f"{target_name} pipeline: {pipeline}")
-        if initial_artifacts:
-            pipeline = StepRegistry.reduce_steps(pipeline, [type(artifact) for artifact in
-                                                            initial_artifacts])
-            log.debug(f"{target_name} reduced pipeline: {pipeline}")
+        full_pipeline = step_registry.resolve_dependencies(target)
+        log.debug(f"{target_name} full pipeline: {full_pipeline}")
 
-        if initial_artifacts:
-            for artifact in initial_artifacts:
+        if additional_artifacts:
+            for artifact in additional_artifacts:
                 self.store.merge_artifact_into(artifact)
+
+        # removes the Steps that are not necessary (since their produced Artifacts are already in the Store)
+        pipeline = StepRegistry.reduce_steps(full_pipeline, [type(artifact) for artifact in
+                                                             self.store.artifacts.values()])
+        log.info(f"{target_name} pipeline: {pipeline}")
 
         for step in pipeline:
             log.info(f"Running step {step.name}.")
             self._run_step(step)
 
-        # Pipeline run is complete, save the produced artifacts and the config that was used
-        self.store.save(run_identifier=self.config.run_identifier)
+        if self.save_store:
+            # Pipeline run is complete, save the produced artifacts and the config that was used
+            self.store.save(run_identifier=self.config.run_identifier)
 
-        with open(self.config.root_directory / f"config_{self.config.run_identifier}.json", 'w') as config_f:
-            config_f.write(self.config.json(indent=4))
+            with open(self.config.root_directory / f"config_{self.config.run_identifier}.json",
+                      'w') as config_f:
+                config_f.write(self.config.json(indent=4))

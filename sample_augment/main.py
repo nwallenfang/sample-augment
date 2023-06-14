@@ -64,7 +64,7 @@ def main(arg_config: Path = None):
 
     # TODO re-add dry run
     # experiment.dry_run()
-    experiment.run(config.target)
+    experiment.run("CreateTrainValTest")
 
 
 # @main.command()

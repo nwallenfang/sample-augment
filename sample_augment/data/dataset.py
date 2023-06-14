@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
 import torch
@@ -52,6 +52,19 @@ class AugmentDataset(TensorDataset, Artifact):
         assert len(tensors[0]) == len(tensors[1])
         Artifact.__init__(self, name=name, root_dir=root_dir, img_ids=img_ids,
                           tensors=tensors)
+
+    def subset(self, indices: Union[List[int], np.ndarray]) -> 'AugmentDataset':
+        # copies the tensors, so this is a copy rather than a view
+        # so potential for optimization, which we will ignore for now.
+        subset_tensors: Tuple[Tensor, Tensor] = self.tensors[0][indices], self.tensors[1][indices]
+        subset_img_ids = [self.img_ids[i] for i in indices]
+
+        return AugmentDataset(
+            name=self.name,
+            root_dir=self.root_dir,
+            img_ids=subset_img_ids,
+            tensors=subset_tensors
+        )
 
     @property
     def image_tensor(self):
