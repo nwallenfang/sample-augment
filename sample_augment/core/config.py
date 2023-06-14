@@ -24,8 +24,10 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
 
     target: str = Field(exclude=True)
 
+    # path for files that get saved by steps and are not Artifacts themselves
     figure_directory: Path
     raw_data_directory: Path
+    checkpoint_directory: Path
 
     def get_hash(self):
         json_bytes = self.json(sort_keys=True, exclude={'name': True, 'target': True}).encode('utf-8')
@@ -61,7 +63,7 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     def filename(self):
         return f"{self.name}_{self.get_hash()[:self.CONFIG_HASH_CUTOFF]}"
 
-    @validator('figure_directory', 'raw_data_directory', pre=True)
+    @validator('figure_directory', 'raw_data_directory', 'checkpoint_directory', pre=True)
     def assemble_figure_path(cls, v, values):
         if 'root_directory' in values and isinstance(v, str):
             fig_dir: Path = values['root_directory'] / v

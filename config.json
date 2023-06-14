@@ -4,6 +4,7 @@
   "root_directory": "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data",
   "figure_directory": "./figures",
   "raw_data_directory": "./raw",
+  "checkpoint_directory": "./checkpoints",
   "target": "gc10_data_exploration",
   "test_ratio": 0.2,
   "val_ratio": 0.1

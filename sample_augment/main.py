@@ -64,7 +64,8 @@ def main(arg_config: Path = None):
 
     # TODO re-add dry run
     # experiment.dry_run()
-    experiment.run(config.target)
+    # TODO add specific test model
+    experiment.run(config.target, additional_artifacts=None)
 
 
 # @main.command()

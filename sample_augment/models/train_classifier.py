@@ -1,15 +1,12 @@
-from pathlib import Path
-
 import torch
+from torch import nn  # All neural network modules
+from torch import optim  # For optimizers like SGD, Adam, etc.
+from torch.utils.data import DataLoader  # Gives easier dataset management
 from torch.utils.data import Dataset
 from torchvision.transforms import transforms
 from tqdm import tqdm  # For nice progress bar!
-from torch import optim  # For optimizers like SGD, Adam, etc.
-from torch import nn  # All neural network modules
-from torch.utils.data import DataLoader  # Gives easier dataset management
 
 from sample_augment.core import step
-from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import ValSet, TrainSet
 from sample_augment.models.classifier import TrainedClassifier
 from sample_augment.utils.paths import project_path
