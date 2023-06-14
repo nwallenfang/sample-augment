@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from sample_augment.core.experiment import Experiment
 from sample_augment.core.config import Config
 from sample_augment.core.step import import_step_modules
+from sample_augment.data.gc10.download_gc10 import GC10Folder
 from sample_augment.utils.log import log
 
 
@@ -55,7 +56,7 @@ def main(arg_config: Path = None):
     # so in the future it won't be like it is now with a whole json file always being parsed
     config = read_config(arg_config)
 
-    import_step_modules(root_modules=['test', 'data'])
+    import_step_modules(root_modules=['test', 'data', 'models'])
 
     # log.debug(steps)
 
@@ -65,7 +66,8 @@ def main(arg_config: Path = None):
     # TODO re-add dry run
     # experiment.dry_run()
     # TODO add specific test model
-    experiment.run(config.target, additional_artifacts=None)
+    experiment.run(config.target, additional_artifacts=[GC10Folder(image_dir=Path(
+        r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\raw\gc10-mini"), label_dir=Path('/'))])
 
 
 # @main.command()

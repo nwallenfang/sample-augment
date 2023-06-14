@@ -51,7 +51,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             for idx, tensor in enumerate(tensors):
                 # serialize each tensor the same way we do it for individual tensors
                 filename = f'{self.__class__.__name__}_{field_name}_{idx}.pt'
-                save_path = external_directory.with_name(filename)
+                save_path = external_directory / filename
                 torch.save(tensor, str(save_path))
                 serialized_tensor_strings.append({
                     'type': 'torch.Tensor',

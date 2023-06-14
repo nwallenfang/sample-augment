@@ -27,7 +27,7 @@ class Experiment:
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
         # state = self.store.load_from_config(config)
-        store_file_path = config.root_directory / f"{config.run_identifier}.json"
+        store_file_path = config.root_directory / f"{config.name}_{config.run_identifier}.json"
         if store_file_path.exists() and self.load_store:
             self.store = Store.load_from(store_file_path)
             log.info(f"Store has artifacts: {store_file_path.name} "
@@ -54,6 +54,7 @@ class Experiment:
                 sys.exit(-1)
             except KeyError:
                 log.error(f"Missing dependency {arg_type.__name__} while preparing for {step.name}")
+                self.save()
                 sys.exit(-1)
 
         # TODO type checking, satsifiability
@@ -62,12 +63,20 @@ class Experiment:
             config_args_filled = {key: self.config.__getattribute__(key) for key in step.config_args.keys()}
         except KeyError as err:
             log.error(str(err))
-            log.error(f"Entry missing in config")
+            log.error(f"Entry missing in config.")
+            self.save()
             sys.exit(-1)
         output_state: Artifact = step(**state_args_filled, **config_args_filled)
 
         self.store.completed_steps.append(step.name)
         self.store.merge_artifact_into(output_state)
+
+    def save(self):
+        # Pipeline run is complete, save the produced artifacts and the config that was used
+        self.store.save(filename=self.config.filename, run_identifier=self.config.run_identifier)
+        external_directory = self.config.root_directory / f"store_{self.config.run_identifier}"
+        with open(external_directory / f"config_{self.config.filename}.json", 'w') as config_f:
+            config_f.write(self.config.json(indent=4))
 
     def run(self, target_name: str, additional_artifacts: List[Artifact] = None):
         target = get_step(target_name)
@@ -94,10 +103,4 @@ class Experiment:
 
         if self.save_store:
             # Pipeline run is complete, save the produced artifacts and the config that was used
-            self.store.save(filename=self.config.filename, run_identifier=self.config.run_identifier)
-            external_directory = self.config.root_directory / f"store_{self.config.run_identifier}"
-            with open(external_directory / f"config_{self.config.filename}.json", 'w') as config_f:
-                config_f.write(self.config.json(indent=4))
-
-            # TODO move config file into store directory, rename store file, move datasets into raw, rename
-            #   store directory to store_{unique}
+            self.save()

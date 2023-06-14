@@ -5,7 +5,7 @@ from pydantic import Extra, DirectoryPath, BaseModel, Field, validator
 
 
 class SubConfig(BaseModel, extra=Extra.allow, allow_mutation=False):
-    # not being used atm
+    # might get used for StyleGAN config bundle
     pass
 
 

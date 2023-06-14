@@ -56,7 +56,7 @@ class Store:
         return self.artifacts[artifact_type.__name__]
 
     def save(self, filename: str, run_identifier: str):
-        external_directory = self.root_directory / f"store_{run_identifier}"
+        external_directory = self.root_directory / f"store_{run_identifier}/"
         os.makedirs(self.root_directory, exist_ok=True)
         os.makedirs(external_directory, exist_ok=True)
 

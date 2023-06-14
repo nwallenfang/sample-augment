@@ -34,7 +34,7 @@ class AugmentDataset(TensorDataset, Artifact):
     """
     name: str
     root_dir: Path
-    # TODO verify that these are just the ids or else make them so
+    # TODO verify that these are just the step names or else make them so
     img_ids: List[str]
     # redeclare these so they are turned into Pydantic fields
     # needed for proper serialization of this class
@@ -53,14 +53,14 @@ class AugmentDataset(TensorDataset, Artifact):
         Artifact.__init__(self, name=name, root_dir=root_dir, img_ids=img_ids,
                           tensors=tensors)
 
-    def subset(self, indices: Union[List[int], np.ndarray]) -> 'AugmentDataset':
+    def subset(self, indices: Union[List[int], np.ndarray], name: str = None) -> 'AugmentDataset':
         # copies the tensors, so this is a copy rather than a view
         # so potential for optimization, which we will ignore for now.
         subset_tensors: Tuple[Tensor, Tensor] = self.tensors[0][indices], self.tensors[1][indices]
         subset_img_ids = [self.img_ids[i] for i in indices]
 
         return AugmentDataset(
-            name=self.name,
+            name=name if name else "subset",
             root_dir=self.root_dir,
             img_ids=subset_img_ids,
             tensors=subset_tensors
@@ -116,9 +116,7 @@ def gc10_adapter(gc10_data: GC10Folder) -> ImageFolderPath:
 
 # meta: don't really like having to create an artifact for single attributes but fine
 @step()
-def imagefolder_to_tensors(image_folder_path: ImageFolderPath,
-                           name: str,  # true_labels: dict[str, int] = None
-                           ) -> AugmentDataset:
+def imagefolder_to_tensors(image_folder_path: ImageFolderPath) -> AugmentDataset:
     """
         ImageFolder dataset is designed for big datasets that don't fit into RAM (think ImageNet).
         For GC10 we can easily load the whole dataset into RAM transform the ImageDataset into a
@@ -192,7 +190,7 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath,
     image_data = image_data.astype(np.uint8)
     image_tensor = torch.from_numpy(image_data)
     # TODO test that new img ids are correct
-    tensor_dataset = AugmentDataset(name=name, tensors=(image_tensor, label_tensor),
+    tensor_dataset = AugmentDataset(name="complete", tensors=(image_tensor, label_tensor),
                                     img_ids=img_ids,
                                     root_dir=root_dir)
     return tensor_dataset

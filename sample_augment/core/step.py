@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import pkgutil
+import pprint
 import sys
 from typing import Type, Dict, Any, Callable, List, Optional
 
@@ -129,8 +130,10 @@ class StepRegistry:
 
     def get_step(self, name) -> Step:
         if name not in self.all_steps:
-            raise ValueError(f"Step with name {name} is not registered in StepManager. Available steps: "
-                             f"{self.all_steps}")
+            pretty_list = pprint.pformat(sorted(list(self.all_steps.values()),
+                                                key=lambda list_step: list_step.name))
+            raise ValueError(f"Step with name {name} is not registered in StepManager. Available steps:\n"
+                             f"{pretty_list}")
         return self.all_steps[name]
 
     def resolve_dependencies(self, target_step: Step) -> List[Step]:

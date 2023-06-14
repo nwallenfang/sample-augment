@@ -80,8 +80,9 @@ def stratified_split(dataset: AugmentDataset,
     #     test_dataset = Subset(dataset, test_indices)
     # else:
     # take metadata (img paths) from sample_augment.dataset into subsets
-    train_dataset = dataset.subset(train_indices)
-    test_dataset = dataset.subset(test_indices)
+    train_dataset = dataset.subset(train_indices, name="train")
+    test_dataset = dataset.subset(test_indices, name="test")
+
 
     return train_dataset, test_dataset
 
@@ -109,6 +110,7 @@ class TestSet(AugmentDataset):
 
 @step
 def extract_train_set(bundle: TrainTestValBundle) -> TrainSet:
+    log.info("Extracting training set")
     return typing.cast(TrainSet, bundle.train)
 
 
