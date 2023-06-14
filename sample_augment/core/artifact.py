@@ -1,5 +1,4 @@
 import inspect
-import os
 import typing
 from importlib import import_module
 from pathlib import Path
@@ -30,8 +29,12 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             return element_type is torch.Tensor
         return False
 
-    def _serialize_field(self, field, field_name, field_type, root_directory):
+    def _serialize_field(self, field, field_name: str, field_type, root_directory: Path, run_identifier: str):
         # TODO we could maybe reduce some duplications here with some smart method extractions
+        save_path_stem = root_directory / run_identifier / f'{self.__class__.__name__}_{field_name}'
+        # create "run identifier" subdir
+        save_path_stem.parent.mkdir(exist_ok=True)
+
         if Artifact._is_tuple_of_tensors(field_type):
             serialized_tensor_strings = []
             # hard-coded specifically for SampleAugmentDataset tensors
@@ -39,39 +42,39 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
             for idx, tensor in enumerate(tensors):
                 # serialize each tensor the same way we do it for individual tensors
-                save_path = root_directory / f'{self.__class__.__name__}_{field_name}{idx}.pt'
+                filename = f'{self.__class__.__name__}_{field_name}_{idx}.pt'
+                save_path = save_path_stem.with_name(filename)
                 torch.save(tensor, str(save_path))
                 serialized_tensor_strings.append({
                     'type': 'torch.Tensor',
-                    'path': str(save_path.relative_to(root_directory))
+                    'path': save_path.relative_to(root_directory).as_posix()
                 })
             return serialized_tensor_strings
         if not inspect.isclass(field_type):
             # it's a primitive type or a list
             # simply assign
             return field
-
+        # OK at this point it's a class, go through some special cases
         # Tensors and Arrays should get saved to external files (large binary blobs)
         if issubclass(field_type, torch.Tensor):
-            save_path = root_directory / f'{self.__class__.__name__}_{field_name}.pt'
+            save_path = save_path_stem.with_suffix('.pt')
             torch.save(field, str(save_path))
             return {'type': 'torch.Tensor',
-                    'path': f'{str(save_path.relative_to(root_directory))}'}
+                    'path': f'{save_path.relative_to(root_directory).as_posix()}'}
         elif issubclass(field_type, np.ndarray):
-            save_path = root_directory / f'{self.__class__.__name__}_{field_name}.npy'
+            save_path = save_path_stem.with_suffix('.npy')
             np.save(str(save_path), field)
             return {'type': 'numpy.ndarray',
-                    'path': f'{str(save_path.relative_to(root_directory))}'}
+                    'path': f'{save_path.relative_to(root_directory).as_posix()}'}
         elif issubclass(field_type, Artifact):
             # field is a sub-artifact. Recursively save it.
             return field.serialize(root_directory)
-        # TODO
         elif issubclass(field_type, Path):
             # make Path instances relative to config.root_dir
-            relative_path = field.relative_to(root_directory)
+            relative_path = field.relative_to(root_directory).as_posix()
             return {
-                'type': 'pathlib.Path',  # might rather be purepath or something
-                'path': str(relative_path)
+                'type': 'pathlib.Path',
+                'path': relative_path
             }
 
         return field
@@ -106,13 +109,14 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             # simple object, do nothing
             return value
 
-    def serialize(self, root_directory: Path) -> Dict:
+    def serialize(self, root_directory: Path, run_identifier: str) -> Dict:
         # TODO docs
         data = {}
 
         for field_name, field_type in self.__annotations__.items():
             field = getattr(self, field_name)
-            data[field_name] = self._serialize_field(field, field_name, field_type, root_directory)
+            data[field_name] = self._serialize_field(field, field_name, field_type, root_directory,
+                                                     run_identifier)
 
         return data
 
