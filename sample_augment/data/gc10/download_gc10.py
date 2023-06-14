@@ -35,7 +35,7 @@ def download_gc10(raw_data_directory: Path) -> GC10Folder:
         # (which expects each class to have its own subdir)
         shutil.move(lable_dir, new_lable_dir)
     else:
-        log.debug("Skipping GC10 since dir exists.")
+        log.info("Skipping GC10 since dir exists.")
 
     assert gc10_path.is_dir()
     assert new_lable_dir.is_dir()

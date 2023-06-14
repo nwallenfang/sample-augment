@@ -27,7 +27,7 @@ class Experiment:
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
         # state = self.store.load_from_config(config)
-        store_file_path = config.root_directory / f"store_{config.run_identifier}.json"
+        store_file_path = config.root_directory / f"{config.run_identifier}.json"
         if store_file_path.exists() and self.load_store:
             self.store = Store.load_from(store_file_path)
             log.info(f"Store has artifacts: {store_file_path.name} "
@@ -94,8 +94,10 @@ class Experiment:
 
         if self.save_store:
             # Pipeline run is complete, save the produced artifacts and the config that was used
-            self.store.save(run_identifier=self.config.run_identifier)
-
-            with open(self.config.root_directory / f"config_{self.config.run_identifier}.json",
-                      'w') as config_f:
+            self.store.save(filename=self.config.filename, run_identifier=self.config.run_identifier)
+            external_directory = self.config.root_directory / f"store_{self.config.run_identifier}"
+            with open(external_directory / f"config_{self.config.filename}.json", 'w') as config_f:
                 config_f.write(self.config.json(indent=4))
+
+            # TODO move config file into store directory, rename store file, move datasets into raw, rename
+            #   store directory to store_{unique}

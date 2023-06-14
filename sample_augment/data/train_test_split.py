@@ -6,7 +6,6 @@ import typing
 
 import numpy as np
 from sklearn.model_selection import train_test_split
-from torch.utils.data import Subset
 from torchvision.datasets import ImageFolder
 
 from sample_augment.core import step, Artifact

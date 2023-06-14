@@ -8,7 +8,10 @@ from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch import nn  # All neural network modules
 from torch.utils.data import DataLoader  # Gives easier dataset management
 
+from sample_augment.core import step
 from sample_augment.data.dataset import AugmentDataset
+from sample_augment.data.train_test_split import ValSet, TrainSet
+from sample_augment.models.classifier import TrainedClassifier
 from sample_augment.utils.paths import project_path
 
 
@@ -32,7 +35,7 @@ def preprocess(dataset):
     return dataset
 
 
-def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_epochs=23, batch_size=64,
+def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs=23, batch_size=64,
           learning_rate=0.001):
     """
         this code is taken in large part from Michel's notebook,
@@ -49,8 +52,8 @@ def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_e
 
     # TODO set random_seed so the experiment is (more) reproducible
     # Train Network
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(dataset=val_set, batch_size=batch_size, shuffle=True)
 
     # Loss and optimizer
     criterion = nn.CrossEntropyLoss()
@@ -119,7 +122,8 @@ def train(train_dataset: Dataset, test_dataset: Dataset, model: nn.Module, num_e
             f'Val Accuracy: {val_accuracy.item():.2f}')
 
 
-def main():
+@step
+def train_classifier(train_data: TrainSet, val_data: ValSet) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
@@ -150,14 +154,15 @@ def main():
         nn.Linear(30, num_classes))
     model.to(device)
 
-    train_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
-    val_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
+    # train_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
+    # val_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
 
     train_data = preprocess(train_data)
     val_data = preprocess(val_data)
 
     train(train_data, val_data, model)
 
-
-if __name__ == '__main__':
-    main()
+    return TrainedClassifier(
+        name="missing name",
+        model=model
+    )

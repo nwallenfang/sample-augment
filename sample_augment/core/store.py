@@ -55,20 +55,22 @@ class Store:
 
         return self.artifacts[artifact_type.__name__]
 
-    def save(self, run_identifier: str):
+    def save(self, filename: str, run_identifier: str):
+        external_directory = self.root_directory / f"store_{run_identifier}"
         os.makedirs(self.root_directory, exist_ok=True)
+        os.makedirs(external_directory, exist_ok=True)
+
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
-            artifact_dict = artifact.serialize(self.root_directory, run_identifier)
+            artifact_dict = artifact.serialize(self.root_directory, external_directory)
             if artifact_dict:
                 log.debug(f"Saving artifact {artifact_name}")
                 data[artifact.fully_qualified_name] = artifact_dict
 
-        # TODO muy importante save config along with state
-
-        log.info(f"Saving store to store_{run_identifier}.json")
-        with open(self.root_directory / f'store_{run_identifier}.json', 'w') as f:
+        store_filename = f'{filename}.json'
+        log.info(f"Saving store to {store_filename}")
+        with open(self.root_directory / store_filename, 'w') as f:
             try:
                 json.dump(data, f, indent=4)
             except TypeError as err:
@@ -95,5 +97,7 @@ class Store:
         store = cls(root_directory)
         store.artifacts = artifacts
         return store
+
+
 
 

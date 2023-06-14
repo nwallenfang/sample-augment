@@ -83,8 +83,6 @@ class StepRegistry:
             name = func.__name__  # used to be camel case, but it was confusing
 
         if name in self.all_steps:
-            # raise ValueError(
-            #     f"Step ID '{name}' is already registered. Please choose a different step ID.")
             log.warn(f"Step {name} is already registered.")
             return
 
