@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from sample_augment.core import Experiment
-from sample_augment.core.step import import_step_modules
+from sample_augment.core.step import find_steps
 from sample_augment.data.dataset import ImageFolderPath
 from sample_augment.main import read_config
 
@@ -11,7 +11,7 @@ from sample_augment.main import read_config
 @pytest.fixture
 def experiment():
     config = read_config(Path("config.json"))
-    import_step_modules(root_modules=['test', 'data'])
+    find_steps(include=['test', 'data'])
 
     # create Experiment instance
     experiment_instance = Experiment(config)

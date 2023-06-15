@@ -1,4 +1,7 @@
+from typing import Dict
+
 import torch
+import torchvision.models
 from torch import nn  # All neural network modules
 from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch.utils.data import DataLoader  # Gives easier dataset management
@@ -9,7 +12,6 @@ from tqdm import tqdm  # For nice progress bar!
 from sample_augment.core import step
 from sample_augment.data.train_test_split import ValSet, TrainSet
 from sample_augment.models.classifier import TrainedClassifier
-from sample_augment.utils.paths import project_path
 
 
 def preprocess(dataset):
@@ -32,7 +34,7 @@ def preprocess(dataset):
     return dataset
 
 
-def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs=23, batch_size=64,
+def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs=20, batch_size=64,
           learning_rate=0.001):
     """
         this code is taken in large part from Michel's notebook,
@@ -109,8 +111,8 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs=23,
             # store loss
             val_batch_losses.append(val_loss.item())
 
-        torch.save(model.state_dict(),
-                   project_path(f'models/checkpoints/densenet201/tmp-{epoch}-val-{val_loss:.3f}.pt'))
+        # torch.save(model.state_dict(),
+        #            project_path(f'models/checkpoints/densenet201/tmp-{epoch}-val-{val_loss:.3f}.pt'))
 
         val_losses.append(sum(val_batch_losses) / len(val_batch_losses))
         print(
@@ -119,45 +121,57 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs=23,
             f'Val Accuracy: {val_accuracy.item():.2f}')
 
 
+class CustomDenseNet(torchvision.models.DenseNet):
+    num_classes: int
+
+    def __init__(self, num_classes, load_pretrained=False):
+        # Initialize with densenet201 configuration
+        super().__init__(num_init_features=64, growth_rate=32, block_config=(6, 12, 48, 32),
+                         num_classes=1000)  # initially set to match the pre-trained model
+        if load_pretrained:
+            # use the model pretrained on imagenet
+            pretrained = torch.hub.load('pytorch/vision:v0.10.0', 'densenet201', weights='IMAGENET1K_V1')
+            self.load_state_dict(pretrained.state_dict(), strict=False)
+        # Freeze early layers
+        for param in self.parameters():
+            param.requires_grad = False
+
+        # Modify the classifier part of the model
+        self.classifier = nn.Sequential(
+            nn.Linear(1920, 960),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(960, 240),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(240, 30),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(30, num_classes))
+
+        self.num_classes = num_classes
+
+    def get_kwargs(self) -> Dict:
+        return {'num_classes': self.num_classes}
+
+
 @step
-def train_classifier(train_data: TrainSet, val_data: ValSet) -> TrainedClassifier:
+def train_classifier(train_data: TrainSet, val_data: ValSet, num_epochs: int) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
     see references/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
     """
-    num_classes = 10
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # use the model pretrained on imagenet
-    model = torch.hub.load('pytorch/vision:v0.10.0', 'densenet201', weights='IMAGENET1K_V1')
-
-    # Freeze early layers
-    for param in model.parameters():
-        param.requires_grad = False
-
-    # Modify the classifier part of the model
-    model.classifier = nn.Sequential(
-        nn.Linear(1920, 960),
-        nn.ReLU(),
-        nn.Dropout(0.2),
-        nn.Linear(960, 240),
-        nn.ReLU(),
-        nn.Dropout(0.2),
-        nn.Linear(240, 30),
-        nn.ReLU(),
-        nn.Dropout(0.2),
-        nn.Linear(30, num_classes))
+    model = CustomDenseNet(num_classes=train_data.num_classes, load_pretrained=True)
     model.to(device)
-
     # train_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
     # val_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
 
     train_data = preprocess(train_data)
     val_data = preprocess(val_data)
 
-    train(train_data, val_data, model)
+    train(train_data, val_data, model, num_epochs=num_epochs)
 
     return TrainedClassifier(
         name="missing name",

@@ -83,24 +83,32 @@ def stratified_split(dataset: AugmentDataset,
     train_dataset = dataset.subset(train_indices, name="train")
     test_dataset = dataset.subset(test_indices, name="test")
 
-
     return train_dataset, test_dataset
 
 
-class TrainTestValBundle(Artifact):
-    train: AugmentDataset
-    val: AugmentDataset
-    test: AugmentDataset
-    _serialize_this = False
-
-
-# helper classes and steps to have clean interfaces
-# since currently the steps API only supports returning a single Artifact
 class TrainSet(AugmentDataset):
+    # def __init__(self, dataset: AugmentDataset):
+    #     super().__init__(dataset.name,
+    #                      tensors=(dataset.tensors[0], dataset.tensors[1]),
+    #                      img_ids=dataset.img_ids,
+    #                      root_dir=dataset.root_dir)
+    #     self.name = dataset.name
+    #     self.tensors = dataset.tensors
+    #     self.img_ids = dataset.img_ids
+    #     self.root_dir = dataset.root_dir
     pass
 
 
 class ValSet(AugmentDataset):
+    # def __init__(self, dataset: AugmentDataset):
+    #     super().__init__(dataset.name,
+    #                      tensors=(dataset.tensors[0], dataset.tensors[1]),
+    #                      img_ids=dataset.img_ids,
+    #                      root_dir=dataset.root_dir)
+    #     self.name = dataset.name
+    #     self.tensors = dataset.tensors
+    #     self.img_ids = dataset.img_ids
+    #     self.root_dir = dataset.root_dir
     pass
 
 
@@ -108,10 +116,21 @@ class TestSet(AugmentDataset):
     pass
 
 
+class TrainTestValBundle(Artifact):
+    train: TrainSet
+    val: ValSet
+    test: TestSet
+    _serialize_this = False
+
+
+# helper classes and steps to have clean interfaces
+# since currently the steps API only supports returning a single Artifact
+
+
 @step
 def extract_train_set(bundle: TrainTestValBundle) -> TrainSet:
-    log.info("Extracting training set")
-    return typing.cast(TrainSet, bundle.train)
+    train_set = typing.cast(TrainSet, bundle.train)
+    return train_set
 
 
 @step
@@ -126,12 +145,19 @@ def extract_test_set(bundle: TrainTestValBundle) -> TestSet:
 
 @step
 def create_train_val_test(dataset: AugmentDataset, random_seed: int,
-                          test_ratio: float, val_ratio: float) -> TrainTestValBundle:
-    train_val_data, test_data = stratified_split(dataset, train_ratio=(1.0 - test_ratio),
-                                                 random_seed=random_seed)
+                          test_ratio: float, val_ratio: float, min_instances: int) -> TrainTestValBundle:
+    n = len(dataset)
+    train_val_data, test_data = stratified_split(dataset,
+                                                 train_ratio=(1.0 - test_ratio),
+                                                 random_seed=random_seed,
+                                                 min_instances_per_class=min_instances)
     # stratified split returns Subsets, turn train_val_data into a TensorDataset to split it again
     train_data, val_data = stratified_split(train_val_data,
                                             random_seed=random_seed,
-                                            train_ratio=(1.0 - val_ratio))
+                                            train_ratio=(1.0 - val_ratio),
+                                            min_instances_per_class=min_instances)
 
-    return TrainTestValBundle(train=train_data, val=val_data, test=test_data)
+    assert len(train_data) + len(val_data) == len(train_val_data)
+    assert len(train_val_data) + len(test_data) == n
+    return TrainTestValBundle(train=TrainSet.from_existing(train_data), val=ValSet.from_existing(val_data),
+                              test=TestSet.from_existing(test_data))

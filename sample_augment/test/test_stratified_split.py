@@ -8,7 +8,7 @@ from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import stratified_split
 
 
-def create_dummy_dataset(n, number_of_1s):
+def create_dummy_dataset(n, number_of_1s, root_dir=None):
     dummy_data = torch.ones([n, 1, 1])
 
     for i in range(n):
@@ -19,9 +19,14 @@ def create_dummy_dataset(n, number_of_1s):
     dummy_labels[:number_of_1s + 1] = 1
     # shuffle labels
     dummy_labels = dummy_labels[torch.randperm(dummy_labels.shape[0])]
-    dataset = AugmentDataset(name='dummy', tensors=(dummy_data, dummy_labels), img_ids=['/'] * n,
-                             root_dir=Path(
-                                 '/'))
+    if root_dir:
+        dataset = AugmentDataset(name='dummy', tensors=(dummy_data, dummy_labels),
+                                 img_ids=[str(i) for i in range(n)],
+                                 root_dir=root_dir)
+    else:
+        dataset = AugmentDataset(name='dummy', tensors=(dummy_data, dummy_labels),
+                                 img_ids=[str(i) for i in range(n)],
+                                 root_dir=Path('/'))
     assert len(dataset) == n
     return dataset
 
@@ -46,7 +51,7 @@ def test_split_dummy_data(min_test_instances, n, number_of_1s):
 
 
 def test_repeated_split(n=100):
-    dummy_dataset = create_dummy_dataset(n, n//5)
+    dummy_dataset = create_dummy_dataset(n, n // 5)
     train_val, test = stratified_split(dummy_dataset, random_seed=42, min_instances_per_class=0)
     train, val = stratified_split(train_val, random_seed=42, min_instances_per_class=0)
 

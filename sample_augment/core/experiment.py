@@ -81,7 +81,7 @@ class Experiment:
     def run(self, target_name: str, additional_artifacts: List[Artifact] = None):
         target = get_step(target_name)
         full_pipeline = step_registry.resolve_dependencies(target)
-        log.debug(f"Pre-Reduce Pipeline: {full_pipeline}")
+        log.info(f"Pre-Reduce Pipeline: {full_pipeline}")
 
         if additional_artifacts:
             for artifact in additional_artifacts:

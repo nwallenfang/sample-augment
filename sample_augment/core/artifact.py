@@ -42,8 +42,11 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         # TODO we could maybe reduce some duplications here with some smart method extractions
         # create "run identifier" subdir
         external_directory.parent.mkdir(exist_ok=True)
+        filename = f'{self.__class__.__name__}_{field_name}'
+        save_path = external_directory / filename
 
         if is_tuple_of_tensors(field_type):
+            # TODO we could stack the tensor instead of saving it individually..
             serialized_tensor_strings = []
             # hard-coded specifically for SampleAugmentDataset tensors
             tensors = typing.cast(typing.Tuple[torch.Tensor, ...], field)
@@ -65,17 +68,19 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         # OK at this point it's a class, go through some special cases
         # Tensors and Arrays should get saved to external files (large binary blobs)
         if issubclass(field_type, torch.Tensor):
-            save_path = external_directory.with_suffix('.pt')
+            save_path = save_path.with_suffix('.pt')
             torch.save(field, str(save_path))
             return {'type': 'torch.Tensor',
                     'path': f'{save_path.relative_to(root_directory).as_posix()}'}
         elif issubclass(field_type, torch.nn.Module):
-            save_path = external_directory.with_suffix('.pt')
+            save_path = save_path.with_suffix('.pt')
             torch.save(field.state_dict(), str(save_path))
             return {'type': 'torch.nn.Module',
+                    'class': f'{field.__class__.__module__}.{field.__class__.__name__}',
+                    'kwargs': field.get_kwargs(),  # TODO ensure that every model has this
                     'path': f'{save_path.relative_to(root_directory).as_posix()}'}
         elif issubclass(field_type, np.ndarray):
-            save_path = external_directory.with_suffix('.npy')
+            save_path = save_path.with_suffix('.npy')
             np.save(str(save_path), field)
             return {'type': 'numpy.ndarray',
                     'path': f'{save_path.relative_to(root_directory).as_posix()}'}
@@ -103,11 +108,9 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                 # TODO
                 module_name, class_name = value['class'].rsplit('.', 1)
                 ModelClass = getattr(import_module(module_name), class_name)
-                model = ModelClass()
-
+                model = ModelClass(**value['kwargs'])
                 model.load_state_dict(torch.load(root_dir / value['path']))
-                # Make sure to call model.eval() if you are using the model for inference
-                # model.eval()
+                model.eval()
                 return model
             elif value['type'] == 'numpy.ndarray':
                 return np.load(root_dir / value['path'])
@@ -153,6 +156,13 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         #     data = json.load(f)
 
         for field_name, value in data.items():
+            if field_name not in cls.__fields__:
+                # field is not in pydantic model
+                continue
+            model_field = cls.__fields__[field_name]
+            if 'exclude' in model_field.field_info.extra and model_field.field_info.extra['exclude']:
+                # field is excluded in pydantic model
+                continue
             data[field_name] = Artifact._deserialize_field(field_name, value, root_dir)
 
         try:

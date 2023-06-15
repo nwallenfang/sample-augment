@@ -169,24 +169,29 @@ class StepRegistry:
             #     log.debug(f"skipped step {pipeline_step.name}")
             #     continue  # step not producing anything
             if pipeline_step.produces in initial_artifacts:
-                log.debug(f"Filtered step {pipeline_step.name}")
+                # log.debug(f"Filtered step {pipeline_step.name}")
                 continue
             else:
                 filtered_pipeline.append(pipeline_step)
 
+            # TODO create_train_val_test doesn't get filtered even though it could be
+            #  (since its artifact doesn't get serialized)
+
         return filtered_pipeline
 
 
-def import_step_modules(root_modules: List[str]):
+def find_steps(include: List[str], exclude: List[str] = None):
     """
-    @param root_modules: List of root modules to search for @step methods recursively.
+    @param include: List of root modules to search for @step methods recursively.
+    @param exclude: List of module names that will be ignored.
     """
-    for root_module in root_modules:
+    for root_module in include:
         # Recursively import all submodules in the package
         package = importlib.import_module(root_module)
         prefix = package.__name__ + "."
         for _importer, modname, _ispkg in pkgutil.walk_packages(package.__path__, prefix):
-            if modname not in sys.modules:
+            if modname not in sys.modules and not any([mod in modname for mod in exclude]):
+                # log.debug(f"importing {modname}")
                 _module = importlib.import_module(modname)
 
 

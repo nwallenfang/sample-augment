@@ -5,6 +5,7 @@ from typing import List, Tuple, Union
 import numpy as np
 import torch
 import torchvision
+from pydantic import Field
 from torch import Tensor
 from torch.utils.data import TensorDataset
 from torchvision.datasets import ImageFolder
@@ -40,7 +41,6 @@ class AugmentDataset(TensorDataset, Artifact):
     # needed for proper serialization of this class
     tensors: Tuple[Tensor, ...]
 
-    # noinspection PyMissingConstructor
     def __init__(self, name: str, tensors: Tuple[Tensor, Tensor], img_ids: List[str],
                  root_dir: Path):
         """
@@ -48,8 +48,7 @@ class AugmentDataset(TensorDataset, Artifact):
             img_ids (List[str]): list going from Tensor index to relative path of the given image
             root_dir (Path): for resolving the relative paths from img_ids
         """
-        # assert number of images == number of labels
-        assert len(tensors[0]) == len(tensors[1])
+        assert len(tensors[0]) == len(tensors[1]), "Image tensor length doesn't match label tensor length!"
         Artifact.__init__(self, name=name, root_dir=root_dir, img_ids=img_ids,
                           tensors=tensors)
 
@@ -66,6 +65,17 @@ class AugmentDataset(TensorDataset, Artifact):
             tensors=subset_tensors
         )
 
+    @classmethod
+    def from_existing(cls, existing_dataset: 'AugmentDataset') -> 'AugmentDataset':
+        """
+            'copy-constructor' used for constructing subclasses such as TestSet.
+        """
+        new_dataset = cls(name=existing_dataset.name, tensors=(existing_dataset.tensors[0],
+                                                               existing_dataset.tensors[1]),
+                          img_ids=existing_dataset.img_ids,
+                          root_dir=existing_dataset.root_dir)
+        return new_dataset
+
     @property
     def image_tensor(self):
         return self.tensors[0]
@@ -73,6 +83,11 @@ class AugmentDataset(TensorDataset, Artifact):
     @property
     def label_tensor(self):
         return self.tensors[1]
+
+    @property
+    def num_classes(self):
+        # very unperformant when called often
+        return int(torch.max(self.tensors[1]) - torch.min(self.tensors[1])) + 1
 
 
 def test_train_test_split():

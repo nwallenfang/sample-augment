@@ -16,6 +16,7 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     debug = True
     cache = False
 
+    # TODO put root_directory into env instead -> goal: make config.json portable between os/machines
     root_directory: DirectoryPath = Field(exclude=True)
 
     # train test split params

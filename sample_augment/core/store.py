@@ -17,8 +17,11 @@ class Store:
     artifacts: Dict[str, Artifact] = {}
     completed_steps: List[str] = []
 
-    def __init__(self, root_directory: Path):
+    def __init__(self, root_directory: Path, artifacts=None):
         self.root_directory = root_directory
+        if artifacts:
+            assert isinstance(artifacts, dict)
+            self.artifacts = artifacts
 
     def __len__(self):
         return len(self.artifacts)
@@ -42,6 +45,7 @@ class Store:
             return
 
         if name not in self.artifacts or overwrite:
+            log.debug(f"Added artifact {name}")
             self.artifacts[name] = artifact
         elif name in self.artifacts and not overwrite:
             # if not overwrite and this artifact exists already, we'll ignore it
@@ -78,6 +82,8 @@ class Store:
                 log.error("Couldn't serialize Store, data dict:")
                 log.error(data)
                 sys.exit(-1)
+
+        return Path(self.root_directory / store_filename)
 
     @classmethod
     def load_from(cls, store_path: Path):  # TODO maybe pass dependencies instead
