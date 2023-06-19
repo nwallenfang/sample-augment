@@ -5,7 +5,6 @@ from typing import List, Tuple, Union
 import numpy as np
 import torch
 import torchvision
-from pydantic import Field
 from torch import Tensor
 from torch.utils.data import TensorDataset
 from torchvision.datasets import ImageFolder

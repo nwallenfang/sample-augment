@@ -262,9 +262,20 @@ def evaluate_classifier_old():
 
 
 @step
-def evaluate_test(classifier: TrainedClassifier):
-    log.info(f"Training:   {classifier.metrics.train_loss}")
-    log.info(f"Validation: {classifier.metrics.validation_loss}")
+def plot_loss_over_epochs(classifier: TrainedClassifier, figure_directory: Path):
+    # log.info(f"Training:   {classifier.metrics.train_loss}")
+    # log.info(f"Validation: {classifier.metrics.validation_loss}")
+    plt.figure(figsize=(10, 7))
+
+    plt.plot(classifier.metrics.train_loss, label='Training Loss', color='blue')
+    plt.plot(classifier.metrics.validation_loss, label='Validation Loss', color='red')
+
+    plt.title('Cross-Entropy Loss per Epoch')
+    plt.xlabel('Epoch')
+    plt.ylabel('Cross-Entropy Loss')
+    plt.legend()
+
+    plt.savefig(figure_directory / "losses.png")
 
 
 if __name__ == '__main__':

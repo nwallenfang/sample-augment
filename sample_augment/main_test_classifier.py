@@ -16,9 +16,9 @@ if __name__ == '__main__':
 
     # fixed store with trained classifier from colab
     store = Store.load_from(store_path=Path(
-        "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data\\colab_244ba.json"),
+        "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data\\colab_1883c.json"),
         root_directory=Path("C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data\\"))
 
     # create Experiment instance
-    experiment = Experiment(config, store=store)
-    experiment.run("evaluate_test")
+    experiment = Experiment(config, store=store, save_store=False)
+    experiment.run("plot_loss_over_epochs")
