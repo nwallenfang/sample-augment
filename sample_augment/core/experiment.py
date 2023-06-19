@@ -17,24 +17,26 @@ class Experiment:
     load_store: bool
     save_store: bool
 
-    def __init__(self, config: Config, load_store: bool = True, save_store: bool = True):
+    def __init__(self, config: Config, store: Store = None, load_store: bool = True, save_store: bool = True):
         self.load_store = load_store
         self.save_store = save_store
 
-        # TODO root_directory through .env file or sys env
         self.config = config
 
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
         # state = self.store.load_from_config(config)
-        store_file_path = config.root_directory / f"{config.name}_{config.run_identifier}.json"
-        if store_file_path.exists() and self.load_store:
-            self.store = Store.load_from(store_file_path)
-            log.info(f"Store has artifacts: {store_file_path.name} "
-                     f"{[a for a in self.store.artifacts]}")
+        if store is None:
+            store_file_path = config.root_directory / f"{config.name}_{config.run_identifier}.json"
+            if store_file_path.exists() and self.load_store:
+                self.store = Store.load_from(store_file_path, config.root_directory)
+                log.info(f"Store has artifacts: {store_file_path.name} "
+                         f"{[a for a in self.store.artifacts]}")
+            else:
+                log.info(f"No existing store for hash {config.run_identifier}. Starting fresh.")
+                self.store = Store(config.root_directory)
         else:
-            log.info(f"No existing store for hash {config.run_identifier}. Starting fresh.")
-            self.store = Store(config.root_directory)
+            self.store = store
 
     def __repr__(self):
         return f"Experiment_{self.config.run_identifier}"
@@ -79,20 +81,20 @@ class Experiment:
         with open(external_directory / f"config_{self.config.filename}.json", 'w') as config_f:
             config_f.write(self.config.json(indent=4))
 
-    def run(self, target_name: str, additional_artifacts: List[Artifact] = None):
+    def run(self, target_name: str, initial_artifacts: List[Artifact] = None):
         target = get_step(target_name)
         full_pipeline = step_registry.resolve_dependencies(target)
         log.info(f"Pre-Reduce Pipeline: {full_pipeline}")
 
-        if additional_artifacts:
-            for artifact in additional_artifacts:
+        if initial_artifacts:
+            for artifact in initial_artifacts:
                 self.store.merge_artifact_into(artifact)
 
         # removes the Steps that are not necessary (since their produced Artifacts are already in the Store)
         pipeline = StepRegistry.reduce_steps(full_pipeline, [type(artifact) for artifact in
                                                              self.store.artifacts.values()])
         if target not in pipeline:
-            # shouldn't be necessary but doing it because of bug in reduce steps
+            # shouldn't be necessary but doing it because of bug in reduce_steps
             pipeline.append(target)
         if pipeline:
             log.info(f"Running pipeline: {pipeline}")

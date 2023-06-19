@@ -3,7 +3,7 @@ from pathlib import Path
 from sample_augment.core import Experiment
 from sample_augment.core.artifact import Artifact
 from sample_augment.core.step import step
-from sample_augment.main import read_config
+from sample_augment.core.config import read_config
 
 
 class DummyState(Artifact):

@@ -159,5 +159,7 @@ def create_train_val_test(dataset: AugmentDataset, random_seed: int,
 
     assert len(train_data) + len(val_data) == len(train_val_data)
     assert len(train_val_data) + len(test_data) == n
-    return TrainTestValBundle(train=TrainSet.from_existing(train_data), val=ValSet.from_existing(val_data),
-                              test=TestSet.from_existing(test_data))
+    trainset, valset, testset = TrainSet.from_existing(train_data), ValSet.from_existing(val_data), TestSet.from_existing(test_data)
+    assert len(trainset) + len(valset) == len(train_val_data)
+    assert len(train_val_data) + len(testset) == n
+    return TrainTestValBundle(train=trainset, val=valset, test=testset)

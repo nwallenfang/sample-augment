@@ -102,12 +102,16 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             if value['type'] == 'torch.Tensor':
                 # TODO down the line it could be good/performant to do "lazy loading", so only load once
                 #   this artifact is actually being used
-                return torch.load(root_dir / value['path'])
+                return torch.load(root_dir / value['path'],
+                                  map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
             elif value['type'] == 'torch.nn.Module':
                 module_name, class_name = value['class'].rsplit('.', 1)
                 ModelClass = getattr(import_module(module_name), class_name)
                 model = ModelClass(**value['kwargs'])
-                model.load_state_dict(torch.load(root_dir / value['path']))
+                model.load_state_dict(
+                    torch.load(root_dir / value['path'],
+                               map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu')))
+
                 model.eval()
                 return model
             elif value['type'] == 'numpy.ndarray':

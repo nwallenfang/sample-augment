@@ -1,7 +1,12 @@
 import hashlib
+import json
+import sys
+from json import JSONDecodeError
 from pathlib import Path
 
-from pydantic import Extra, DirectoryPath, BaseModel, Field, validator
+from pydantic import Extra, DirectoryPath, BaseModel, Field, validator, ValidationError
+
+from sample_augment.utils import log
 
 
 class SubConfig(BaseModel, extra=Extra.allow, allow_mutation=False):
@@ -73,3 +78,34 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
 
             return fig_dir.resolve()
         return v
+
+
+def read_config(arg_config: Path = None) -> Config:
+    if arg_config is None:
+        config_path = Path(__file__).parent.parent.parent / 'config.json'
+        log.debug(f"Using default config path {config_path.absolute()}")
+    else:
+        config_path = Path(arg_config)
+
+    # config preprocessing
+    try:
+        with open(config_path) as json_file:
+            param_dict = json.load(json_file)
+    except FileNotFoundError as err:
+        log.error(str(err))
+        sys.exit(-1)
+    except JSONDecodeError as err:
+        log.error(str(err))
+        log.error(f"Failed to parse {config_path.name}, exiting.")
+        sys.exit(-1)
+
+    # try reading config file
+    try:
+        # maybe add command line args to config.json as well
+        config = Config.parse_obj(param_dict)
+    except ValidationError as e:
+        log.error(str(e))
+        log.error(f"Validation failed for {config_path.name}, exiting.")
+        sys.exit(1)
+
+    return config

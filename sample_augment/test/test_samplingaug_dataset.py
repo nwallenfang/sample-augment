@@ -5,7 +5,7 @@ import pytest
 from sample_augment.core import Experiment
 from sample_augment.core.step import find_steps
 from sample_augment.data.dataset import ImageFolderPath
-from sample_augment.main import read_config
+from sample_augment.core.config import read_config
 
 
 @pytest.fixture
@@ -25,6 +25,6 @@ def test_pipeline_with_gc10_mini(experiment):
     # TODO see in dependency management that only the necessary steps get run
     # TODO get proper testing config, maybe use testing fixture for it
     experiment.run("ImageFolderToTensors",
-                   additional_artifacts=[ImageFolderPath(
+                   initial_artifacts=[ImageFolderPath(
                        image_dir=Path(
                            r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\gc10-mini"))])

@@ -18,6 +18,7 @@ class ComplexArtifact(Artifact):
 
 
 def test_artifact_store(tmpdir):
+    # TODO fix this test
     # First, let's create some Artifacts
     simple_artifact = SimpleArtifact(x=1, y=2.0, z='three')
     complex_artifact = ComplexArtifact(simple=simple_artifact,

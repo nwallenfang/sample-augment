@@ -86,9 +86,9 @@ class Store:
         return Path(self.root_directory / store_filename)
 
     @classmethod
-    def load_from(cls, store_path: Path):  # TODO maybe pass dependencies instead
-        root_directory = store_path.parent  # the dir above the actual store file
-        # TODO should this be a class method? hmm
+    def load_from(cls, store_path: Path, root_directory: Path):
+        # root_directory = store_path.parent  # the dir above the actual store file
+        # TODO error handling
         with open(store_path, 'r') as f:
             data = json.load(f)
 
@@ -102,6 +102,7 @@ class Store:
 
         store = cls(root_directory)
         store.artifacts = artifacts
+        # TODO return config if it's present (or move this to Config? not sure)
         return store
 
 

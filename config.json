@@ -1,16 +1,16 @@
 {
   "name": "experiment",
   "root_directory": "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data",
-  "random_seed": 41,
+  "random_seed": 123,
   "figure_directory": "./figures",
   "raw_data_directory": "./raw",
   "checkpoint_directory": "./checkpoints",
-  "target": "evaluate_test",
+  "target": "extract_test_set",
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 0,
 
   "learning_rate": 0.01,
-  "num_epochs": 6,
+  "num_epochs": 7,
   "batch_size": 1
 }
