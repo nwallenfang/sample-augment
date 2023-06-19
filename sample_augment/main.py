@@ -13,6 +13,11 @@ from sample_augment.data.gc10.download_gc10 import GC10Folder
 from sample_augment.utils.log import log
 
 
+# @click.group()
+# def cli():
+#     # TODO
+#     pass
+
 def read_config(arg_config: Path = None) -> Config:
     if arg_config is None:
         config_path = Path(__file__).parent.parent / 'config.json'
@@ -44,7 +49,7 @@ def read_config(arg_config: Path = None) -> Config:
     return config
 
 
-@click.command()
+@click.group()
 @click.option('arg_config', '--config', default=None, type=click.Path(), help='Path to the configuration '
                                                                               'file.')
 def main(arg_config: Path = None):
@@ -68,8 +73,13 @@ def main(arg_config: Path = None):
     # TODO add specific test model
     # TODO providing additional artifacts doesn't change the run identifier so this could bring issues
     experiment.run(config.target, additional_artifacts=[GC10Folder(
-        image_dir=Path(r"/home/nils/thesis/sample-augment/data/raw/gc10-mini/"),
-        label_dir=Path('/home/nils/thesis/sample-augment/data/raw/gc10_labels'))])
+        image_dir=Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\raw\gc10-mini"),
+        label_dir=Path(r'C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\raw\gc10-mini'))])
+
+
+@main.command(name="list")
+def list_steps():
+    print("list")
 
 
 # @main.command()

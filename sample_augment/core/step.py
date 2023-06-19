@@ -84,8 +84,8 @@ class StepRegistry:
             name = func.__name__  # used to be camel case, but it was confusing
 
         if name in self.all_steps:
-            log.warn(f"Step {name} is already registered.")
-            return
+            # log.warn(f"Step {name} is already registered.")
+            return func
 
         sig = inspect.signature(func)
 
@@ -185,6 +185,8 @@ def find_steps(include: List[str], exclude: List[str] = None):
     @param include: List of root modules to search for @step methods recursively.
     @param exclude: List of module names that will be ignored.
     """
+    if not exclude:
+        exclude = []
     for root_module in include:
         # Recursively import all submodules in the package
         package = importlib.import_module(root_module)

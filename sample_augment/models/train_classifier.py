@@ -1,5 +1,7 @@
+import sys
 from typing import Dict
 
+import numpy as np
 import torch
 import torchvision.models
 from torch import nn  # All neural network modules
@@ -9,9 +11,8 @@ from torch.utils.data import Dataset
 from torchvision.transforms import transforms
 from tqdm import tqdm  # For nice progress bar!
 
-from sample_augment.core import step
+from sample_augment.core import step, Artifact
 from sample_augment.data.train_test_split import ValSet, TrainSet
-from sample_augment.models.classifier import TrainedClassifier
 
 
 def preprocess(dataset):
@@ -34,20 +35,13 @@ def preprocess(dataset):
     return dataset
 
 
-def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs=20, batch_size=64,
-          learning_rate=0.001):
+def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs, batch_size,
+          learning_rate) -> (np.ndarray, np.ndarray):
     """
         this code is taken in large part from Michel's notebook,
         see references/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # this DataParallel approach doesn't work on windows. If we want to accelerate with 2 GPUS,
-    # we need to use DDP:
-    # https://cloudblogs.microsoft.com/opensource/2021/08/04/introducing-distributed-data-parallel-support-on-pytorch-windows/
-    # if torch.cuda.device_count() > 1:
-    #   print("Let's use", torch.cuda.device_count(), "GPUs!")
-    #   model = nn.DataParallel(model)
 
     # TODO set random_seed so the experiment is (more) reproducible
     # Train Network
@@ -72,7 +66,7 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs=20,
         val_loss = -1
         val_accuracy = -1
 
-        for batch_idx, (image, label) in enumerate(tqdm(train_loader)):
+        for batch_idx, (image, label) in enumerate(tqdm(train_loader, file=sys.stdout, desc="Training")):
             # Get data to cuda if possible
             image = image.to(device=device)
             label = label.to(device=device)
@@ -97,7 +91,7 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs=20,
             f' Train Loss: {train_loss.item():.4f}')
 
         model.eval()
-        for batch_idx, (image, label) in enumerate(tqdm(test_loader)):
+        for batch_idx, (image, label) in enumerate(tqdm(test_loader, file=sys.stdout, desc="Validation")):
             # Get data to cuda if possible
             image = image.to(device=device)
             label = label.to(device=device)
@@ -119,6 +113,8 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs=20,
             f'Epoch [{epoch + 1}/{num_epochs}], Step [{batch_idx + 1}/{n_total_steps}], '
             f'Val Loss: {val_loss.item():.3f}, '
             f'Val Accuracy: {val_accuracy.item():.2f}')
+
+    return np.array(train_losses), np.array(val_losses)
 
 
 class CustomDenseNet(torchvision.models.DenseNet):
@@ -155,12 +151,22 @@ class CustomDenseNet(torchvision.models.DenseNet):
         return {'num_classes': self.num_classes}
 
 
+class TrainedClassifier(Artifact):
+    name: str
+    model: torch.nn.Module
+    train_losses: np.ndarray
+    validation_losses: np.ndarray
+
+
 @step
-def train_classifier(train_data: TrainSet, val_data: ValSet, num_epochs: int) -> TrainedClassifier:
+def train_classifier(train_data: TrainSet, val_data: ValSet,
+                     num_epochs: int, batch_size: int, learning_rate: float) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
     see references/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
+
+    old default train params: num_epochs = 20, batch_size = 64, learning_rate = 0.001
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = CustomDenseNet(num_classes=train_data.num_classes, load_pretrained=True)
@@ -171,9 +177,12 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, num_epochs: int) ->
     train_data = preprocess(train_data)
     val_data = preprocess(val_data)
 
-    train(train_data, val_data, model, num_epochs=num_epochs)
+    train_losses, validation_losses = train(train_data, val_data, model, num_epochs=num_epochs,
+                                            batch_size=batch_size, learning_rate=learning_rate)
 
     return TrainedClassifier(
         name="missing name",
-        model=model
+        model=model,
+        train_losses=train_losses,
+        validation_losses=validation_losses
     )

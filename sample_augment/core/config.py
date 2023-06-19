@@ -31,7 +31,8 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     checkpoint_directory: Path
 
     def get_hash(self):
-        json_bytes = self.json(sort_keys=True, exclude={'name': True, 'target': True}).encode('utf-8')
+        json_bytes = self.json(sort_keys=True, exclude={'name': True, 'target': True,
+                                                        'root_directory': True}).encode('utf-8')
         model_hash = hashlib.sha256(json_bytes).hexdigest()
 
         return model_hash

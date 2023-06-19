@@ -1,14 +1,16 @@
 {
   "name": "experiment",
-  "root_directory": "/home/nils/thesis/sample-augment/data/",
+  "root_directory": "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data",
   "random_seed": 41,
   "figure_directory": "./figures",
   "raw_data_directory": "./raw",
   "checkpoint_directory": "./checkpoints",
-  "target": "train_classifier",
+  "target": "evaluate_classifier_test",
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 0,
-  "num_epochs": 1,
-  "batch_size": 64
+
+  "learning_rate": 0.1,
+  "num_epochs": 6,
+  "batch_size": 1
 }

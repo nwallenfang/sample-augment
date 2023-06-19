@@ -16,7 +16,9 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
 from tqdm import tqdm
 
+from sample_augment.core import step
 from sample_augment.data.dataset import AugmentDataset
+from sample_augment.models.train_classifier import TrainedClassifier
 from sample_augment.utils.paths import project_path
 from sample_augment.utils import log
 
@@ -251,6 +253,17 @@ def run_metrics_on_predictions_file():
     #  need to see if this problem is already present in the train_test split
     # TODO verify that train, test and val sets are disjoint!!
     print(counts)
+
+
+@step
+def evaluate_classifier_old():
+    # TODO integrate old main_method from this file
+    pass
+
+
+@step
+def evaluate_test(classifier: TrainedClassifier):
+    print(classifier.validation_losses)
 
 
 if __name__ == '__main__':

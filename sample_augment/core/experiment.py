@@ -33,6 +33,7 @@ class Experiment:
             log.info(f"Store has artifacts: {store_file_path.name} "
                      f"{[a for a in self.store.artifacts]}")
         else:
+            log.info(f"No existing store for hash {config.run_identifier}. Starting fresh.")
             self.store = Store(config.root_directory)
 
     def __repr__(self):
@@ -90,6 +91,9 @@ class Experiment:
         # removes the Steps that are not necessary (since their produced Artifacts are already in the Store)
         pipeline = StepRegistry.reduce_steps(full_pipeline, [type(artifact) for artifact in
                                                              self.store.artifacts.values()])
+        if target not in pipeline:
+            # shouldn't be necessary but doing it because of bug in reduce steps
+            pipeline.append(target)
         if pipeline:
             log.info(f"Running pipeline: {pipeline}")
         else:
