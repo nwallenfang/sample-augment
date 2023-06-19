@@ -39,7 +39,6 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
     def _serialize_field(self, field, field_name: str, field_type, root_directory: Path,
                          external_directory: Path):
-        # TODO we could maybe reduce some duplications here with some smart method extractions
         # create "run identifier" subdir
         external_directory.parent.mkdir(exist_ok=True)
         filename = f'{self.__class__.__name__}_{field_name}'
@@ -105,7 +104,6 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                 #   this artifact is actually being used
                 return torch.load(root_dir / value['path'])
             elif value['type'] == 'torch.nn.Module':
-                # TODO
                 module_name, class_name = value['class'].rsplit('.', 1)
                 ModelClass = getattr(import_module(module_name), class_name)
                 model = ModelClass(**value['kwargs'])
@@ -140,7 +138,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
     def serialize(self, root_directory: Path, external_directory: Path) -> Dict:
         if not self._serialize_this:
             return {}
-        # TODO docs
+
         data = {}
         for field_name, field_type in self.__annotations__.items():
             field = getattr(self, field_name)
@@ -152,8 +150,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
     @classmethod
     def deserialize(cls, data: Dict, root_dir: Path):
-        # with open(os.path.join(path, f'{cls.__name__}_data.json'), 'r') as f:
-        #     data = json.load(f)
+        subartifacts = {}
 
         for field_name, value in data.items():
             if field_name not in cls.__fields__:
@@ -163,7 +160,19 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             if 'exclude' in model_field.field_info.extra and model_field.field_info.extra['exclude']:
                 # field is excluded in pydantic model
                 continue
-            data[field_name] = Artifact._deserialize_field(field_name, value, root_dir)
+            field_type = model_field.outer_type_  # Get the field's type annotation
+            # if field_type is a subclass of Artifact, we need to recursively deserialize it
+            # else we can deserialize the field with our helper method.
+            if isinstance(field_type, type) and issubclass(field_type, Artifact):
+                # save subartifact in external dict and apply after the main loop
+                # since the field_name needs to change
+                subartifacts[field_name] = field_type.deserialize(value, root_dir)
+            else:
+                data[field_name] = Artifact._deserialize_field(field_name, value, root_dir)
+
+        for field_name, subartifact in subartifacts.items():
+            data.pop(field_name, None)
+            data[field_name] = subartifact
 
         try:
             return parse_obj_as(cls, data)

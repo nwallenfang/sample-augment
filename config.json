@@ -5,12 +5,12 @@
   "figure_directory": "./figures",
   "raw_data_directory": "./raw",
   "checkpoint_directory": "./checkpoints",
-  "target": "evaluate_classifier_test",
+  "target": "evaluate_test",
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 0,
 
-  "learning_rate": 0.1,
+  "learning_rate": 0.01,
   "num_epochs": 6,
   "batch_size": 1
 }

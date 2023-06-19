@@ -49,7 +49,7 @@ def read_config(arg_config: Path = None) -> Config:
     return config
 
 
-@click.group()
+@click.command()
 @click.option('arg_config', '--config', default=None, type=click.Path(), help='Path to the configuration '
                                                                               'file.')
 def main(arg_config: Path = None):
@@ -77,9 +77,9 @@ def main(arg_config: Path = None):
         label_dir=Path(r'C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\raw\gc10-mini'))])
 
 
-@main.command(name="list")
-def list_steps():
-    print("list")
+# @main.command(name="list")
+# def list_steps():
+#     print("list")
 
 
 # @main.command()

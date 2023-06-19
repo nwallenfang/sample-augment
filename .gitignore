@@ -97,3 +97,8 @@ lightning_logs/
 .pytest_cache
 
 *.iml
+
+
+# gdrive tmp dirs
+.tmp.drivedownload
+.tmp.driveupload

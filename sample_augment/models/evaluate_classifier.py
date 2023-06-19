@@ -263,7 +263,8 @@ def evaluate_classifier_old():
 
 @step
 def evaluate_test(classifier: TrainedClassifier):
-    print(classifier.validation_losses)
+    log.info(f"Training:   {classifier.metrics.train_loss}")
+    log.info(f"Validation: {classifier.metrics.validation_loss}")
 
 
 if __name__ == '__main__':
