@@ -22,13 +22,13 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     cache = False
 
     # TODO put root_directory into env instead -> goal: make config.json portable between os/machines
-    root_directory: DirectoryPath = Field(exclude=True)
+    root_directory: DirectoryPath # = Field(exclude=True)
 
     # train test split params
     train_ratio: float = 0.8,
     min_instances_per_class: int = 10
 
-    target: str = Field(exclude=True)
+    target: str # = Field(exclude=True)
 
     # path for files that get saved by steps and are not Artifacts themselves
     figure_directory: Path

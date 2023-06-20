@@ -1,4 +1,3 @@
-import json
 import sys
 from abc import abstractmethod, ABC
 from pathlib import Path
@@ -6,33 +5,24 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch.cuda
-import torch.nn as nn
 import torchmetrics
-import torchvision
-import typing
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
 from tqdm import tqdm
 
-from sample_augment.core import step
+from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
-from sample_augment.models.train_classifier import TrainedClassifier
-from sample_augment.utils.paths import project_path
-from sample_augment.utils import log
+from sample_augment.data.gc10.read_labels import GC10Labels
+from sample_augment.data.train_test_split import TestSet
+from sample_augment.models.train_classifier import TrainedClassifier, CustomDenseNet
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
 _std = torch.tensor([0.229, 0.224, 0.225])
 normalize = Normalize(mean=_mean, std=_std)
 # reverse operation for use in visualization
 inverse_normalize = Normalize((-_mean / _std).tolist(), (1.0 / _std).tolist())
-
-
-class ClassifierBenchmark:
-    # load a model checkpoint and a test dataset
-    # run a list of Metrics
-    pass
 
 
 class Metric(ABC):
@@ -64,7 +54,7 @@ class ConfusionMatrixMetric(Metric):
         plt.show()
 
 
-def preprocess(data: TensorDataset) -> TensorDataset:
+def preprocess(data: AugmentDataset) -> AugmentDataset:
     img_data = data.tensors[0]
 
     if img_data.dtype == torch.uint8:
@@ -85,63 +75,27 @@ def show_image_with_label_and_prediction(image, label, prediction):
     plt.show()
 
 
-def get_free_memory():
-    r = torch.cuda.memory_reserved(0)
-    a = torch.cuda.memory_allocated(0)
-    return r - a
+class TestPredictions(Artifact):
+    predictions: Tensor
 
 
-def load_densenet(checkpoint_path: str, num_classes: int, device):
-    classifier = torchvision.models.densenet201()
-    classifier.classifier = nn.Sequential(
-        nn.Linear(1920, 960),
-        nn.ReLU(),
-        nn.Dropout(0.2),
-        nn.Linear(960, 240),
-        nn.ReLU(),
-        nn.Dropout(0.2),
-        nn.Linear(240, 30),
-        nn.ReLU(),
-        nn.Dropout(0.2),
-        nn.Linear(30, num_classes))
-    checkpoint = torch.load(checkpoint_path,
-                            map_location=lambda storage, loc: storage)
-    classifier.load_state_dict(checkpoint)
-    classifier.eval()
-    del checkpoint
-    classifier.to(device)
-    return classifier
-
-
-def main():
+@step
+def predict_testset(classifier: TrainedClassifier, test_dataset: TestSet, batch_size: int) -> TestPredictions:
     # should read number of classes from the model, since it might change
     # But it doesn't seem like there is a canonical way of getting that.
     # Maybe just by passing in an input
-    num_classes = 10
-    batch_size = 64
+    assert isinstance(classifier.model, CustomDenseNet), "only support DenseNet for now , we need to read " \
+                                                         "num_classes"
+    num_classes = classifier.model.num_classes
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # we need: train set, validation set, test set, model
+
     # image preprocessing
     # important: assert that the validation and test sets are identical to the split that was
     # done when training the classifier. Should add some kind of sanity check to ensure this
     # first steps, see available metrics in torch and calculate total and class-wise accuracy
-    # train_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_train.pt')))
-    test_dataset = AugmentDataset.load_from_file(
-        Path(project_path('data/interim/gc10_test.pt')))
-    # val_data = CustomTensorDataset.load(Path(project_path('data/interim/gc10_val.pt')))
+
     test_data = preprocess(test_dataset)
     # val_data = preprocess(val_data)
-
-    if device == 'cuda:0':
-        # if we get the Lightning classifier working instead of the old method,
-        # we will need to implement the forward method
-        classifier = load_densenet(
-            project_path('models/checkpoints/densenet201/epoch-18-val-0.111.pt'),
-            num_classes,
-            device)
-    else:  # load to CPU instead
-        log.error("No CUDA device found. Classifier evaluation only supported on CUDA for now.")
-        sys.exit(-1)
 
     # metric has the option 'average' with values micro, macro, and weighted.
     # Might be worth looking at.
@@ -149,12 +103,13 @@ def main():
     predictions = torch.empty((test_data.tensors[0].size()[0], num_classes), dtype=torch.float32)
 
     for i, batch in enumerate(tqdm((DataLoader(TensorDataset(test_data.tensors[0]),
-                                               batch_size=batch_size)))):
-        batch = batch.to(device)
+                                               batch_size=batch_size)),
+                                   desc="Test predictions", file=sys.stdout)):
+        batch = batch[0].to(device)
         with torch.no_grad():
-            predictions[i * batch_size:(i + 1) * batch_size] = classifier(batch)
+            predictions[i * batch_size:(i + 1) * batch_size] = classifier.model(batch)
 
-    torch.save(predictions, project_path('data/interim/predictions_densenet.pt'))
+    # torch.save(predictions, project_path('data/interim/predictions_densenet.pt'))
 
     targets = test_data.tensors[1]
 
@@ -177,8 +132,12 @@ def main():
     # Create a modified Confusion Matrix where the secondary labels are considered
     # Qualitatively look at the misclassifications
 
+    return TestPredictions(predictions=predictions)
 
-def run_metrics_on_predictions_file():
+
+@step
+def run_metrics_on_predictions_file(test_pred: TestPredictions, test_data: TestSet,
+                                    labels_artifact: GC10Labels):
     classes = [
         "punching_hole",
         "welding_line",
@@ -191,35 +150,33 @@ def run_metrics_on_predictions_file():
         "crease",
         "waist_folding"
     ]
-    # TODO probably move to test since this is specific to GC10
+    test_data = preprocess(test_data)
+    predictions = test_pred.predictions
 
-    test_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_test.pt')))
-    test_data: AugmentDataset = typing.cast(AugmentDataset, preprocess(test_data))
-
-    predictions = torch.load(project_path('data/ds_data/predictions_densenet.pt'))
+    # predictions = torch.load(project_path('data/ds_data/predictions_densenet.pt'))
     assert len(predictions) == len(test_data)
 
-    _imgs, labels = test_data.tensors[0], test_data.tensors[1]
+    imgs, labels = test_data.tensors[0], test_data.tensors[1]
     # ConfusionMatrixMetric().calculate(predictions, labels).show()
 
     # retrieve secondary labels for test instances
-    with open(project_path('data/interim/labels.json', 'r')) as label_json_file:
-        label_info = json.load(label_json_file)
+    # with open(project_path('data/interim/labels.json', 'r')) as label_json_file:
+    #     label_info = json.load(label_json_file)
+    sec_labels = labels_artifact.labels
+    for i in range(10):
+        i += 10
+        test_img = imgs[i]
+        test_img_id = test_data.img_ids[i]
+        test_img_path = test_data.root_dir / str(labels[i] + 1) / test_img_id
+        test_img = ToPILImage()(inverse_normalize(test_img))
+        secondary = [classes[sec] for sec in sec_labels[test_img_id]['secondary']]
 
-    # for i in range(10):
-    #     i += 10
-    #     test_img = imgs[i]
-    #     test_img_id = test_data.get_img_id(i)
-    #     test_img_path = test_data.get_img_path(i)
-    #     test_img = ToPILImage()(inverse_normalize(test_img))
-    #     secondary = [classes[sec] for sec in label_info[test_img_id]['secondary']]
-    #
-    #     plt.imshow(test_img)
-    #     plt.title(f'{test_img_id} - {test_img_path}')
-    #     plt.figtext(0.5, 0.05, f'true: {classes[labels[i]]}, secondary: {secondary} '
-    #                            f'- predicted: {classes[torch.argmax(predictions[i])]}',
-    #                            ha='center', fontsize=9)
-    #     plt.show()
+        plt.imshow(test_img)
+        plt.title(f'{test_img_id} - {test_img_path}')
+        plt.figtext(0.5, 0.05, f'true: {classes[labels[i]]}, secondary: {secondary} '
+                               f'- predicted: {classes[torch.argmax(predictions[i])]}',
+                               ha='center', fontsize=9)
+        plt.show()
 
     # count number of misclassifications
     # calc ratio of predicted labels that are part of secondary labels
@@ -236,7 +193,7 @@ def run_metrics_on_predictions_file():
         predicted_label = torch.argmax(predictions[idx])
         true_label = labels[idx]
         assert predicted_label != true_label
-        secondary = label_info[test_data.get_img_id(idx)]['secondary']
+        secondary = sec_labels[test_data.img_ids[idx]]['secondary']
 
         # secondary can be a single class index or a list of indices
         if secondary and (predicted_label == secondary or predicted_label in secondary):

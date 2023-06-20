@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Dict, List
+from typing import *
 
 from sample_augment.core import Step, Config, get_step, Store, Artifact
 from sample_augment.core.step import step_registry, StepRegistry
@@ -36,7 +36,10 @@ class Experiment:
                 log.info(f"No existing store for hash {config.run_identifier}. Starting fresh.")
                 self.store = Store(config.root_directory)
         else:
+            # when providing an existing store, save a snapshot of the initial artifacts.
+            # when saving this store later, only add the new artifacts
             self.store = store
+            self.initial_artifacts = set(store.artifacts)
 
     def __repr__(self):
         return f"Experiment_{self.config.run_identifier}"
@@ -76,15 +79,22 @@ class Experiment:
 
     def save(self):
         # Pipeline run is complete, save the produced artifacts and the config that was used
-        self.store.save(filename=self.config.filename, run_identifier=self.config.run_identifier)
-        external_directory = self.config.root_directory / f"store_{self.config.run_identifier}"
-        with open(external_directory / f"config_{self.config.filename}.json", 'w') as config_f:
+        # TODO clean this up, it's a true mess
+        if self.store.previous_run_identifier:
+            identifier = self.store.previous_run_identifier
+            log.info(f"Using previous store's id {identifier}.")
+        else:
+            identifier = self.config.run_identifier
+
+        self.store.save(filename=f"{self.config.name}_{identifier}", run_identifier=identifier)
+        external_directory = self.config.root_directory / f"store_{identifier}"
+        with open(external_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
             config_f.write(self.config.json(indent=4))
 
     def run(self, target_name: str, initial_artifacts: List[Artifact] = None):
         target = get_step(target_name)
         full_pipeline = step_registry.resolve_dependencies(target)
-        log.info(f"Pre-Reduce Pipeline: {full_pipeline}")
+        log.debug(f"Pre-Reduce Pipeline: {full_pipeline}")
 
         if initial_artifacts:
             for artifact in initial_artifacts:

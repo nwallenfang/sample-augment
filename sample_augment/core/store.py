@@ -3,9 +3,10 @@ import os
 import sys
 from importlib import import_module
 from pathlib import Path
-from typing import Dict, List, Union, Type, Any
+from typing import Dict, List, Union, Type, Any, Set, Optional
 
 from sample_augment.core import Artifact
+from sample_augment.core.config import read_config
 from sample_augment.utils import log
 
 
@@ -16,6 +17,11 @@ class Store:
     root_directory: Path
     artifacts: Dict[str, Artifact] = {}
     completed_steps: List[str] = []
+
+    initial_artifacts: Optional[Set[str]]
+    origin_store: Optional[Path]
+    # could maybe remove the upper two ones if this works
+    previous_run_identifier: Optional[str]
 
     def __init__(self, root_directory: Path, artifacts=None):
         self.root_directory = root_directory
@@ -67,6 +73,9 @@ class Store:
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
+            # if artifact_name in self.initial_artifacts:
+            #     log.debug(f"Skipping saving {artifact_name}")
+            #     continue  # skip already serialized artifacts when this store was loaded from a previous run
             artifact_dict = artifact.serialize(self.root_directory, external_directory)
             if artifact_dict:
                 log.debug(f"Saving artifact {artifact_name}")
@@ -102,9 +111,14 @@ class Store:
 
         store = cls(root_directory)
         store.artifacts = artifacts
-        # TODO return config if it's present (or move this to Config? not sure)
-        return store
+        store.initial_artifacts = set(artifacts)
+        store.origin_store = store_path
 
+        # return config if it's present (or move this to Config? not sure)
+        # quick and dirty:
+        identifier = store_path.name.split('.')[0].split('_')[1]  # fails if name contains a '_'
+        config_path = store_path.parent / f"store_{identifier}" / f"config_{store_path.name}"
+        store.previous_run_identifier = identifier
+        stored_config = read_config(config_path)
 
-
-
+        return store, stored_config
