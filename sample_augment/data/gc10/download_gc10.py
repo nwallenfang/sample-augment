@@ -1,3 +1,4 @@
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -34,6 +35,12 @@ def download_gc10(raw_data_directory: Path) -> GC10Folder:
         # move lable (sic) dir outside the gc10 dir to make it easily readable by PyTorch ImageFolder
         # (which expects each class to have its own subdir)
         shutil.move(lable_dir, new_lable_dir)
+
+        # rename class dirs to fix torch ImageFolder (else the class '10' comes between '1' and '2)
+        for i in range(1, 11):
+            old_dir = gc10_path / str(i)
+            new_dir = gc10_path / str(i).zfill(2)
+            os.rename(old_dir, new_dir)
     else:
         log.info("Skipping GC10 since dir exists.")
 

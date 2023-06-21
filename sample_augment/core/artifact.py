@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from pydantic import BaseModel, parse_obj_as, ValidationError
 
-from sample_augment.utils import log
+from sample_augment.utils import log, path_utils
 
 
 def is_tuple_of_tensors(field_type):
@@ -97,40 +97,42 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         return field
 
     @staticmethod
-    def _deserialize_field(field_name: str, value: typing.Any, root_dir: Path) -> typing.Any:
+    def _deserialize_field(field_name: str, value: typing.Any) -> typing.Any:
+
         if isinstance(value, dict) and 'path' in value:
+            field_path = path_utils.root_directory / value['path']
             if value['type'] == 'torch.Tensor':
                 # TODO down the line it could be good/performant to do "lazy loading", so only load once
                 #   this artifact is actually being used
-                return torch.load(root_dir / value['path'],
+                return torch.load(field_path,
                                   map_location=torch.device('cpu'))
             elif value['type'] == 'torch.nn.Module':
                 module_name, class_name = value['class'].rsplit('.', 1)
                 ModelClass = getattr(import_module(module_name), class_name)
                 model = ModelClass(**value['kwargs'])
                 model.load_state_dict(
-                    torch.load(root_dir / value['path'],
+                    torch.load(field_path,
                                map_location=torch.device('cpu')))
 
                 model.eval()
                 return model
             elif value['type'] == 'numpy.ndarray':
-                return np.load(root_dir / value['path'])
+                return np.load(field_path)
             elif value['type'] == 'pathlib.Path':
-                return root_dir.joinpath(value['path'])
+                return field_path
             else:  # Artifact type (subartifact)
                 # assert: see below (list branch)
                 assert field_name != "anonymous subfield", "Lists of Artifacts not supported"
                 module_name, class_name = field_name.rsplit('.', 1)
                 ArtifactSubclass = getattr(import_module(module_name), class_name)
-                return ArtifactSubclass.load_from(value, root_dir)
+                return ArtifactSubclass.load_from(value)
         elif isinstance(value, list):
             # for lists, check if the list values are simple values or key:value fields as well
             first_element = value[0]
             if isinstance(first_element, dict):
                 # complex object, we need to recursively deserialize each of these
                 # the fieldname only gets used in the Artifact branch. For now, we definately don't support
-                return [Artifact._deserialize_field("anonymous subfield", dict_subvalue, root_dir)
+                return [Artifact._deserialize_field("anonymous subfield", dict_subvalue)
                         for dict_subvalue in value]
             else:
                 # simple object, do nothing

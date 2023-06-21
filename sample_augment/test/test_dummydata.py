@@ -12,7 +12,7 @@ from torchvision.utils import make_grid
 
 from sample_augment.data.dataset import ImageDataset, AugmentDataset
 from sample_augment.data.train_test_split import stratified_split
-from sample_augment.utils.paths import project_path
+from sample_augment.utils.path_utils import project_path
 from sample_augment.data import dataset as dataset_package
 
 

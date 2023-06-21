@@ -14,7 +14,7 @@ import xmltodict
 from sample_augment.core import step, Artifact
 from sample_augment.data.gc10.download_gc10 import GC10Folder
 # from sample_augment.data.gc10.download import load_gc10_if_missing
-from sample_augment.utils.paths import project_path
+from sample_augment.utils.path_utils import project_path
 from sample_augment.utils.plot import show_image
 
 # from sample_augment.data/gc10/Defect Descriptions.xlsx, which also contains some example images

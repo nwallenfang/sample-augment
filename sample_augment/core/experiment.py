@@ -6,6 +6,7 @@ from typing import *
 from sample_augment.core import Step, Config, get_step, Store, Artifact
 from sample_augment.core.step import step_registry, StepRegistry
 from sample_augment.utils.log import log
+from sample_augment.utils.path_utils import root_directory
 
 
 class Experiment:
@@ -27,14 +28,14 @@ class Experiment:
         # the state contains the config file
         # state = self.store.load_from_config(config)
         if store is None:
-            store_file_path = config.root_directory / f"{config.name}_{config.run_identifier}.json"
+            store_file_path = root_directory / f"{config.name}_{config.run_identifier}.json"
             if store_file_path.exists() and self.load_store:
-                self.store = Store.load_from(store_file_path, config.root_directory)
+                self.store, _loaded_config = Store.load_from(store_file_path, root_directory)
                 log.info(f"Store has artifacts: {store_file_path.name} "
                          f"{[a for a in self.store.artifacts]}")
             else:
                 log.info(f"No existing store for hash {config.run_identifier}. Starting fresh.")
-                self.store = Store(config.root_directory)
+                self.store = Store(root_directory)
         else:
             # when providing an existing store, save a snapshot of the initial artifacts.
             # when saving this store later, only add the new artifacts
@@ -80,14 +81,14 @@ class Experiment:
     def save(self):
         # Pipeline run is complete, save the produced artifacts and the config that was used
         # TODO clean this up, it's a true mess
-        if self.store.previous_run_identifier:
+        if hasattr(self.store, "previous_run_identifier"):
             identifier = self.store.previous_run_identifier
             log.info(f"Using previous store's id {identifier}.")
         else:
             identifier = self.config.run_identifier
 
         self.store.save(filename=f"{self.config.name}_{identifier}", run_identifier=identifier)
-        external_directory = self.config.root_directory / f"store_{identifier}"
+        external_directory = root_directory / f"store_{identifier}"
         with open(external_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
             config_f.write(self.config.json(indent=4))
 

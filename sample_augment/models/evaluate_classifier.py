@@ -1,6 +1,8 @@
 import sys
 from abc import abstractmethod, ABC
+from copy import deepcopy
 from pathlib import Path
+from pprint import pprint
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,6 +19,7 @@ from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.gc10.read_labels import GC10Labels
 from sample_augment.data.train_test_split import TestSet
 from sample_augment.models.train_classifier import TrainedClassifier, CustomDenseNet
+from sample_augment.utils import log
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
 _std = torch.tensor([0.229, 0.224, 0.225])
@@ -94,7 +97,8 @@ def predict_testset(classifier: TrainedClassifier, test_dataset: TestSet, batch_
     # done when training the classifier. Should add some kind of sanity check to ensure this
     # first steps, see available metrics in torch and calculate total and class-wise accuracy
 
-    test_data = preprocess(test_dataset)
+    # deepcopy because consumed artifacts are not thrown away yet! (so state is mutable)
+    test_data = preprocess(deepcopy(test_dataset))
     # val_data = preprocess(val_data)
 
     # metric has the option 'average' with values micro, macro, and weighted.
@@ -150,43 +154,59 @@ def run_metrics_on_predictions_file(test_pred: TestPredictions, test_data: TestS
         "crease",
         "waist_folding"
     ]
-    test_data = preprocess(test_data)
+    # quickfix since the artifacts are not properly guarded from being mutated yet (TODO)
+    test_data = preprocess(deepcopy(test_data))
     predictions = test_pred.predictions
-
-    # predictions = torch.load(project_path('data/ds_data/predictions_densenet.pt'))
     assert len(predictions) == len(test_data)
-
     imgs, labels = test_data.tensors[0], test_data.tensors[1]
-    # ConfusionMatrixMetric().calculate(predictions, labels).show()
-
-    # retrieve secondary labels for test instances
-    # with open(project_path('data/interim/labels.json', 'r')) as label_json_file:
-    #     label_info = json.load(label_json_file)
     sec_labels = labels_artifact.labels
     for i in range(10):
         i += 10
         test_img = imgs[i]
         test_img_id = test_data.img_ids[i]
-        test_img_path = test_data.root_dir / str(labels[i] + 1) / test_img_id
+        test_img_path = test_data.root_dir / str(labels[i].item() + 1) / test_img_id
         test_img = ToPILImage()(inverse_normalize(test_img))
+        # test_img = ToPILImage()(test_img)
         secondary = [classes[sec] for sec in sec_labels[test_img_id]['secondary']]
 
         plt.imshow(test_img)
         plt.title(f'{test_img_id} - {test_img_path}')
         plt.figtext(0.5, 0.05, f'true: {classes[labels[i]]}, secondary: {secondary} '
                                f'- predicted: {classes[torch.argmax(predictions[i])]}',
-                               ha='center', fontsize=9)
+                    ha='center', fontsize=9)
         plt.show()
 
     # count number of misclassifications
     # calc ratio of predicted labels that are part of secondary labels
+    apply_secondary_labels(labels, predictions, sec_labels, test_data)
+    # ConfusionMatrixMetric(labels=classes).calculate(predictions, labels).show()
+    # confusion_mat = confusion_matrix(torch.argmax(predictions, dim=1).numpy(), labels.numpy())
+    # log.debug(confusion_mat)
+    log.debug(' --- ')
+    # TODO something is wrong here! The counts show that the classes aren't properly balanced
+    #  need to see if this problem is already present in the train_test split
+    # class counts for test set
+    counts = np.bincount(labels)
+    ratios = counts / len(labels)
+    ratio_dict = {classes[i]: f"{ratios[i] * 100:.2f}%" for i in range(len(ratios))}
+    # log.info(f"TestSet: {pprint(ratio_dict)}")
+    print("test_set:")
+    pprint(ratio_dict)
+
+    total_labels = [label['y'] - 1 for label in sec_labels.values()]
+    total_counts = np.bincount(total_labels)
+    total_ratios = total_counts / len(total_labels)
+    total_ratio_dict = {classes[i]: f"{total_ratios[i] * 100:.2f}%" for i in range(len(total_ratios))}
+    print("total:")
+    pprint(total_ratio_dict)
+
+
+def apply_secondary_labels(labels, predictions, sec_labels, test_data):
     misclassification_idx = [i for i in range(len(predictions)) if
                              torch.argmax(predictions[i]) != labels[i]]
-
-    print(f'test size: {len(predictions)}')
-    print(f'number of misses: {len(misclassification_idx)}')
+    log.debug(f'test size: {len(predictions)}')
+    log.info(f'accuracy: {1.0 - len(misclassification_idx) / len(predictions)}')
     number_of_secondary_hits = 0
-
     # let's be lenient towards the model and change all misses
     # with secondary hits to their secondary labels
     for idx in misclassification_idx:
@@ -199,23 +219,7 @@ def run_metrics_on_predictions_file(test_pred: TestPredictions, test_data: TestS
         if secondary and (predicted_label == secondary or predicted_label in secondary):
             labels[idx] = predicted_label
             number_of_secondary_hits += 1
-
-    print(f'number of secondary hits: {number_of_secondary_hits}')
-    ConfusionMatrixMetric(labels=classes).calculate(predictions, labels).show()
-    confusion_mat = confusion_matrix(torch.argmax(predictions, dim=1).numpy(), labels.numpy())
-    counts = np.bincount(labels)
-    print(confusion_mat)
-    print(' --- ')
-    # TODO something is wrong here! The counts show that the classes aren't properly balanced
-    #  need to see if this problem is already present in the train_test split
-    # TODO verify that train, test and val sets are disjoint!!
-    print(counts)
-
-
-@step
-def evaluate_classifier_old():
-    # TODO integrate old main_method from this file
-    pass
+    log.debug(f'number of secondary hits: {number_of_secondary_hits}')
 
 
 @step
@@ -235,6 +239,13 @@ def plot_loss_over_epochs(classifier: TrainedClassifier, figure_directory: Path)
     plt.savefig(figure_directory / "losses.png")
 
 
+@step
+def check_class_distributions(complete: AugmentDataset):
+    counts = np.bincount(complete.label_tensor)
+    total = sum(counts)
+    print(counts)
+    print(f"sum : {total}")
+
+
 if __name__ == '__main__':
     run_metrics_on_predictions_file()
-    # main()

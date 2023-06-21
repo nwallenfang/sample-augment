@@ -4,9 +4,9 @@ import sys
 from json import JSONDecodeError
 from pathlib import Path
 
-from pydantic import Extra, DirectoryPath, BaseModel, Field, validator, ValidationError
+from pydantic import Extra, BaseModel, validator, ValidationError
 
-from sample_augment.utils import log
+from sample_augment.utils import log, path_utils
 
 
 class SubConfig(BaseModel, extra=Extra.allow, allow_mutation=False):
@@ -16,24 +16,17 @@ class SubConfig(BaseModel, extra=Extra.allow, allow_mutation=False):
 
 class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     # Experiment-wide parameters
-    name: str
-    random_seed: int = 42
-    debug = True
-    cache = False
-
-    # TODO put root_directory into env instead -> goal: make config.json portable between os/machines
-    root_directory: DirectoryPath # = Field(exclude=True)
+    name: str = "test"
+    # random_seed: int = 42
 
     # train test split params
-    train_ratio: float = 0.8,
-    min_instances_per_class: int = 10
-
-    target: str # = Field(exclude=True)
+    # train_ratio: float = 0.8,
+    # min_instances_per_class: int = 10
 
     # path for files that get saved by steps and are not Artifacts themselves
-    figure_directory: Path
-    raw_data_directory: Path
-    checkpoint_directory: Path
+    figure_directory: Path = Path("./figures")
+    raw_data_directory: Path = Path("./raw")
+    checkpoint_directory: Path = Path("./checkpoints")
 
     def get_hash(self):
         json_bytes = self.json(sort_keys=True, exclude={'name': True, 'target': True,
@@ -71,13 +64,11 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
         return f"{self.name}_{self.get_hash()[:self.CONFIG_HASH_CUTOFF]}"
 
     @validator('figure_directory', 'raw_data_directory', 'checkpoint_directory', pre=True)
-    def assemble_figure_path(cls, v, values):
-        if 'root_directory' in values and isinstance(v, str):
-            fig_dir: Path = values['root_directory'] / v
-            fig_dir.mkdir(exist_ok=True)
+    def assemble_figure_path(cls, value):
+        fig_dir: Path = path_utils.root_directory / value
+        fig_dir.mkdir(exist_ok=True)
 
-            return fig_dir.resolve()
-        return v
+        return fig_dir.resolve()
 
 
 def read_config(arg_config: Path = None) -> Config:

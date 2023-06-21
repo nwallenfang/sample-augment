@@ -32,7 +32,10 @@ def main(arg_config: Path = None):
     # TODO re-add dry run
     # experiment.dry_run()
     # TODO providing additional artifacts doesn't change the run identifier so this could bring issues
-    experiment.run(config.target)
+    experiment.run("imagefolder_to_tensors")
+    # , initial_artifacts=[GC10Folder(
+    #         image_dir=Path("/home/nils/thesis/sample-augment/data/raw/gc10-mini"),
+    #         label_dir=Path("/home/nils/thesis/sample-augment/data/raw/gc10_labels"))])
 
 
 # @main.command(name="list")

@@ -5,6 +5,7 @@ from typing import List, Tuple, Union
 import numpy as np
 import torch
 import torchvision
+from pydantic import validator
 from torch import Tensor
 from torch.utils.data import TensorDataset
 from torchvision.datasets import ImageFolder
@@ -14,7 +15,7 @@ from tqdm import tqdm
 from sample_augment.core import Artifact, step
 from sample_augment.data.gc10.download_gc10 import GC10Folder
 from sample_augment.utils.log import log
-from sample_augment.utils.paths import project_path
+from sample_augment.utils.path_utils import project_path
 
 
 class ImageDataset(torchvision.datasets.ImageFolder):
@@ -83,19 +84,17 @@ class AugmentDataset(TensorDataset, Artifact):
     def label_tensor(self):
         return self.tensors[1]
 
+    @validator("tensors")
+    def validate_image_tensor_dtype(cls, value):
+        if not value[0].dtype == torch.uint8:
+            raise ValueError(f"invalid image tensor dtype {value[0].dtype}")
+        else:
+            return value
+
     @property
     def num_classes(self):
         # very unperformant when called often
         return int(torch.max(self.tensors[1]) - torch.min(self.tensors[1])) + 1
-
-
-def test_train_test_split():
-    # TODO next stop: train, test split :)
-    # train_data, val_data, test_data = create_train_val_test_sets(tensor_dataset, random_seed=15)
-    # train_data.save_to_file(path=Path(project_path('data/interim/')), description='train')
-    # val_data.save_to_file(path=Path(project_path('data/interim/')), description='val')
-    # test_data.save_to_file(path=Path(project_path('data/interim/')), description='test')
-    pass
 
 
 def test_duplicate_ids():

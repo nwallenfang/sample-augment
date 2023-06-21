@@ -12,9 +12,11 @@ if __name__ == '__main__':
 
     # fixed store with trained classifier from colab
     store, stored_config = Store.load_from(store_path=Path(
-        "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data\\colab_1883c.json"),
+        "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data\\colab_2b2dc.json"),
         root_directory=Path("C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data\\"))
 
     # create Experiment instance
     experiment = Experiment(stored_config, store=store, save_store=True)
-    experiment.run("run_metrics_on_predictions_file")
+    # experiment.run("run_metrics_on_predictions_file")
+    experiment.run("check_class_distributions")
+

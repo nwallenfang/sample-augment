@@ -1,10 +1,11 @@
 import sys
-from typing import Dict
+from copy import deepcopy
+from typing import Dict, Tuple
 
 import numpy as np
 import torch
 import torchvision.models
-from torch import nn  # All neural network modules
+from torch import nn, Tensor  # All neural network modules
 from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch.utils.data import DataLoader  # Gives easier dataset management
 from torch.utils.data import Dataset
@@ -12,6 +13,7 @@ from torchvision.transforms import transforms
 from tqdm import tqdm  # For nice progress bar!
 
 from sample_augment.core import step, Artifact
+from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import ValSet, TrainSet
 from sample_augment.utils import log
 
@@ -60,24 +62,22 @@ class ClassifierMetrics(Artifact):
     validation_accuracy: np.ndarray
 
 
-def preprocess(dataset):
+# could be moved to a more central location
+def preprocess(dataset: AugmentDataset) -> AugmentDataset:
     data = dataset.tensors[0]
+    assert data.dtype == torch.uint8, f"preprocess() expected imgs to be uint8, got {data.dtype}"
 
-    if data.dtype == torch.uint8:
-        # convert to float32
-        data = data.float()
-        data /= 255.0
+    # convert to float32
+    data = data.float()
+    data /= 255.0
 
-    # might need to preprocess to required resolution
-    transform = transforms.Compose([
-        # transforms.Resize((224, 224)),
-        # ImageNet normalization factors
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
+    # ImageNet normalization factors
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     # convert labels to expected Long dtype as well
-    dataset.tensors = (transform(data), dataset.tensors[1].long())
+    # we're modifying the dataset here..
+    dataset.tensors = (normalize(data), dataset.tensors[1].long())
 
-    return dataset
+    return dataset  # don't modify dataset
 
 
 def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs, batch_size,
@@ -198,8 +198,8 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
     # train_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
     # val_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
 
-    train_data = preprocess(train_data)
-    val_data = preprocess(val_data)
+    train_data = preprocess(deepcopy(train_data))
+    val_data = preprocess(deepcopy(val_data))
 
     metrics = train(train_data, val_data, model, num_epochs=num_epochs,
                     batch_size=batch_size, learning_rate=learning_rate)
