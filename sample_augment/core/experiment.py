@@ -30,7 +30,7 @@ class Experiment:
         if store is None:
             store_file_path = root_directory / f"{config.name}_{config.run_identifier}.json"
             if store_file_path.exists() and self.load_store:
-                self.store, _loaded_config = Store.load_from(store_file_path, root_directory)
+                self.store = Store.load_from(store_file_path, root_directory)
                 log.info(f"Store has artifacts: {store_file_path.name} "
                          f"{[a for a in self.store.artifacts]}")
             else:
@@ -79,6 +79,9 @@ class Experiment:
         self.store.completed_steps.append(step.name)
         self.store.merge_artifact_into(produced)
 
+        if not produced.is_serialized():
+            produced.save_to_disk()
+
     def run(self, target_name: str, initial_artifacts: List[Artifact] = None):
         target = get_step(target_name)
         pipeline = self._calc_pipeline(initial_artifacts, target)
@@ -120,8 +123,7 @@ class Experiment:
         else:
             identifier = self.config.run_identifier
 
-        self.store.save(filename=f"{self.config.name}_{identifier}", run_identifier=identifier)
-        external_directory = root_directory / f"store_{identifier}"
+        self.store.save(store_filename=f"{self.config.name}_{identifier}.json")
 
-        with open(external_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
+        with open(root_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
             config_f.write(self.config.json(indent=4))

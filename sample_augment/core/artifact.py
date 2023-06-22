@@ -1,5 +1,7 @@
+import hashlib
 import inspect
 import json
+import sys
 import typing
 from importlib import import_module
 from pathlib import Path
@@ -34,11 +36,10 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
     def fully_qualified_name(self):
         return f'{self.__module__}.{self.__class__.__name__}'
 
-    def _serialize_field(self, field, field_name: str, field_type, root_directory: Path,
-                         external_directory: Path):
+    def _serialize_field(self, field, field_name: str, field_type, external_directory: Path):
         # create "run identifier" subdir
-        external_directory.parent.mkdir(exist_ok=True)
-        filename = f'{self.__class__.__name__}_{field_name}'
+        external_directory.mkdir(exist_ok=True)
+        filename = f'{self.config_hash}_{field_name}'
         save_path = external_directory / filename
 
         if is_tuple_of_tensors(field_type):
@@ -49,12 +50,12 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
             for idx, tensor in enumerate(tensors):
                 # serialize each tensor the same way we do it for individual tensors
-                filename = f'{self.__class__.__name__}_{field_name}_{idx}.pt'
+                filename = f'{self.config_hash}_{field_name}_{idx}.pt'
                 save_path = external_directory / filename
                 torch.save(tensor, str(save_path))
                 serialized_tensor_strings.append({
                     'type': 'torch.Tensor',
-                    'path': save_path.relative_to(root_directory).as_posix()
+                    'path': save_path.relative_to(path_utils.root_directory).as_posix()
                 })
             return serialized_tensor_strings
         if not inspect.isclass(field_type):
@@ -67,25 +68,25 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             save_path = save_path.with_suffix('.pt')
             torch.save(field, str(save_path))
             return {'type': 'torch.Tensor',
-                    'path': f'{save_path.relative_to(root_directory).as_posix()}'}
+                    'path': f'{save_path.relative_to(path_utils.root_directory).as_posix()}'}
         elif issubclass(field_type, torch.nn.Module):
             save_path = save_path.with_suffix('.pt')
             torch.save(field.state_dict(), str(save_path))
             return {'type': 'torch.nn.Module',
                     'class': f'{field.__class__.__module__}.{field.__class__.__name__}',
                     'kwargs': field.get_kwargs(),  # TODO ensure that every model has this
-                    'path': f'{save_path.relative_to(root_directory).as_posix()}'}
+                    'path': f'{save_path.relative_to(path_utils.root_directory).as_posix()}'}
         elif issubclass(field_type, np.ndarray):
             save_path = save_path.with_suffix('.npy')
             np.save(str(save_path), field)
             return {'type': 'numpy.ndarray',
-                    'path': f'{save_path.relative_to(root_directory).as_posix()}'}
+                    'path': f'{save_path.relative_to(path_utils.root_directory).as_posix()}'}
         elif issubclass(field_type, Artifact):
             # field is a sub-artifact. Recursively save it.
-            return field.serialize(root_directory, external_directory)
+            return field.serialize()
         elif issubclass(field_type, Path):
             # make Path instances relative to config.root_dir
-            relative_path = field.relative_to(root_directory).as_posix()
+            relative_path = field.relative_to(path_utils.root_directory).as_posix()
             return {
                 'type': 'pathlib.Path',
                 'path': relative_path
@@ -110,7 +111,6 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                 model.load_state_dict(
                     torch.load(field_path,
                                map_location=torch.device('cpu')))
-
                 model.eval()
                 return model
             elif value['type'] == 'numpy.ndarray':
@@ -138,23 +138,62 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             # simple object, do nothing
             return value
 
-    def serialize(self, root_directory: Path, external_directory: Path) -> Dict:
+    @property
+    def config_hash(self):
+        return self._calculate_config_hash(self.config_dependencies)
+
+    @staticmethod
+    def _calculate_config_hash(config_dependencies):
+        return hashlib.sha256(json.dumps(config_dependencies, sort_keys=True).encode()).hexdigest()[:6]
+
+    # TODO call this method (where?)
+    def is_serialized(self):
+        external_directory = path_utils.root_directory / self.__class__.__name__
+        return (external_directory / f"{self.config_hash}.json").exists()
+
+    def serialize(self) -> Dict:
         if not self._serialize_this:
             return {}
+
+        # config_hash = (hashlib.sha256(json.dumps(self.config_dependencies, sort_keys=True).encode())
+        #                .hexdigest()[:6])
+        external_directory = path_utils.root_directory / self.__class__.__name__
 
         data = {}
         for field_name, field_type in self.__annotations__.items():
             field = getattr(self, field_name)
 
-            data[field_name] = self._serialize_field(field, field_name, field_type, root_directory,
-                                                     external_directory)
+            data[field_name] = self._serialize_field(field, field_name, field_type, external_directory)
 
         data['config_dependencies'] = self.config_dependencies
 
         return data
 
+    def save_to_disk(self):
+        data = self.serialize()
+        external_directory = path_utils.root_directory / self.__class__.__name__
+        external_directory.mkdir(exist_ok=True)
+        artifact_path = external_directory / f"{self.config_hash}.json"
+        log.info(f"Saving artifact to {artifact_path}")
+        with open(artifact_path, 'w') as f:
+            try:
+                json.dump(data, f, indent=4)
+            except TypeError as err:
+                log.error(str(err))
+                log.error("Couldn't serialize Artifact, data dict:")
+                log.error(data)
+                sys.exit(-1)
+
     @classmethod
-    def deserialize(cls, data: Dict, root_dir: Path):
+    def load_from_disk(cls, config_entries: Dict[str, Any]) -> "Artifact":
+        config_hash = cls._calculate_config_hash(config_entries)
+        artifact_path = path_utils.root_directory / cls.__name__ / f"{config_hash}.json"
+        with open(artifact_path) as artifact_json:
+            artifact = cls.deserialize(json.load(artifact_json))
+            return artifact
+
+    @classmethod
+    def deserialize(cls, data: Dict) -> "Artifact":
         subartifacts = {}
 
         for field_name, value in data.items():
@@ -173,7 +212,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             if isinstance(field_type, type) and issubclass(field_type, Artifact):
                 # save subartifact in external dict and apply after the main loop
                 # since the field_name needs to change
-                subartifacts[field_name] = field_type.deserialize(value, root_dir)
+                subartifacts[field_name] = field_type.deserialize(value)
             else:
                 data[field_name] = Artifact._deserialize_field(field_name, value)
 

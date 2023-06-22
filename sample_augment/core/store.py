@@ -1,12 +1,10 @@
 import json
-import os
 import sys
 from importlib import import_module
 from pathlib import Path
 from typing import Dict, List, Union, Type, Any, Set, Optional
 
 from sample_augment.core import Artifact
-from sample_augment.core.config import read_config
 from sample_augment.utils import log
 
 
@@ -58,30 +56,25 @@ class Store:
             # (this is not default behavior and I don't know if it has any use)
             log.debug(f'Dropped produced {type(artifact).__name__}.')
 
-    # noinspection PyPep8Naming
-    def __geitem__(self, artifact_type: Type[Artifact]) -> Artifact:
-        if artifact_type not in self.artifacts:
-            raise KeyError(f"Artifact {artifact_type.__name__} is not contained in ArtifactStore.")
+    def load_artifact(self, artifact_type: Type[Artifact], config_entries: Dict[str, Any]):
+        # if artifact is not in store currently, we can expect it to be loadable from disk
+        # since we are checking for that already in the beginning
+        deserialized_artifact = artifact_type.load_from_disk(config_entries)
+        self.artifacts[artifact_type.__name__] = deserialized_artifact
+        return deserialized_artifact
 
-        return self.artifacts[artifact_type.__name__]
-
-    def save(self, filename: str, run_identifier: str):
-        external_directory = self.root_directory / f"store_{run_identifier}/"
-        os.makedirs(self.root_directory, exist_ok=True)
-        os.makedirs(external_directory, exist_ok=True)
-
+    def save(self, store_filename: str):
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
             # if artifact_name in self.initial_artifacts:
             #     log.debug(f"Skipping saving {artifact_name}")
             #     continue  # skip already serialized artifacts when this store was loaded from a previous run
-            artifact_dict = artifact.serialize(self.root_directory, external_directory)
+            artifact_dict = artifact.serialize()
             if artifact_dict:
                 log.debug(f"Saving artifact {artifact_name}")
                 data[artifact.fully_qualified_name] = artifact_dict
 
-        store_filename = f'{filename}.json'
         log.info(f"Saving store to {store_filename}")
         with open(self.root_directory / store_filename, 'w') as f:
             try:
@@ -92,7 +85,7 @@ class Store:
                 log.error(data)
                 sys.exit(-1)
 
-        return Path(self.root_directory / store_filename)
+        # return Path(self.root_directory / store_filename)
 
     @classmethod
     def load_from(cls, store_path: Path, root_directory: Path):
@@ -107,7 +100,7 @@ class Store:
             # module_name, class_name = artifact_data['__class__'].rsplit('.', 1)
             module_name, class_name = artifact_name.rsplit('.', 1)
             ArtifactSubclass = getattr(import_module(module_name), class_name)
-            artifacts[class_name] = ArtifactSubclass.deserialize(artifact_data, root_directory)
+            artifacts[class_name] = ArtifactSubclass.deserialize(artifact_data)
 
         store = cls(root_directory)
         store.artifacts = artifacts
@@ -117,8 +110,8 @@ class Store:
         # return config if it's present (or move this to Config? not sure)
         # quick and dirty:
         identifier = store_path.name.split('.')[0].split('_')[1]  # fails if name contains a '_'
-        config_path = store_path.parent / f"store_{identifier}" / f"config_{store_path.name}"
+        # config_path = store_path.parent / f"store_{identifier}" / f"config_{store_path.name}"
         store.previous_run_identifier = identifier
-        stored_config = read_config(config_path)
+        # stored_config = read_config(config_path)
 
-        return store, stored_config
+        return store  # , stored_config
