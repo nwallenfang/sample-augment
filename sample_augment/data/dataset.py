@@ -42,7 +42,7 @@ class AugmentDataset(TensorDataset, Artifact):
     tensors: Tuple[Tensor, ...]
 
     def __init__(self, name: str, tensors: Tuple[Tensor, Tensor], img_ids: List[str],
-                 root_dir: Path):
+                 root_dir: Path, **kwargs):
         """
         Args:
             img_ids (List[str]): list going from Tensor index to relative path of the given image
@@ -50,7 +50,7 @@ class AugmentDataset(TensorDataset, Artifact):
         """
         assert len(tensors[0]) == len(tensors[1]), "Image tensor length doesn't match label tensor length!"
         Artifact.__init__(self, name=name, root_dir=root_dir, img_ids=img_ids,
-                          tensors=tensors)
+                          tensors=tensors, **kwargs)
 
     def subset(self, indices: Union[List[int], np.ndarray], name: str = None) -> 'AugmentDataset':
         # copies the tensors, so this is a copy rather than a view

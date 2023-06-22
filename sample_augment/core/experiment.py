@@ -46,61 +46,57 @@ class Experiment:
         return f"Experiment_{self.config.run_identifier}"
 
     def _run_step(self, step: Step):
-        """
-            Run passed step, this method doesn't do error checking and
-             fails if the store/config doesn't contain necessary artifacts!
-        """
         # Get all artifacts from the store that this step receives as arguments
-        state_args_filled: Dict[str, Artifact] = {}
-        for arg_name, arg_type in step.state_args.items():
+        input_artifacts: Dict[str, Artifact] = {}
+        for arg_name, artefact_type in step.consumes.items():
             try:
-                artifact = self.store[arg_type]
-                state_args_filled[arg_name] = artifact
+                artifact = self.store[artefact_type]
+                input_artifacts[arg_name] = artifact
             except ValueError as err:
                 log.error(str(err))
                 sys.exit(-1)
             except KeyError:
-                log.error(f"Missing dependency {arg_type.__name__} while preparing for {step.name}")
+                log.error(f"Missing dependency {artefact_type.__name__} while preparing for {step.name}")
                 self.save()
                 sys.exit(-1)
 
-        # TODO type checking, satsifiability
         # extract required entries from config
         try:
-            config_args_filled = {key: self.config.__getattribute__(key) for key in step.config_args.keys()}
+            input_configs = {key: getattr(self.config, key) for key in step.config_args.keys()}
         except KeyError as err:
             log.error(str(err))
             log.error(f"Entry missing in config.")
             self.save()
             sys.exit(-1)
-        output_state: Artifact = step(**state_args_filled, **config_args_filled)
+        produced: Artifact = step(**input_artifacts, **input_configs)
+
+        # add this step's config args plus all consumed artifact's config args to dependencies
+        produced.config_dependencies = input_configs
+
+        for artifact in input_artifacts.values():
+            produced.config_dependencies.update(artifact.config_dependencies)
 
         self.store.completed_steps.append(step.name)
-        self.store.merge_artifact_into(output_state)
-
-    def save(self):
-        # Pipeline run is complete, save the produced artifacts and the config that was used
-        # TODO clean this up, it's a true mess
-        if hasattr(self.store, "previous_run_identifier"):
-            identifier = self.store.previous_run_identifier
-            log.info(f"Using previous store's id {identifier}.")
-        else:
-            identifier = self.config.run_identifier
-
-        self.store.save(filename=f"{self.config.name}_{identifier}", run_identifier=identifier)
-        external_directory = root_directory / f"store_{identifier}"
-        with open(external_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
-            config_f.write(self.config.json(indent=4))
+        self.store.merge_artifact_into(produced)
 
     def run(self, target_name: str, initial_artifacts: List[Artifact] = None):
         target = get_step(target_name)
+        pipeline = self._calc_pipeline(initial_artifacts, target)
+
+        for step in pipeline:
+            log.info(f"--- {step.name}() ---")
+            self._run_step(step)
+
+        if self.save_store:
+            # Pipeline run is complete, save the produced artifacts and the config that was used
+            self.save()
+
+    def _calc_pipeline(self, initial_artifacts, target):
         full_pipeline = step_registry.resolve_dependencies(target)
         log.debug(f"Pre-Reduce Pipeline: {full_pipeline}")
-
         if initial_artifacts:
             for artifact in initial_artifacts:
                 self.store.merge_artifact_into(artifact)
-
         # removes the Steps that are not necessary (since their produced Artifacts are already in the Store)
         pipeline = StepRegistry.reduce_steps(full_pipeline, [type(artifact) for artifact in
                                                              self.store.artifacts.values()])
@@ -113,11 +109,19 @@ class Experiment:
             # pipeline empty, so only run the target
             # because doing nothing shouldn't be intended :)
             pipeline.append(target)
+        return pipeline
 
-        for step in pipeline:
-            log.info(f"--- {step.name}() ---")
-            self._run_step(step)
+    def save(self):
+        # Pipeline run is complete, save the produced artifacts and the config that was used
+        # TODO clean this up, it's a true mess
+        if hasattr(self.store, "previous_run_identifier"):
+            identifier = self.store.previous_run_identifier
+            log.info(f"Using previous store's id {identifier}.")
+        else:
+            identifier = self.config.run_identifier
 
-        if self.save_store:
-            # Pipeline run is complete, save the produced artifacts and the config that was used
-            self.save()
+        self.store.save(filename=f"{self.config.name}_{identifier}", run_identifier=identifier)
+        external_directory = root_directory / f"store_{identifier}"
+
+        with open(external_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
+            config_f.write(self.config.json(indent=4))

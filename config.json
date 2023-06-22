@@ -1,11 +1,8 @@
 {
-  "random_seed": 123,
-  "figure_directory": "./figures",
-  "raw_data_directory": "./raw",
-  "checkpoint_directory": "./checkpoints",
+  "random_seed": 124,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
-  "min_instances": 10,
+  "min_instances": 0,
 
   "learning_rate": 0.01,
   "num_epochs": 2,

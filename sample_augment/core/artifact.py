@@ -1,12 +1,13 @@
 import inspect
+import json
 import typing
 from importlib import import_module
 from pathlib import Path
-from typing import Dict
+from typing import *
 
 import numpy as np
 import torch
-from pydantic import BaseModel, parse_obj_as, ValidationError
+from pydantic import BaseModel, parse_obj_as, ValidationError, Field
 
 from sample_augment.utils import log, path_utils
 
@@ -18,11 +19,6 @@ def is_tuple_of_tensors(field_type):
     return False
 
 
-"""
-f'{self.__class__.__name__}_{field_name}'
-"""
-
-
 class Artifact(BaseModel, arbitrary_types_allowed=True):
     """
         TODO update docs
@@ -32,6 +28,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         Subclasses will extend StateBundle and fill it with the state they need.
     """
     _serialize_this = True
+    config_dependencies: Dict[str, Any] = Field(default_factory=dict)
 
     @property
     def fully_qualified_name(self):
@@ -48,7 +45,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             # TODO we could stack the tensor instead of saving it individually..
             serialized_tensor_strings = []
             # hard-coded specifically for SampleAugmentDataset tensors
-            tensors = typing.cast(typing.Tuple[torch.Tensor, ...], field)
+            tensors = cast(Tuple[torch.Tensor, ...], field)
 
             for idx, tensor in enumerate(tensors):
                 # serialize each tensor the same way we do it for individual tensors
@@ -97,7 +94,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         return field
 
     @staticmethod
-    def _deserialize_field(field_name: str, value: typing.Any) -> typing.Any:
+    def _deserialize_field(field_name: str, value: Any) -> Any:
 
         if isinstance(value, dict) and 'path' in value:
             field_path = path_utils.root_directory / value['path']
@@ -152,6 +149,8 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             data[field_name] = self._serialize_field(field, field_name, field_type, root_directory,
                                                      external_directory)
 
+        data['config_dependencies'] = self.config_dependencies
+
         return data
 
     @classmethod
@@ -159,6 +158,8 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         subartifacts = {}
 
         for field_name, value in data.items():
+            # if field_name == 'config_dependencies':
+            #     pass
             if field_name not in cls.__fields__:
                 # field is not in pydantic model
                 continue
@@ -174,7 +175,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                 # since the field_name needs to change
                 subartifacts[field_name] = field_type.deserialize(value, root_dir)
             else:
-                data[field_name] = Artifact._deserialize_field(field_name, value, root_dir)
+                data[field_name] = Artifact._deserialize_field(field_name, value)
 
         for field_name, subartifact in subartifacts.items():
             data.pop(field_name, None)

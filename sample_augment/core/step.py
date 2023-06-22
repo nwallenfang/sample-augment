@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import importlib
 import inspect
 import pkgutil
@@ -13,20 +14,22 @@ from sample_augment.core.artifact import Artifact
 from sample_augment.utils import log
 
 
-# Function to convert snake_case names to CamelCase
-def _snake_to_camel(word):
-    return ''.join(x.capitalize() or '_' for x in word.split('_'))
-
-
 class Step(Callable, BaseModel):
+    """
+        Class representing a step in a pipeline. A step is a function with special data containers, Artefacts
+        as input and output. Step instances usually get created from normal python functions which are
+        decorated with @step.
+    """
     name: str
     func: Callable
 
-    state_args: Dict[str, Type[Artifact]]
+    """dict (arg_name -> arg_type) of config entries this Step takes as arguments.
+       Note that every argument is either an Artifact or a config entry."""
     config_args: Dict[str, Type[Any]]
+    """dict (arg_name -> artifact_type) of Artifact types this Step expects as input arguments (consumes)"""
+    consumes: Dict[str, Type[Artifact]]
+    """Artefact type this step produces (optional)"""
     produces: Optional[Type[Artifact]]
-
-    # TODO add a method to easily get all consumed/produced Artifacts
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
@@ -46,17 +49,12 @@ class Step(Callable, BaseModel):
         # name is unique and immutable
         return hash(self.name)
 
-    def validate_config(self):
-        # TODO the config types a step method can receive are either *top-level* config entries or
-        #  *subconfig* entries. Before running a step method we should check that the configs are present.
-        #  Preferably in the dry_run.
-        # entries
-        pass
-
 
 class StepRegistry:
     # TODO document this class well since the code is complex
     all_steps = {}
+    # For more advanced use-cases, it would make sense to have the data structure for the steps be a
+    # graph instead of these two dicts
     producers: Dict[Type[Artifact], List[Step]] = {}
     consumers: Dict[Type[Artifact], List[Step]] = {}
 
@@ -66,34 +64,56 @@ class StepRegistry:
     def get_all_steps(self):
         return self.all_steps
 
-    # TODO env_check callable as optional parameter
     def step(self, name=None):
         if callable(name):  # if used without name argument the "name" is function being decorated
-            return self._register_step(name)
+            return self._create_step(name)
 
         else:
             # if using the name argument, this method @step() is what's called a decorator factory
             # we inject the function name into the decorator and return it
             def decorator(func):
-                return self._register_step(func, name)
+                return self._create_step(func, name)
 
             return decorator
 
-    def _register_step(self, func, name=None):
+    @staticmethod
+    def _wrap_step(step_instance: Step):
+        # the wrapper function to be applied to the original function
+        @functools.wraps(step_instance.func)
+        def wrapper(*args, **kwargs):
+            # TODO this code isn't reached. probably because func in Step gets called and that one isn't
+            #  wrapped. We can probably skip that whole wrapping deal and just do our things in experiment
+            #  run_Step()
+            produced: Artifact = step_instance(*args, **kwargs)
+            # Now you can access the step_instance inside the wrapper
+            input_artifacts = [arg_value for arg_value in kwargs.values() if isinstance(arg_value, Artifact)]
+            input_configs = {arg_name: arg_value for arg_name, arg_value in kwargs.items()
+                             if arg_value not in input_artifacts}
+            # add this step's config args plus all consumed artifact's config args to dependencies
+            produced.config_dependencies = input_configs
+
+            for artifact in input_artifacts:
+                produced.config_dependencies.update(artifact.config_dependencies)
+
+            return produced
+
+        return wrapper
+
+    def _create_step(self, func, name=None):
         if name is None:
-            name = func.__name__  # used to be camel case, but it was confusing
+            name = func.__name__
 
         if name in self.all_steps:
-            # log.warn(f"Step {name} is already registered.")
-            return func
+            # already registered
+            return self.all_steps[name]
 
         sig = inspect.signature(func)
 
         config_kwargs = {}
-        state_kwargs = {}
+        consumed_artifacts = {}
         for param_name, param in sig.parameters.items():
             if issubclass(param.annotation, Artifact):
-                state_kwargs[param_name] = param.annotation
+                consumed_artifacts[param_name] = param.annotation
             else:
                 # assert somehow that this is a config
                 config_kwargs[param_name] = param.annotation
@@ -109,16 +129,12 @@ class StepRegistry:
         new_step = Step(
             name=name,
             func=func,
-            state_args=state_kwargs,
+            consumes=consumed_artifacts,
             config_args=config_kwargs,
             produces=produced_artifact
         )
 
-        # TODO differentiate between "producer" and "transformer" steps
-        #   this could be relevant for when we have say a preprocessing step that takes a Dataset and
-        #   returns it as well. Don't know if it should really return a new Artifact
-
-        for artifact in new_step.state_args.values():
+        for artifact in new_step.consumes.values():
             self.consumers.setdefault(artifact, []).append(new_step)
 
         if produced_artifact:
@@ -126,7 +142,8 @@ class StepRegistry:
 
         self.all_steps[name] = new_step
         log.debug(f'Registered step {name}.')
-        return func
+
+        return new_step
 
     def get_step(self, name) -> Step:
         if name not in self.all_steps:
@@ -138,7 +155,7 @@ class StepRegistry:
 
     def resolve_dependencies(self, target_step: Step) -> List[Step]:
         """
-            basically depth-first search topological sort
+            Create a a pipeline of steps to run.
             TODO document (no cycles, example, produced_artifacts)
         """
         visited = set()
@@ -146,7 +163,7 @@ class StepRegistry:
 
         def add_dependencies(node):
             visited.add(node)
-            for artifact in node.state_args.values():
+            for artifact in node.consumes.values():
                 if artifact not in self.producers:
                     raise ValueError(f"No step found that produces {artifact}")
 
@@ -165,11 +182,7 @@ class StepRegistry:
         filtered_pipeline = []
         for pipeline_step in pipeline:
             # for now this expects every step to only produce a single Artifact!
-            # if not pipeline_step.produces:
-            #     log.debug(f"skipped step {pipeline_step.name}")
-            #     continue  # step not producing anything
             if pipeline_step.produces in initial_artifacts:
-                # log.debug(f"Filtered step {pipeline_step.name}")
                 continue
             else:
                 filtered_pipeline.append(pipeline_step)
@@ -193,7 +206,6 @@ def find_steps(include: List[str], exclude: List[str] = None):
         prefix = package.__name__ + "."
         for _importer, modname, _ispkg in pkgutil.walk_packages(package.__path__, prefix):
             if modname not in sys.modules and not any([mod in modname for mod in exclude]):
-                # log.debug(f"importing {modname}")
                 _module = importlib.import_module(modname)
 
 
