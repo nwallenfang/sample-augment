@@ -6,20 +6,10 @@ import typing
 
 import numpy as np
 from sklearn.model_selection import train_test_split
-from torchvision.datasets import ImageFolder
 
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.utils.log import log
-
-
-# class CustomSubset(AugmentDataset):
-#     def __init__(self, dataset: AugmentDataset, indices):
-#         tensors_data = dataset.tensors[0][indices]
-#         tensors_labels = dataset.tensors[1][indices]
-#         img_paths = list(np.array(dataset.img_ids)[indices])
-#         self.indices = indices
-#         super().__init__(dataset.name, tensors_data, tensors_labels, img_ids, dataset.root_dir)
 
 
 def stratified_split(dataset: AugmentDataset,
@@ -37,11 +27,7 @@ def stratified_split(dataset: AugmentDataset,
     """
     np.random.seed(random_seed)
 
-    if isinstance(dataset, ImageFolder):
-        labels = dataset.targets
-    else:  # is TensorDataset
-        # assert isinstance(dataset, CustomTensorDataset)
-        labels = dataset.tensors[1]
+    labels = dataset.label_tensor
 
     n = len(dataset)
     indices = list(range(n))
@@ -75,10 +61,6 @@ def stratified_split(dataset: AugmentDataset,
 
     assert set(train_indices).intersection(set(test_indices)) == set()
 
-    # if type(dataset) is ImageFolder:  # typechecking the other way around (CustomTensor..) doesn't work..
-    #     train_dataset = Subset(dataset, train_indices)
-    #     test_dataset = Subset(dataset, test_indices)
-    # else:
     # take metadata (img paths) from sample_augment.dataset into subsets
     train_dataset = dataset.subset(train_indices, name="train")
     test_dataset = dataset.subset(test_indices, name="test")
@@ -87,28 +69,10 @@ def stratified_split(dataset: AugmentDataset,
 
 
 class TrainSet(AugmentDataset):
-    # def __init__(self, dataset: AugmentDataset):
-    #     super().__init__(dataset.name,
-    #                      tensors=(dataset.tensors[0], dataset.tensors[1]),
-    #                      img_ids=dataset.img_ids,
-    #                      root_dir=dataset.root_dir)
-    #     self.name = dataset.name
-    #     self.tensors = dataset.tensors
-    #     self.img_ids = dataset.img_ids
-    #     self.root_dir = dataset.root_dir
     pass
 
 
 class ValSet(AugmentDataset):
-    # def __init__(self, dataset: AugmentDataset):
-    #     super().__init__(dataset.name,
-    #                      tensors=(dataset.tensors[0], dataset.tensors[1]),
-    #                      img_ids=dataset.img_ids,
-    #                      root_dir=dataset.root_dir)
-    #     self.name = dataset.name
-    #     self.tensors = dataset.tensors
-    #     self.img_ids = dataset.img_ids
-    #     self.root_dir = dataset.root_dir
     pass
 
 
