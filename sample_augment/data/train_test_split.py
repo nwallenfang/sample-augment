@@ -5,8 +5,6 @@
 import typing
 
 import numpy as np
-import torch
-from pydantic import validator
 from sklearn.model_selection import train_test_split
 from torchvision.datasets import ImageFolder
 
@@ -161,7 +159,8 @@ def create_train_test_val(dataset: AugmentDataset, random_seed: int,
 
     assert len(train_data) + len(val_data) == len(train_val_data)
     assert len(train_val_data) + len(test_data) == n
-    trainset, valset, testset = TrainSet.from_existing(train_data), ValSet.from_existing(val_data), TestSet.from_existing(test_data)
+    trainset, valset, testset = TrainSet.from_existing(train_data), ValSet.from_existing(val_data), \
+        TestSet.from_existing(test_data)
     assert len(trainset) + len(valset) == len(train_val_data)
     assert len(train_val_data) + len(testset) == n
     return TrainTestValBundle(train=trainset, val=valset, test=testset)

@@ -71,8 +71,8 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                 else:
                     # call serialize_field method for "simple fields"
                     return [
-                        self._serialize_field(subfield, f"{field_name}_{i}", type(subfield), external_directory)
-                        for i, subfield in enumerate(field)
+                        self._serialize_field(subfield, f"{field_name}_{i}", type(subfield),
+                                              external_directory) for i, subfield in enumerate(field)
                     ]
 
             # primitive type, simply assign

@@ -75,7 +75,7 @@ def preprocess(dataset: AugmentDataset) -> AugmentDataset:
     # ImageNet normalization factors
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     # convert labels to expected Long dtype as well
-    # we're modifying the dataset here..
+    # we're modifying the dataset here.
     dataset.tensors = (normalize(data), dataset.tensors[1].long())
 
     return dataset  # don't modify dataset

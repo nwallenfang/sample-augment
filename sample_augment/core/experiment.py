@@ -83,8 +83,6 @@ class Experiment:
 
         self.store.completed_steps.append(step.name)
 
-
-
     def run(self, target_name: str, initial_artifacts: List[Artifact] = None):
         target = get_step(target_name)
         pipeline = self._calc_pipeline(initial_artifacts, target)
