@@ -1,6 +1,7 @@
 import hashlib
 import inspect
 import json
+import pprint
 import sys
 import typing
 from importlib import import_module
@@ -41,6 +42,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         external_directory.mkdir(exist_ok=True)
         filename = f'{self.config_hash}_{field_name}'
         save_path = external_directory / filename
+        origin = typing.get_origin(field_type)
 
         if is_tuple_of_tensors(field_type):
             # TODO we could stack the tensor instead of saving it individually..
@@ -60,7 +62,20 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             return serialized_tensor_strings
         if not inspect.isclass(field_type):
             # it's a primitive type or a list
-            # simply assign
+            if origin is list or origin is List:  # check if field_type is a list
+                # check if it's a list of artifacts
+                element_type = get_args(field_type)[0]
+                if issubclass(element_type, Artifact):
+                    # call upper serialize methdod for Artifacts
+                    return [subartifact.serialize() for subartifact in field]
+                else:
+                    # call serialize_field method for "simple fields"
+                    return [
+                        self._serialize_field(subfield, f"{field_name}_{i}", type(subfield), external_directory)
+                        for i, subfield in enumerate(field)
+                    ]
+
+            # primitive type, simply assign
             return field
         # OK at this point it's a class, go through some special cases
         # Tensors and Arrays should get saved to external files (large binary blobs)
@@ -95,7 +110,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         return field
 
     @staticmethod
-    def _deserialize_field(field_name: str, value: Any) -> Any:
+    def _deserialize_field(field_name: str, value: Any, type_annotation: Optional[Type[Any]]) -> Any:
 
         if isinstance(value, dict) and 'path' in value:
             field_path = path_utils.root_directory / value['path']
@@ -118,21 +133,25 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             elif value['type'] == 'pathlib.Path':
                 return field_path
             else:  # Artifact type (subartifact)
-                # assert: see below (list branch)
-                assert field_name != "anonymous subfield", "Lists of Artifacts not supported"
                 module_name, class_name = field_name.rsplit('.', 1)
                 ArtifactSubclass = getattr(import_module(module_name), class_name)
                 return ArtifactSubclass.load_from(value)
         elif isinstance(value, list):
             # for lists, check if the list values are simple values or key:value fields as well
             first_element = value[0]
-            if isinstance(first_element, dict):
+            origin = get_origin(type_annotation)
+            if origin is list or origin is List:  # checks if type_annotation is a list
+                element_type = get_args(type_annotation)[0]  # gets the type of the elements in the list
+                if issubclass(element_type, Artifact):  # if list of artifact, special artifact-wise deseres
+                    return [element_type.deserialize(subartifact_data) for subartifact_data in value]
+            if isinstance(first_element, dict):  # list of complex objects
                 # complex object, we need to recursively deserialize each of these
-                # the fieldname only gets used in the Artifact branch. For now, we definately don't support
-                return [Artifact._deserialize_field("anonymous subfield", dict_subvalue)
+                # the fieldname only gets used in the Artifact branch.
+                # TODO check if element is an artifact, else deserialize as it is being done now
+                return [Artifact._deserialize_field("anonymous subfield", dict_subvalue, None)
                         for dict_subvalue in value]
             else:
-                # simple object, do nothing
+                # list of simple objects, return like this
                 return value
         else:
             # simple object, do nothing
@@ -181,7 +200,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             except TypeError as err:
                 log.error(str(err))
                 log.error("Couldn't serialize Artifact, data dict:")
-                log.error(data)
+                log.error(pprint.pformat(data))
                 sys.exit(-1)
 
     @classmethod
@@ -214,7 +233,9 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                 # since the field_name needs to change
                 subartifacts[field_name] = field_type.deserialize(value)
             else:
-                data[field_name] = Artifact._deserialize_field(field_name, value)
+                data[field_name] = Artifact._deserialize_field(field_name, value,
+                                                               cls.__annotations__[field_name] if
+                                                               field_name in cls.__annotations__ else None)
 
         for field_name, subartifact in subartifacts.items():
             data.pop(field_name, None)

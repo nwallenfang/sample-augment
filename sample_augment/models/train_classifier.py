@@ -1,20 +1,21 @@
 import sys
 from copy import deepcopy
-from typing import Dict, Tuple
+from typing import Dict, List
 
 import numpy as np
 import torch
 import torchvision.models
-from torch import nn, Tensor  # All neural network modules
+from torch import nn  # All neural network modules
 from torch import optim  # For optimizers like SGD, Adam, etc.
-from torch.utils.data import DataLoader  # Gives easier dataset management
+from torch.utils.data import DataLoader, WeightedRandomSampler  # Gives easier dataset management
 from torch.utils.data import Dataset
 from torchvision.transforms import transforms
 from tqdm import tqdm  # For nice progress bar!
 
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
-from sample_augment.data.train_test_split import ValSet, TrainSet
+from sample_augment.data.train_test_split import ValSet, TrainSet, create_train_test_val, \
+    TrainTestValBundle
 from sample_augment.utils import log
 
 
@@ -80,8 +81,27 @@ def preprocess(dataset: AugmentDataset) -> AugmentDataset:
     return dataset  # don't modify dataset
 
 
-def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs, batch_size,
-          learning_rate) -> ClassifierMetrics:
+def create_weighted_random_sampler(dataset: Dataset):
+    # create a weighted sampler that oversamples smaller classes to make each class
+    # appear at the same frequency
+
+    # calling len on dataset is fine
+    # noinspection PyTypeChecker
+    labels = [dataset[i][1] for i in range(len(dataset))]
+    class_counts = np.bincount(labels)
+    num_samples = len(labels)
+
+    # Compute weight for each class and for each sample
+    class_weights = [num_samples / class_counts[i] for i in range(len(class_counts))]
+    weights = [class_weights[labels[i]] for i in range(num_samples)]
+
+    # Create a sampler with these weights
+    sampler = WeightedRandomSampler(weights, num_samples)
+    return sampler
+
+
+def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
+          learning_rate: float, balance_classes: bool) -> ClassifierMetrics:
     """
         this code is taken in large part from Michel's notebook,
         see references/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
@@ -90,7 +110,9 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs, ba
 
     # TODO set random_seed so the experiment is (more) reproducible
     # Train Network
-    train_loader = DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
+    sampler = create_weighted_random_sampler(train_set) if balance_classes else None
+    train_loader = DataLoader(dataset=train_set, batch_size=batch_size, shuffle=(sampler is None),
+                              sampler=sampler)
     test_loader = DataLoader(dataset=val_set, batch_size=batch_size, shuffle=True)
 
     # Loss and optimizer
@@ -98,13 +120,15 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs, ba
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     train_loss_per_epoch = []
-    train_loss_per_batch = []
+    train_losses = 0
 
     val_loss_per_epoch = []
-    val_loss_per_batch = []
+    val_losses = 0
 
     train_acc_per_epoch = []
     val_acc_per_epoch = []
+
+    train_accuracies = 0
 
     for epoch in range(num_epochs):
         model.train()
@@ -120,6 +144,7 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs, ba
             # forward
             predictions = model(image)  # Pass batch
             train_loss = criterion(predictions, label)  # Calculate the loss
+            train_accuracies += (predictions.argmax(dim=-1) == label).float().mean().item()
 
             # backward
             optimizer.zero_grad()  #
@@ -129,10 +154,10 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs, ba
             optimizer.step()  # Update the weights
 
             # store loss
-            train_loss_per_batch.append(train_loss.item())
+            train_losses += train_loss.item()
 
-        train_loss_per_epoch.append(sum(train_loss_per_batch) / len(train_loss_per_batch))
-        train_loss_per_batch.clear()
+        train_loss_per_epoch.append(train_losses / len(train_loader))
+        train_acc_per_epoch.append(train_accuracies / len(train_loader))
         print(
             f'Epoch [{epoch + 1}/{num_epochs}], '
             f' Train Loss: {train_loss.item():.4f}')
@@ -151,14 +176,14 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs, ba
             val_accuracy = (predictions.argmax(dim=-1) == label).float().mean()
 
             # store metrics
-            val_loss_per_batch.append(val_loss.item())
+            val_losses += val_loss.item()
 
         # save checkpoints? not sure..
         # torch.save(model.state_dict(),
         #            project_path(f'models/checkpoints/densenet201/tmp-{epoch}-val-{val_loss:.3f}.pt'))
 
-        val_loss_per_epoch.append(sum(val_loss_per_batch) / len(val_loss_per_batch))
-        val_loss_per_batch.clear()
+        val_loss_per_epoch.append(val_losses / len(test_loader))
+
         log.info(
             f'Epoch [{epoch + 1}/{num_epochs}], '
             f'Val Loss: {val_loss.item():.3f}, '
@@ -173,7 +198,7 @@ def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs, ba
 
 
 class TrainedClassifier(Artifact):
-    name: str
+    # name: str
     model: torch.nn.Module
     # these following metrics are taken for each epoch
     # TODO extra cred task: a decorator like @extractable would be nice. This decorator would mean that a
@@ -184,7 +209,8 @@ class TrainedClassifier(Artifact):
 
 @step
 def train_classifier(train_data: TrainSet, val_data: ValSet,
-                     num_epochs: int, batch_size: int, learning_rate: float) -> TrainedClassifier:
+                     num_epochs: int, batch_size: int, learning_rate: float,
+                     balance_classes: bool) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
@@ -202,10 +228,38 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
     val_data = preprocess(deepcopy(val_data))
 
     metrics = train(train_data, val_data, model, num_epochs=num_epochs,
-                    batch_size=batch_size, learning_rate=learning_rate)
+                    batch_size=batch_size, learning_rate=learning_rate, balance_classes=balance_classes)
 
     return TrainedClassifier(
-        name="missing name",
         model=model,
         metrics=metrics
     )
+
+
+# TODO train_x_classifiers step, early stopping
+class KFoldTrainedClassifiers(Artifact):
+    classifiers: List[TrainedClassifier]
+
+
+@step
+def k_fold_train_classifier(dataset: AugmentDataset, k_folds: int,
+                            test_ratio: float, val_ratio: float,
+                            min_instances: int,
+                            random_seed: int,
+                            num_epochs: int,
+                            batch_size: int,
+                            learning_rate: float,
+                            balance_classes: bool) -> KFoldTrainedClassifiers:
+    fold_random_seed = random_seed
+    classifiers = []
+    for k in range(k_folds):
+        # different random seed when splitting for each fold
+        fold_random_seed += 1
+        train_test_val: TrainTestValBundle = create_train_test_val(dataset, fold_random_seed, test_ratio,
+                                                                   val_ratio, min_instances)
+        classifier: TrainedClassifier = train_classifier(train_test_val.train, train_test_val.val,
+                                                         num_epochs, batch_size, learning_rate,
+                                                         balance_classes)
+        classifiers.append(classifier)
+
+    return KFoldTrainedClassifiers(classifiers=classifiers)

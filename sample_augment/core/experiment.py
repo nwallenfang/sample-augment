@@ -30,12 +30,12 @@ class Experiment:
         if store is None:
             store_file_path = root_directory / f"{config.name}_{config.run_identifier}.json"
             if store_file_path.exists() and self.load_store:
-                self.store = Store.load_from(store_file_path, root_directory)
+                self.store = Store.load_from(store_file_path)
                 log.info(f"Store has artifacts: {store_file_path.name} "
                          f"{[a for a in self.store.artifacts]}")
             else:
                 log.info(f"No existing store for hash {config.run_identifier}. Starting fresh.")
-                self.store = Store(root_directory)
+                self.store = Store()
         else:
             # when providing an existing store, save a snapshot of the initial artifacts.
             # when saving this store later, only add the new artifacts
@@ -63,7 +63,7 @@ class Experiment:
         # extract required entries from config
         try:
             input_configs = {key: getattr(self.config, key) for key in step.config_args.keys()}
-        except KeyError as err:
+        except (KeyError, AttributeError) as err:
             log.error(str(err))
             log.error(f"Entry missing in config.")
             self.save()
@@ -71,16 +71,19 @@ class Experiment:
         produced: Artifact = step(**input_artifacts, **input_configs)
 
         # add this step's config args plus all consumed artifact's config args to dependencies
-        produced.config_dependencies = input_configs
+        if produced:
+            produced.config_dependencies = input_configs
 
-        for artifact in input_artifacts.values():
-            produced.config_dependencies.update(artifact.config_dependencies)
+            for artifact in input_artifacts.values():
+                produced.config_dependencies.update(artifact.config_dependencies)
+
+            self.store.merge_artifact_into(produced)
+            if not produced.is_serialized():
+                produced.save_to_disk()
 
         self.store.completed_steps.append(step.name)
-        self.store.merge_artifact_into(produced)
 
-        if not produced.is_serialized():
-            produced.save_to_disk()
+
 
     def run(self, target_name: str, initial_artifacts: List[Artifact] = None):
         target = get_step(target_name)

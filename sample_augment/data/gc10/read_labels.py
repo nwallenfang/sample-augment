@@ -99,7 +99,7 @@ def read_image_dir_labels(image_dir: Path) -> Dict:
     """
     image_dir_labels = {}
     for label in range(1, 11):
-        for filename in os.listdir(image_dir / str(label)):
+        for filename in os.listdir(image_dir / f"{label:02d}"):
             image_id = filename.split('.')[0][4:]  # cut out 'img_'
             image_dir_labels[image_id] = label
 

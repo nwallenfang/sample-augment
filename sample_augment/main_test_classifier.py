@@ -11,12 +11,13 @@ if __name__ == '__main__':
     find_steps(include=['test', 'data', 'models'], exclude=['models.stylegan2'])
 
     # fixed store with trained classifier from colab
-    store, stored_config = Store.load_from(store_path=Path(
-        "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data\\colab_2b2dc.json"),
-        root_directory=Path("C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data\\"))
+    store = Store.load_from(store_path=Path(
+        "C:\\Users\\Nils\\Documents\\Masterarbeit\\sample-augment\\data\\colab_2b2dc.json"))
+    stored_config = read_config(Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data"
+                                r"\config_colab_2b2dc.json"))
 
     # create Experiment instance
     experiment = Experiment(stored_config, store=store, save_store=True)
     # experiment.run("run_metrics_on_predictions_file")
-    experiment.run("check_class_distributions")
+    experiment.run("evaluate_classifier")
 

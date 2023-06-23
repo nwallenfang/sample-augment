@@ -3,12 +3,13 @@ from abc import abstractmethod, ABC
 from copy import deepcopy
 from pathlib import Path
 from pprint import pprint
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch.cuda
 import torchmetrics
-from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+from sklearn.metrics import ConfusionMatrixDisplay, classification_report
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
@@ -18,7 +19,7 @@ from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.gc10.read_labels import GC10Labels
 from sample_augment.data.train_test_split import TestSet
-from sample_augment.models.train_classifier import TrainedClassifier, CustomDenseNet
+from sample_augment.models.train_classifier import TrainedClassifier, CustomDenseNet, KFoldTrainedClassifiers
 from sample_augment.utils import log
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
@@ -139,9 +140,13 @@ def predict_testset(classifier: TrainedClassifier, test_dataset: TestSet, batch_
     return TestPredictions(predictions=predictions)
 
 
+class ClassificationF1Report(Artifact):
+    report: Dict
+
+
 @step
-def run_metrics_on_predictions_file(test_pred: TestPredictions, test_data: TestSet,
-                                    labels_artifact: GC10Labels):
+def evaluate_classifier(test_pred: TestPredictions, test_data: TestSet,
+                        labels_artifact: GC10Labels):
     classes = [
         "punching_hole",
         "welding_line",
@@ -160,6 +165,32 @@ def run_metrics_on_predictions_file(test_pred: TestPredictions, test_data: TestS
     assert len(predictions) == len(test_data)
     imgs, labels = test_data.tensors[0], test_data.tensors[1]
     sec_labels = labels_artifact.labels
+    # show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data)
+
+    # count number of misclassifications
+    # calc ratio of predicted labels that are part of secondary labels
+    apply_secondary_labels(labels, predictions, sec_labels, test_data)
+    # ConfusionMatrixMetric(labels=classes).calculate(predictions, labels).show()
+
+    # debug_class_distribution(classes, labels, sec_labels)
+    predicted_labels = torch.argmax(predictions, dim=1)
+    report = classification_report(labels.numpy(), predicted_labels.numpy(), target_names=classes,
+                                   zero_division=0, output_dict=True)
+    report_text = classification_report(labels.numpy(), predicted_labels.numpy(), target_names=classes,
+                                        zero_division=0, output_dict=False)
+    print(report_text)
+    for class_name in classes:
+        print(f'Accuracy for class {class_name}: {report[class_name]}')
+
+    return ClassificationF1Report(report=report)
+
+
+@step
+def evaluate_k_classifiers(classifiers: KFoldTrainedClassifiers):
+    print(classifiers.classifiers[0].metrics)
+
+
+def show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data):
     for i in range(10):
         i += 10
         test_img = imgs[i]
@@ -176,15 +207,9 @@ def run_metrics_on_predictions_file(test_pred: TestPredictions, test_data: TestS
                     ha='center', fontsize=9)
         plt.show()
 
-    # count number of misclassifications
-    # calc ratio of predicted labels that are part of secondary labels
-    apply_secondary_labels(labels, predictions, sec_labels, test_data)
-    # ConfusionMatrixMetric(labels=classes).calculate(predictions, labels).show()
-    # confusion_mat = confusion_matrix(torch.argmax(predictions, dim=1).numpy(), labels.numpy())
-    # log.debug(confusion_mat)
+
+def debug_class_distribution(classes, labels, sec_labels):
     log.debug(' --- ')
-    # TODO something is wrong here! The counts show that the classes aren't properly balanced
-    #  need to see if this problem is already present in the train_test split
     # class counts for test set
     counts = np.bincount(labels)
     ratios = counts / len(labels)
@@ -192,7 +217,6 @@ def run_metrics_on_predictions_file(test_pred: TestPredictions, test_data: TestS
     # log.info(f"TestSet: {pprint(ratio_dict)}")
     print("test_set:")
     pprint(ratio_dict)
-
     total_labels = [label['y'] - 1 for label in sec_labels.values()]
     total_counts = np.bincount(total_labels)
     total_ratios = total_counts / len(total_labels)
@@ -239,13 +263,5 @@ def plot_loss_over_epochs(classifier: TrainedClassifier, figure_directory: Path)
     plt.savefig(figure_directory / "losses.png")
 
 
-@step
-def check_class_distributions(complete: AugmentDataset):
-    counts = np.bincount(complete.label_tensor)
-    total = sum(counts)
-    print(counts)
-    print(f"sum : {total}")
-
-
 if __name__ == '__main__':
-    run_metrics_on_predictions_file()
+    evaluate_classifier()

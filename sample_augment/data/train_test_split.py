@@ -146,7 +146,7 @@ def extract_test_set(bundle: TrainTestValBundle) -> TestSet:
 
 
 @step
-def create_train_val_test(dataset: AugmentDataset, random_seed: int,
+def create_train_test_val(dataset: AugmentDataset, random_seed: int,
                           test_ratio: float, val_ratio: float, min_instances: int) -> TrainTestValBundle:
     n = len(dataset)
     train_val_data, test_data = stratified_split(dataset,

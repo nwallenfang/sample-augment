@@ -5,6 +5,8 @@
   "min_instances": 0,
 
   "learning_rate": 0.01,
-  "num_epochs": 2,
-  "batch_size": 1
+  "num_epochs": 1,
+  "batch_size": 1,
+  "balance_classes": true,
+  "k_folds": 2
 }

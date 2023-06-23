@@ -5,14 +5,13 @@ from pathlib import Path
 from typing import Dict, List, Union, Type, Any, Set, Optional
 
 from sample_augment.core import Artifact
-from sample_augment.utils import log
+from sample_augment.utils import log, path_utils
 
 
 class Store:
     """
         TODO docs
     """
-    root_directory: Path
     artifacts: Dict[str, Artifact] = {}
     completed_steps: List[str] = []
 
@@ -21,8 +20,7 @@ class Store:
     # could maybe remove the upper two ones if this works
     previous_run_identifier: Optional[str]
 
-    def __init__(self, root_directory: Path, artifacts=None):
-        self.root_directory = root_directory
+    def __init__(self, artifacts=None):
         if artifacts:
             assert isinstance(artifacts, dict)
             self.artifacts = artifacts
@@ -76,7 +74,7 @@ class Store:
                 data[artifact.fully_qualified_name] = artifact_dict
 
         log.info(f"Saving store to {store_filename}")
-        with open(self.root_directory / store_filename, 'w') as f:
+        with open(path_utils.root_directory / store_filename, 'w') as f:
             try:
                 json.dump(data, f, indent=4)
             except TypeError as err:
@@ -88,7 +86,7 @@ class Store:
         # return Path(self.root_directory / store_filename)
 
     @classmethod
-    def load_from(cls, store_path: Path, root_directory: Path):
+    def load_from(cls, store_path: Path):
         # root_directory = store_path.parent  # the dir above the actual store file
         # TODO error handling
         with open(store_path, 'r') as f:
@@ -102,7 +100,7 @@ class Store:
             ArtifactSubclass = getattr(import_module(module_name), class_name)
             artifacts[class_name] = ArtifactSubclass.deserialize(artifact_data)
 
-        store = cls(root_directory)
+        store = cls()
         store.artifacts = artifacts
         store.initial_artifacts = set(artifacts)
         store.origin_store = store_path
