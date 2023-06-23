@@ -5,6 +5,7 @@
 import typing
 
 import numpy as np
+from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import train_test_split
 
 from sample_augment.core import step, Artifact
@@ -66,6 +67,47 @@ def stratified_split(dataset: AugmentDataset,
     test_dataset = dataset.subset(test_indices, name="test")
 
     return train_dataset, test_dataset
+
+
+class FoldDatasets(Artifact):
+    _serialize_this = False
+    datasets: typing.List[typing.Tuple[AugmentDataset, AugmentDataset]]
+
+
+@step
+def stratified_k_fold_split(dataset: AugmentDataset, n_folds: int = 5, random_seed: int = 42,
+                            min_instances_per_class: int = 10) -> FoldDatasets:
+    np.random.seed(random_seed)
+    labels = dataset.label_tensor
+    n = len(dataset)
+    indices = list(range(n))
+
+    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_seed)
+
+    fold_datasets = []
+    for train_indices, test_indices in skf.split(indices, labels):
+        train_indices, test_indices = np.array(train_indices), np.array(test_indices)
+        class_counts = np.bincount(labels[test_indices])
+        for class_no in np.where(class_counts < min_instances_per_class)[0]:
+            class_no = class_no.item()
+            number_of_instances = min_instances_per_class - class_counts[class_no]
+            class_indices = np.argwhere(labels[train_indices] == class_no).flatten()
+            if len(class_indices) < number_of_instances:
+                log.error(
+                    f'stratified split: Not enough instances of class with label {class_no} '
+                    f'to fulfill min_instances={min_instances_per_class}')
+                continue
+            indices_to_move = np.random.choice(class_indices, number_of_instances, replace=False)
+            instances_to_move = train_indices[indices_to_move]
+            test_indices = np.append(test_indices, instances_to_move)
+            train_indices = np.delete(train_indices, indices_to_move)
+
+        assert set(train_indices).intersection(set(test_indices)) == set()
+        train_dataset = dataset.subset(train_indices, name=f"train_fold_{len(fold_datasets) + 1}")
+        test_dataset = dataset.subset(test_indices, name=f"test_fold_{len(fold_datasets) + 1}")
+        fold_datasets.append((train_dataset, test_dataset))
+
+    return FoldDatasets(datasets=fold_datasets)
 
 
 class TrainSet(AugmentDataset):

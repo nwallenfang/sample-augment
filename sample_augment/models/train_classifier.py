@@ -14,8 +14,8 @@ from tqdm import tqdm  # For nice progress bar!
 
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
-from sample_augment.data.train_test_split import ValSet, TrainSet, create_train_test_val, \
-    TrainTestValBundle
+from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split, \
+    TestSet
 from sample_augment.utils import log
 
 
@@ -100,8 +100,8 @@ def create_weighted_random_sampler(dataset: Dataset):
     return sampler
 
 
-def train(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
-          learning_rate: float, balance_classes: bool) -> ClassifierMetrics:
+def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
+                learning_rate: float, balance_classes: bool) -> ClassifierMetrics:
     """
         this code is taken in large part from Michel's notebook,
         see references/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
@@ -227,8 +227,8 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
     train_data = preprocess(deepcopy(train_data))
     val_data = preprocess(deepcopy(val_data))
 
-    metrics = train(train_data, val_data, model, num_epochs=num_epochs,
-                    batch_size=batch_size, learning_rate=learning_rate, balance_classes=balance_classes)
+    metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
+                          batch_size=batch_size, learning_rate=learning_rate, balance_classes=balance_classes)
 
     return TrainedClassifier(
         model=model,
@@ -239,10 +239,11 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
 # TODO train_x_classifiers step, early stopping
 class KFoldTrainedClassifiers(Artifact):
     classifiers: List[TrainedClassifier]
+    test_set: TestSet
 
 
 @step
-def k_fold_train_classifier(dataset: AugmentDataset, k_folds: int,
+def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                             test_ratio: float, val_ratio: float,
                             min_instances: int,
                             random_seed: int,
@@ -251,15 +252,17 @@ def k_fold_train_classifier(dataset: AugmentDataset, k_folds: int,
                             learning_rate: float,
                             balance_classes: bool) -> KFoldTrainedClassifiers:
     fold_random_seed = random_seed
+    train_val, test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
     classifiers = []
-    for k in range(k_folds):
+    splits = stratified_k_fold_split(train_val, n_folds, random_seed, min_instances)
+    for train, val in splits.datasets:
         # different random seed when splitting for each fold
         fold_random_seed += 1
-        train_test_val: TrainTestValBundle = create_train_test_val(dataset, fold_random_seed, test_ratio,
-                                                                   val_ratio, min_instances)
-        classifier: TrainedClassifier = train_classifier(train_test_val.train, train_test_val.val,
+
+        classifier: TrainedClassifier = train_classifier(TrainSet.from_existing(train),
+                                                         ValSet.from_existing(val),
                                                          num_epochs, batch_size, learning_rate,
                                                          balance_classes)
         classifiers.append(classifier)
 
-    return KFoldTrainedClassifiers(classifiers=classifiers)
+    return KFoldTrainedClassifiers(classifiers=classifiers, test_set=TestSet.from_existing(test))

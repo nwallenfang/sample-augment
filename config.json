@@ -8,5 +8,5 @@
   "num_epochs": 1,
   "batch_size": 1,
   "balance_classes": true,
-  "k_folds": 2
+  "n_folds": 2
 }
