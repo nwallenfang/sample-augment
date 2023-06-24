@@ -1,3 +1,4 @@
+import random
 import sys
 from copy import deepcopy
 from typing import Dict, List
@@ -100,15 +101,28 @@ def create_weighted_random_sampler(dataset: Dataset):
     return sampler
 
 
+def _set_random_seed(random_seed: int):
+    torch.manual_seed(random_seed)
+    np.random.seed(random_seed)
+    random.seed(random_seed)
+    torch.cuda.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed)
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+
+
 def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
-                learning_rate: float, balance_classes: bool) -> ClassifierMetrics:
+                learning_rate: float, balance_classes: bool, random_seed: int) -> ClassifierMetrics:
     """
         this code is taken in large part from Michel's notebook,
-        see references/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
+        see docs/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
     """
+    # make the experiment as reproducible as possible by setting a random seed
+    _set_random_seed(random_seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # TODO set random_seed so the experiment is (more) reproducible
+    # TODO early stopping / return best model according to validation loss
     # Train Network
     sampler = create_weighted_random_sampler(train_set) if balance_classes else None
     train_loader = DataLoader(dataset=train_set, batch_size=batch_size, shuffle=(sampler is None),
@@ -210,7 +224,7 @@ class TrainedClassifier(Artifact):
 @step
 def train_classifier(train_data: TrainSet, val_data: ValSet,
                      num_epochs: int, batch_size: int, learning_rate: float,
-                     balance_classes: bool) -> TrainedClassifier:
+                     balance_classes: bool, random_seed: int) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
@@ -228,7 +242,8 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
     val_data = preprocess(deepcopy(val_data))
 
     metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
-                          batch_size=batch_size, learning_rate=learning_rate, balance_classes=balance_classes)
+                          batch_size=batch_size, learning_rate=learning_rate,
+                          balance_classes=balance_classes, random_seed=random_seed)
 
     return TrainedClassifier(
         model=model,
@@ -236,7 +251,6 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
     )
 
 
-# TODO train_x_classifiers step, early stopping
 class KFoldTrainedClassifiers(Artifact):
     classifiers: List[TrainedClassifier]
     test_set: TestSet
@@ -244,7 +258,7 @@ class KFoldTrainedClassifiers(Artifact):
 
 @step
 def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
-                            test_ratio: float, val_ratio: float,
+                            test_ratio: float,
                             min_instances: int,
                             random_seed: int,
                             num_epochs: int,
@@ -255,14 +269,14 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
     train_val, test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
     classifiers = []
     splits = stratified_k_fold_split(train_val, n_folds, random_seed, min_instances)
-    for train, val in splits.datasets:
+    for i, (train, val) in enumerate(splits.datasets):
         # different random seed when splitting for each fold
         fold_random_seed += 1
 
-        classifier: TrainedClassifier = train_classifier(TrainSet.from_existing(train),
-                                                         ValSet.from_existing(val),
+        classifier: TrainedClassifier = train_classifier(TrainSet.from_existing(train, name="train_fold_{i}"),
+                                                         ValSet.from_existing(val, name="val_fold_{i}"),
                                                          num_epochs, batch_size, learning_rate,
-                                                         balance_classes)
+                                                         balance_classes, fold_random_seed)
         classifiers.append(classifier)
 
     return KFoldTrainedClassifiers(classifiers=classifiers, test_set=TestSet.from_existing(test))

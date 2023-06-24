@@ -66,12 +66,13 @@ class AugmentDataset(TensorDataset, Artifact):
         )
 
     @classmethod
-    def from_existing(cls, existing_dataset: 'AugmentDataset') -> 'AugmentDataset':
+    def from_existing(cls, existing_dataset: 'AugmentDataset', name=None) -> 'AugmentDataset':
         """
             'copy-constructor' used for constructing subclasses such as TestSet.
         """
-        new_dataset = cls(name=existing_dataset.name, tensors=(existing_dataset.tensors[0],
-                                                               existing_dataset.tensors[1]),
+
+        new_dataset = cls(name=name if name else existing_dataset.name, tensors=(existing_dataset.tensors[0],
+                                                                                 existing_dataset.tensors[1]),
                           img_ids=existing_dataset.img_ids,
                           root_dir=existing_dataset.root_dir)
         return new_dataset

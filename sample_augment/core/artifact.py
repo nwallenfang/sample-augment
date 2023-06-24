@@ -24,14 +24,11 @@ def is_tuple_of_tensors(field_type):
 
 class Artifact(BaseModel, arbitrary_types_allowed=True):
     """
-        TODO update docs
-        Represents a subset of the State. Any Step instance expects a StateBundle instance
-        in its run() method.
-        This base class is basically an empty state.
-        Subclasses will extend StateBundle and fill it with the state they need.
+        Represents a piece of data that gets produced/consumed in some Step.
+        Supports automatic (de-)serialization.
     """
     _serialize_this = True
-    config_dependencies: Dict[str, Any] = Field(default_factory=dict)
+    configs: Dict[str, Any] = Field(default_factory=dict)
 
     @property
     def fully_qualified_name(self):
@@ -159,7 +156,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
     @property
     def config_hash(self):
-        return self._calculate_config_hash(self.config_dependencies)
+        return self._calculate_config_hash(self.configs)
 
     @staticmethod
     def _calculate_config_hash(config_dependencies):
@@ -171,8 +168,8 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         return (external_directory / f"{self.config_hash}.json").exists()
 
     def serialize(self) -> Dict:
-        if not self._serialize_this:
-            return {}
+        # if not self._serialize_this:
+        #     return {}
 
         # config_hash = (hashlib.sha256(json.dumps(self.config_dependencies, sort_keys=True).encode())
         #                .hexdigest()[:6])
@@ -184,11 +181,13 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
             data[field_name] = self._serialize_field(field, field_name, field_type, external_directory)
 
-        data['config_dependencies'] = self.config_dependencies
+        data['configs'] = self.configs
 
         return data
 
     def save_to_disk(self):
+        if not self._serialize_this:
+            return
         data = self.serialize()
         external_directory = path_utils.root_directory / self.__class__.__name__
         external_directory.mkdir(exist_ok=True)

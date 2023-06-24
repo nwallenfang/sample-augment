@@ -66,13 +66,13 @@ class StepRegistry:
 
     def step(self, name=None):
         if callable(name):  # if used without name argument the "name" is function being decorated
-            return self._create_step(name)
+            return self._wrap_step(self._create_step(name))
 
         else:
             # if using the name argument, this method @step() is what's called a decorator factory
             # we inject the function name into the decorator and return it
             def decorator(func):
-                return self._create_step(func, name)
+                return self._wrap_step(self._create_step(func, name))
 
             return decorator
 
@@ -81,19 +81,32 @@ class StepRegistry:
         # the wrapper function to be applied to the original function
         @functools.wraps(step_instance.func)
         def wrapper(*args, **kwargs):
-            # TODO this code isn't reached. probably because func in Step gets called and that one isn't
-            #  wrapped. We can probably skip that whole wrapping deal and just do our things in experiment
-            #  run_Step()
+            # handle config tagging for the case where steps get called manually
             produced: Artifact = step_instance(*args, **kwargs)
-            # Now you can access the step_instance inside the wrapper
-            input_artifacts = [arg_value for arg_value in kwargs.values() if isinstance(arg_value, Artifact)]
-            input_configs = {arg_name: arg_value for arg_name, arg_value in kwargs.items()
-                             if arg_value not in input_artifacts}
+
+            sig = inspect.signature(step_instance.func)
+            parameters = sig.parameters
+
+            input_artifacts = []
+            input_configs = {}
+            # go through args
+            for name, param in zip(parameters.keys(), args):
+                if isinstance(param, Artifact):
+                    input_artifacts.append(param)
+                else:
+                    input_configs[name] = param
+            # go through kwargs
+            for name, param in kwargs.items():
+                if isinstance(param, Artifact):
+                    input_artifacts.append(param)
+                else:
+                    input_configs[name] = param
+
             # add this step's config args plus all consumed artifact's config args to dependencies
-            produced.config_dependencies = input_configs
+            produced.configs = input_configs
 
             for artifact in input_artifacts:
-                produced.config_dependencies.update(artifact.config_dependencies)
+                produced.configs.update(artifact.configs)
 
             return produced
 

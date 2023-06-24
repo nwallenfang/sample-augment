@@ -72,10 +72,10 @@ class Experiment:
 
         # add this step's config args plus all consumed artifact's config args to dependencies
         if produced:
-            produced.config_dependencies = input_configs
+            produced.configs = input_configs
 
             for artifact in input_artifacts.values():
-                produced.config_dependencies.update(artifact.config_dependencies)
+                produced.configs.update(artifact.configs)
 
             self.store.merge_artifact_into(produced)
             if not produced.is_serialized():
