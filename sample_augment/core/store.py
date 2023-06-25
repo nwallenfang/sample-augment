@@ -1,4 +1,6 @@
+from __future__ import annotations
 import json
+import os
 import sys
 from importlib import import_module
 from pathlib import Path
@@ -21,6 +23,7 @@ class Store:
     previous_run_identifier: Optional[str]
 
     def __init__(self, artifacts=None):
+        # at least look
         if artifacts:
             assert isinstance(artifacts, dict)
             self.artifacts = artifacts
@@ -94,8 +97,6 @@ class Store:
 
         artifacts = {}
         for artifact_name, artifact_data in data.items():
-            # TODO test doubly nested module
-            # module_name, class_name = artifact_data['__class__'].rsplit('.', 1)
             module_name, class_name = artifact_name.rsplit('.', 1)
             ArtifactSubclass = getattr(import_module(module_name), class_name)
             artifacts[class_name] = ArtifactSubclass.deserialize(artifact_data)
@@ -113,3 +114,34 @@ class Store:
         # stored_config = read_config(config_path)
 
         return store  # , stored_config
+
+    @staticmethod
+    def construct_store_from_cache(config: "Config") -> "Store":
+        artifacts: Dict[str, Artifact] = {}
+        for run_file_name in next(os.walk(path_utils.root_directory))[2]:
+            # TODO only choose run files with same name
+            if run_file_name.endswith(".json"):
+                # this is an artifact file, get its config hash
+                run_json = json.load(open(path_utils.root_directory / run_file_name, 'r'))
+
+                for artifact_name, artifact_dict in run_json.items():
+                    artifact_configs = artifact_dict['configs']
+
+                    for config_entry in artifact_configs.keys():
+                        if config_entry not in config:
+                            log.debug(f"skipping artifact type {artifact_name} since config"
+                                      f" {config_entry} is missing")
+                            break
+                        else:
+                            if artifact_configs[config_entry] != getattr(config, config_entry):
+                                log.debug(
+                                    f"skipping artifact {artifact_name} since its config at {config_entry}"
+                                    f"{artifact_configs[config_entry]} != {getattr(config, config_entry)} "
+                                    f"(our config)")
+                    # artifact is fine and can be loaded
+                    module_name, class_name = artifact_name.rsplit('.', 1)
+                    ArtifactSubclass = getattr(import_module(module_name), class_name)
+                    artifacts[class_name] = ArtifactSubclass.deserialize(artifact_dict)
+                    log.debug(f"Loaded artifact {artifact_name} from {run_file_name}.")
+
+        return Store(artifacts=artifacts)

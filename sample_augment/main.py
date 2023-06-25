@@ -5,7 +5,6 @@ import click
 from sample_augment.core.config import read_config
 from sample_augment.core.experiment import Experiment
 from sample_augment.core.step import find_steps
-from sample_augment.data.gc10.download_gc10 import GC10Folder
 
 
 # @click.group()
@@ -33,10 +32,11 @@ def main(arg_config: Path = None):
     # TODO re-add dry run
     # experiment.dry_run()
     # TODO providing additional artifacts doesn't change the run identifier so this could bring issues
-    experiment.run("k_fold_train_classifier", initial_artifacts=[GC10Folder(
-                    image_dir=Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\raw\gc10-mini"),
-                    label_dir=Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\raw"
-                                   r"\gc10_labels"))])
+    experiment.run("k_fold_plot_loss_over_epochs")
+    # , initial_artifacts=[GC10Folder(
+    #                     image_dir=Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\raw\gc10-mini"),
+    #                     label_dir=Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\raw"
+    #                                    r"\gc10_labels"))]
 
 
 # @main.command(name="list")

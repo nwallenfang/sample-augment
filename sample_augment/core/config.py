@@ -3,6 +3,7 @@ import json
 import sys
 from json import JSONDecodeError
 from pathlib import Path
+from typing import Set
 
 from pydantic import Extra, BaseModel, validator, ValidationError
 
@@ -14,23 +15,22 @@ class SubConfig(BaseModel, extra=Extra.allow, allow_mutation=False):
     pass
 
 
+EXCLUDED_CONFIG_KEYS: Set[str] = {"shared_directory", "name"}
+CONFIG_HASH_CUTOFF: int = 5
+
+
 class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     # Experiment-wide parameters
     name: str = "test"
-    # random_seed: int = 42
-
-    # train test split params
-    # train_ratio: float = 0.8,
-    # min_instances_per_class: int = 10
 
     # path for files that get saved by steps and are not Artifacts themselves
-    figure_directory: Path = Path("./figures")
-    raw_data_directory: Path = Path("./raw")
+    shared_directory: Path = path_utils.root_directory / "shared"
+
     # checkpoint_directory: Path = Path("./checkpoints")
 
     def get_hash(self):
-        json_bytes = self.json(sort_keys=True, exclude={'name': True, 'target': True,
-                                                        'root_directory': True}).encode('utf-8')
+        json_bytes = self.json(sort_keys=True,
+                               exclude={entry: True for entry in EXCLUDED_CONFIG_KEYS}).encode('utf-8')
         model_hash = hashlib.sha256(json_bytes).hexdigest()
 
         return model_hash
@@ -53,22 +53,25 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     def __str__(self):
         return super.__str__(self)
 
-    CONFIG_HASH_CUTOFF: int = 5
-
     @property
     def run_identifier(self):
-        return f"{self.get_hash()[:self.CONFIG_HASH_CUTOFF]}"
+        return f"{self.get_hash()[:CONFIG_HASH_CUTOFF]}"
 
     @property
     def filename(self):
-        return f"{self.name}_{self.get_hash()[:self.CONFIG_HASH_CUTOFF]}"
+        return f"{self.name}_{self.get_hash()[:CONFIG_HASH_CUTOFF]}"
 
-    @validator('figure_directory', 'raw_data_directory', pre=True)
+    @validator('shared_directory', pre=True)
     def assemble_figure_path(cls, value):
         fig_dir: Path = path_utils.root_directory / value
-        fig_dir.mkdir(exist_ok=True)
 
+        fig_dir.mkdir(exist_ok=True)
+        assert fig_dir.exists()
         return fig_dir.resolve()
+
+    def __contains__(self, item):
+        return item in self.__dict__
+
 
 
 def read_config(arg_config: Path = None) -> Config:

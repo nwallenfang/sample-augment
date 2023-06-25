@@ -1,11 +1,12 @@
 {
-  "random_seed": 124,
+  "name": "gc10_mini",
+  "random_seed": 125,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
-  "min_instances": 0,
+  "min_instances": 10,
 
   "learning_rate": 0.01,
-  "num_epochs": 1,
+  "num_epochs": 3,
   "batch_size": 1,
   "balance_classes": true,
   "n_folds": 2

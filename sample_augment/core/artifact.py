@@ -159,8 +159,10 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         return self._calculate_config_hash(self.configs)
 
     @staticmethod
-    def _calculate_config_hash(config_dependencies):
-        return hashlib.sha256(json.dumps(config_dependencies, sort_keys=True).encode()).hexdigest()[:6]
+    def _calculate_config_hash(configs: Dict):
+        keys_to_exclude = {'shared_directory'}
+        filtered_configs = {k: v for k, v in configs.items() if k not in keys_to_exclude}
+        return hashlib.sha256(json.dumps(filtered_configs, sort_keys=True).encode()).hexdigest()[:6]
 
     # TODO call this method (where?)
     def is_serialized(self):

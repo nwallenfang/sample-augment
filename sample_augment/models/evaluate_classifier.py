@@ -7,8 +7,8 @@ from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch.cuda
-import torchmetrics
 from sklearn.metrics import ConfusionMatrixDisplay, classification_report
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
@@ -18,7 +18,8 @@ from tqdm import tqdm
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.gc10.read_labels import GC10Labels
-from sample_augment.data.train_test_split import TestSet
+from sample_augment.data.train_test_split import stratified_split, stratified_k_fold_split, ValSet, \
+    FoldDatasets
 from sample_augment.models.train_classifier import TrainedClassifier, CustomDenseNet, KFoldTrainedClassifiers
 from sample_augment.utils import log
 
@@ -79,12 +80,13 @@ def show_image_with_label_and_prediction(image, label, prediction):
     plt.show()
 
 
-class TestPredictions(Artifact):
+class ValidationPredictions(Artifact):
     predictions: Tensor
 
 
 @step
-def predict_testset(classifier: TrainedClassifier, test_dataset: TestSet, batch_size: int) -> TestPredictions:
+def predict_validation_set(classifier: TrainedClassifier, validation_set: ValSet, batch_size: int) -> \
+        ValidationPredictions:
     # should read number of classes from the model, since it might change
     # But it doesn't seem like there is a canonical way of getting that.
     # Maybe just by passing in an input
@@ -93,33 +95,23 @@ def predict_testset(classifier: TrainedClassifier, test_dataset: TestSet, batch_
     num_classes = classifier.model.num_classes
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # image preprocessing
-    # important: assert that the validation and test sets are identical to the split that was
-    # done when training the classifier. Should add some kind of sanity check to ensure this
-    # first steps, see available metrics in torch and calculate total and class-wise accuracy
-
     # deepcopy because consumed artifacts are not thrown away yet! (so state is mutable)
-    test_data = preprocess(deepcopy(test_dataset))
+    val_data = preprocess(deepcopy(validation_set))
     # val_data = preprocess(val_data)
 
     # metric has the option 'average' with values micro, macro, and weighted.
     # Might be worth looking at.
-    metric = torchmetrics.classification.MulticlassAccuracy(num_classes=num_classes)
-    predictions = torch.empty((test_data.tensors[0].size()[0], num_classes), dtype=torch.float32)
+    # metric = torchmetrics.classification.MulticlassAccuracy(num_classes=num_classes)
+    predictions = torch.empty((val_data.tensors[0].size()[0], num_classes), dtype=torch.float32)
 
-    for i, batch in enumerate(tqdm((DataLoader(TensorDataset(test_data.tensors[0]),
+    for i, batch in enumerate(tqdm((DataLoader(TensorDataset(val_data.tensors[0]),
                                                batch_size=batch_size)),
-                                   desc="Test predictions", file=sys.stdout)):
+                                   desc="Validation predictions", file=sys.stdout)):
         batch = batch[0].to(device)
         with torch.no_grad():
             predictions[i * batch_size:(i + 1) * batch_size] = classifier.model(batch)
 
     # torch.save(predictions, project_path('data/interim/predictions_densenet.pt'))
-
-    targets = test_data.tensors[1]
-
-    print(f'smallest: {torch.min(targets)}, max: {torch.max(targets)}')
-
     # start, n = 20, 1
 
     # look at some random predictions
@@ -128,16 +120,11 @@ def predict_testset(classifier: TrainedClassifier, test_dataset: TestSet, batch_
     #     prediction = classifier(image.unsqueeze(0))
     #     show_image_with_label_and_prediction(image, label, prediction)
 
-    accuracy = metric(predictions, targets)
-    print(accuracy)
-
-    # use sklearn to create confusion matrix
-
     # OK, next steps in the analysis:
     # Create a modified Confusion Matrix where the secondary labels are considered
     # Qualitatively look at the misclassifications
 
-    return TestPredictions(predictions=predictions)
+    return ValidationPredictions(predictions=predictions)
 
 
 class ClassificationF1Report(Artifact):
@@ -145,49 +132,121 @@ class ClassificationF1Report(Artifact):
 
 
 @step
-def evaluate_classifier(test_pred: TestPredictions, test_data: TestSet,
-                        labels_artifact: GC10Labels):
-    classes = [
-        "punching_hole",
-        "welding_line",
-        "crescent_gap",
-        "water_spot",
-        "oil_spot",
-        "silk_spot",
-        "inclusion",
-        "rolled_pit",
-        "crease",
-        "waist_folding"
-    ]
+def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSet,
+                        gc10_labels: GC10Labels):
     # quickfix since the artifacts are not properly guarded from being mutated yet (TODO)
-    test_data = preprocess(deepcopy(test_data))
-    predictions = test_pred.predictions
-    assert len(predictions) == len(test_data)
-    imgs, labels = test_data.tensors[0], test_data.tensors[1]
-    sec_labels = labels_artifact.labels
-    # show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data)
+    val_set = preprocess(deepcopy(val_set))
+    predictions = val_pred_artifact.predictions
+    assert len(predictions) == len(val_set)
+    imgs, labels = val_set.tensors[0], val_set.tensors[1]
+    secondary_labels = gc10_labels.labels
 
-    # count number of misclassifications
-    # calc ratio of predicted labels that are part of secondary labels
-    apply_secondary_labels(labels, predictions, sec_labels, test_data)
+    apply_secondary_labels(labels, predictions, secondary_labels, val_set)
     # ConfusionMatrixMetric(labels=classes).calculate(predictions, labels).show()
-
+    # show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data)
     # debug_class_distribution(classes, labels, sec_labels)
     predicted_labels = torch.argmax(predictions, dim=1)
-    report = classification_report(labels.numpy(), predicted_labels.numpy(), target_names=classes,
+    report = classification_report(labels.numpy(), predicted_labels.numpy(),
+                                   target_names=gc10_labels.class_names[:gc10_labels.number_of_classes],
                                    zero_division=0, output_dict=True)
-    report_text = classification_report(labels.numpy(), predicted_labels.numpy(), target_names=classes,
+    report_text = classification_report(labels.numpy(), predicted_labels.numpy(),
+                                        target_names=gc10_labels.class_names[:gc10_labels.number_of_classes],
                                         zero_division=0, output_dict=False)
-    print(report_text)
-    for class_name in classes:
-        print(f'Accuracy for class {class_name}: {report[class_name]}')
+    log.info("\n" + report_text)
 
     return ClassificationF1Report(report=report)
 
 
 @step
-def evaluate_k_classifiers(classifiers: KFoldTrainedClassifiers):
-    print(classifiers.classifiers[0].metrics)
+def evaluate_k_classifiers(dataset: AugmentDataset,
+                           classifiers: KFoldTrainedClassifiers,
+                           gc10_labels: GC10Labels,
+                           test_ratio: float,
+                           min_instances: int,
+                           random_seed: int,
+                           n_folds: int,
+                           ):
+    # quick and dirty: for getting the splits these were trained on, take the same code
+    train_val, _test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
+    splits: FoldDatasets = stratified_k_fold_split(train_val, n_folds, random_seed, min_instances)
+
+    metrics = []
+    for classifier, (_train, val) in zip(classifiers.classifiers, splits.datasets):
+        predictions: ValidationPredictions = predict_validation_set(classifier, ValSet.from_existing(val), 32)
+        report = evaluate_classifier(predictions, ValSet.from_existing(val), gc10_labels)
+        metrics.append(report.report)
+
+    # Compute the mean and standard deviation for each metric
+    classes = gc10_labels.class_names[:gc10_labels.number_of_classes]
+    metric_stats = {class_name: {} for class_name in classes}
+    for class_name in classes:
+        metric_stats[class_name]['precision'] = (np.mean([m[class_name]['precision'] for m in metrics]),
+                                                 np.std([m[class_name]['precision'] for m in metrics]))
+        metric_stats[class_name]['recall'] = (np.mean([m[class_name]['recall'] for m in metrics]),
+                                              np.std([m[class_name]['recall'] for m in metrics]))
+        metric_stats[class_name]['f1-score'] = (np.mean([m[class_name]['f1-score'] for m in metrics]),
+                                                np.std([m[class_name]['f1-score'] for m in metrics]))
+        metric_stats[class_name]['support'] = (np.mean([m[class_name]['support'] for m in metrics]),
+                                               np.std([m[class_name]['support'] for m in metrics]))
+
+    # Create a pandas DataFrame to display the results in a tabular format
+    df = pd.DataFrame(columns=['Class', 'Precision', 'Recall', 'F1-Score', 'Support'])
+    for class_name, stats in metric_stats.items():
+        df_temp = pd.DataFrame({
+            'Class': [class_name],
+            'Precision': [f"{stats['precision'][0]:.2f} ± {stats['precision'][1]:.2f}"],
+            'Recall': [f"{stats['recall'][0]:.2f} ± {stats['recall'][1]:.2f}"],
+            'F1-Score': [f"{stats['f1-score'][0]:.2f} ± {stats['f1-score'][1]:.2f}"],
+            'Support': [f"{int(stats['support'][0])}"]
+        })
+
+        df = pd.concat([df, df_temp], ignore_index=True)
+    print(df)
+
+    # return metric_stats, df
+
+
+@step
+def k_fold_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_directory: Path):
+    train_losses = []
+    validation_losses = []
+
+    for classifier in classifiers.classifiers:
+        train_losses.append(classifier.metrics.train_loss)
+        validation_losses.append(classifier.metrics.validation_loss)
+
+    # Convert to numpy arrays
+    train_losses = np.array(train_losses)
+    validation_losses = np.array(validation_losses)
+
+    # Compute mean and standard deviation
+    train_mean = np.mean(train_losses, axis=0)
+    validation_mean = np.mean(validation_losses, axis=0)
+    train_std = np.std(train_losses, axis=0)
+    validation_std = np.std(validation_losses, axis=0)
+
+    # Number of epochs
+    epochs = range(1, len(train_mean) + 1)
+
+    # Create the plot
+    plt.figure(figsize=(10, 7))
+
+    # Training loss
+    plt.plot(epochs, train_mean, label='Training Loss', color='blue')
+    plt.fill_between(epochs, train_mean - train_std, train_mean + train_std, color='blue', alpha=0.2)
+
+    # Validation loss
+    plt.plot(epochs, validation_mean, label='Validation Loss', color='red')
+    plt.fill_between(epochs, validation_mean - validation_std, validation_mean + validation_std, color='red',
+                     alpha=0.2)
+
+    # Labels, title and legend
+    plt.title('Average Cross-Entropy Loss per Epoch with Standard Deviation')
+    plt.xlabel('Epoch')
+    plt.ylabel('Cross-Entropy Loss')
+    plt.legend()
+
+    plt.savefig(shared_directory / "kfold_losses.png")
 
 
 def show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data):
@@ -229,7 +288,7 @@ def apply_secondary_labels(labels, predictions, sec_labels, test_data):
     misclassification_idx = [i for i in range(len(predictions)) if
                              torch.argmax(predictions[i]) != labels[i]]
     log.debug(f'test size: {len(predictions)}')
-    log.info(f'accuracy: {1.0 - len(misclassification_idx) / len(predictions)}')
+    log.info(f'accuracy: {1.0 - len(misclassification_idx) / len(predictions)}:.2f')
     number_of_secondary_hits = 0
     # let's be lenient towards the model and change all misses
     # with secondary hits to their secondary labels
@@ -247,7 +306,7 @@ def apply_secondary_labels(labels, predictions, sec_labels, test_data):
 
 
 @step
-def plot_loss_over_epochs(classifier: TrainedClassifier, figure_directory: Path):
+def plot_loss_over_epochs(classifier: TrainedClassifier, shared_directory: Path):
     # log.info(f"Training:   {classifier.metrics.train_loss}")
     # log.info(f"Validation: {classifier.metrics.validation_loss}")
     plt.figure(figsize=(10, 7))
@@ -260,7 +319,7 @@ def plot_loss_over_epochs(classifier: TrainedClassifier, figure_directory: Path)
     plt.ylabel('Cross-Entropy Loss')
     plt.legend()
 
-    plt.savefig(figure_directory / "losses.png")
+    plt.savefig(shared_directory / "losses.png")
 
 
 if __name__ == '__main__':

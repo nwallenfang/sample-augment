@@ -118,37 +118,34 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         this code is taken in large part from Michel's notebook,
         see docs/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
     """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # make the experiment as reproducible as possible by setting a random seed
     _set_random_seed(random_seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # TODO early stopping / return best model according to validation loss
-    # Train Network
     sampler = create_weighted_random_sampler(train_set) if balance_classes else None
     train_loader = DataLoader(dataset=train_set, batch_size=batch_size, shuffle=(sampler is None),
                               sampler=sampler)
-    test_loader = DataLoader(dataset=val_set, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dataset=val_set, batch_size=batch_size, shuffle=True)
 
     # Loss and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     train_loss_per_epoch = []
-    train_losses = 0
-
     val_loss_per_epoch = []
-    val_losses = 0
-
     train_acc_per_epoch = []
     val_acc_per_epoch = []
-
     train_accuracies = 0
+    val_accuracy = -1
+
+    best_epoch = -1
+    best_val_loss = float("inf")
+    best_model_state = None
 
     for epoch in range(num_epochs):
         model.train()
-        train_loss = -1
-        val_loss = -1
-        val_accuracy = -1
+        train_losses = 0
+        val_losses = 0
 
         for batch_idx, (image, label) in enumerate(tqdm(train_loader, file=sys.stdout, desc="Training")):
             # Get data to cuda if possible
@@ -170,14 +167,15 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             # store loss
             train_losses += train_loss.item()
 
-        train_loss_per_epoch.append(train_losses / len(train_loader))
+        avg_train_loss = train_losses / len(train_loader)
+        train_loss_per_epoch.append(avg_train_loss)
         train_acc_per_epoch.append(train_accuracies / len(train_loader))
-        print(
-            f'Epoch [{epoch + 1}/{num_epochs}], '
-            f' Train Loss: {train_loss.item():.4f}')
+        # print(
+        #     f'Epoch [{epoch + 1}/{num_epochs}], '
+        #     f' Train Loss: {avg_train_loss:.4f}')
 
         model.eval()
-        for batch_idx, (image, label) in enumerate(tqdm(test_loader, file=sys.stdout, desc="Validation")):
+        for batch_idx, (image, label) in enumerate(val_loader):
             # Move data to GPU if possible
             image = image.to(device=device)
             label = label.to(device=device)
@@ -187,22 +185,27 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
                 predictions = model(image)
 
             val_loss = criterion(predictions, label)
-            val_accuracy = (predictions.argmax(dim=-1) == label).float().mean()
 
             # store metrics
             val_losses += val_loss.item()
 
-        # save checkpoints? not sure..
-        # torch.save(model.state_dict(),
-        #            project_path(f'models/checkpoints/densenet201/tmp-{epoch}-val-{val_loss:.3f}.pt'))
+            val_accuracy = (predictions.argmax(dim=-1) == label).float().mean()
 
-        val_loss_per_epoch.append(val_losses / len(test_loader))
+        avg_val_loss = val_losses / len(val_loader)
+        if avg_val_loss < best_val_loss:
+            best_epoch = epoch
+            best_val_loss = avg_val_loss
+            best_model_state = model.state_dict()  # Store the state dict of the best model so far
+        val_loss_per_epoch.append(avg_val_loss)
 
         log.info(
             f'Epoch [{epoch + 1}/{num_epochs}], '
-            f'Val Loss: {val_loss.item():.3f}, '
+            f'Train Loss: {avg_train_loss:.3f}, '
+            f'Val Loss: {avg_val_loss:.3f}, '
             f'Val Accuracy: {val_accuracy.item():.2f}')
 
+    log.info(f"Classifier training: Best model from epoch {best_epoch} with val_loss = {best_val_loss:.3f}")
+    model.load_state_dict(best_model_state)
     return ClassifierMetrics(
         train_loss=np.array(train_loss_per_epoch),
         validation_loss=np.array(val_loss_per_epoch),
@@ -253,7 +256,6 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
 
 class KFoldTrainedClassifiers(Artifact):
     classifiers: List[TrainedClassifier]
-    test_set: TestSet
 
 
 @step
@@ -279,4 +281,4 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                                                          balance_classes, fold_random_seed)
         classifiers.append(classifier)
 
-    return KFoldTrainedClassifiers(classifiers=classifiers, test_set=TestSet.from_existing(test))
+    return KFoldTrainedClassifiers(classifiers=classifiers)

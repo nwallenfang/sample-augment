@@ -20,6 +20,14 @@ def project_path(path: str, create=False) -> str:
 def _read_root_diretory() -> Path:  # read root_dir and experiment name from env file or system variables
     current_file_path = Path(__file__)
     project_root = current_file_path.parent.parent.parent
+
+    # highest priority method: reading from system env variable
+    import os
+    if 'ROOT_DIRECTORY' in os.environ:
+        log.info(f"Root directory from environment variable: {os.environ['ROOT_DIRECTORY']}")
+        return Path(os.environ['ROOT_DIRECTORY'])
+
+    # else there needs to be an env file containing the path
     env_path = project_root / '.env'
     assert env_path.is_file(), "expecting .env file in project root with ROOT_DIR variable"
     with open(env_path, 'r') as env_file:
@@ -30,7 +38,7 @@ def _read_root_diretory() -> Path:  # read root_dir and experiment name from env
 
             key, value = line.split("=", 1)
 
-            assert key == 'ROOT_DIR'
+            assert key == 'ROOT_DIRECTORY'
             _root_directory = Path(value)
             if not _root_directory.is_dir():
                 _root_directory = project_root / "data"
@@ -38,6 +46,7 @@ def _read_root_diretory() -> Path:  # read root_dir and experiment name from env
                 log.info(f"Using default root_directory {_root_directory}")
 
             break
+    log.info(f"Root directory: {_root_directory}")
     return _root_directory
 
 

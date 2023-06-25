@@ -4,6 +4,7 @@ import sys
 from typing import *
 
 from sample_augment.core import Step, Config, get_step, Store, Artifact
+from sample_augment.core.config import EXCLUDED_CONFIG_KEYS
 from sample_augment.core.step import step_registry, StepRegistry
 from sample_augment.utils.log import log
 from sample_augment.utils.path_utils import root_directory
@@ -18,11 +19,15 @@ class Experiment:
     load_store: bool
     save_store: bool
 
-    def __init__(self, config: Config, store: Store = None, load_store: bool = True, save_store: bool = True):
+    # root_directory: Path
+
+    def __init__(self, config: Config, store: Store = None,
+                 load_store: bool = True, save_store: bool = True):
         self.load_store = load_store
         self.save_store = save_store
 
         self.config = config
+        # self.root_directory = root_directory if root_directory else env_file_root_directory
 
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
@@ -31,16 +36,15 @@ class Experiment:
             store_file_path = root_directory / f"{config.name}_{config.run_identifier}.json"
             if store_file_path.exists() and self.load_store:
                 self.store = Store.load_from(store_file_path)
-                log.info(f"Store has artifacts: {store_file_path.name} "
-                         f"{[a for a in self.store.artifacts]}")
+                log.info(f"Continuing with store : {store_file_path.name}")
             else:
-                log.info(f"No existing store for hash {config.run_identifier}. Starting fresh.")
-                self.store = Store()
+                self.store = Store.construct_store_from_cache(config)
         else:
             # when providing an existing store, save a snapshot of the initial artifacts.
             # when saving this store later, only add the new artifacts
             self.store = store
-            self.initial_artifacts = set(store.artifacts)
+            # self.initial_artifacts = set(store.artifacts)
+        log.info(f"Store has artifacts: {[a for a in self.store.artifacts]}")
 
     def __repr__(self):
         return f"Experiment_{self.config.run_identifier}"
@@ -72,7 +76,10 @@ class Experiment:
 
         # add this step's config args plus all consumed artifact's config args to dependencies
         if produced:
-            produced.configs = input_configs
+            assert isinstance(produced, Artifact), f"Step {step.name} did not produce an Artifact, but a" \
+                                                   f" {type(produced)}"
+            produced.configs = {key: value for key, value in input_configs.items() if key not
+                                in EXCLUDED_CONFIG_KEYS}
 
             for artifact in input_artifacts.values():
                 produced.configs.update(artifact.configs)
@@ -126,5 +133,6 @@ class Experiment:
 
         self.store.save(store_filename=f"{self.config.name}_{identifier}.json")
 
-        with open(root_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
-            config_f.write(self.config.json(indent=4))
+        # for now: don't save config file, all the config entries are part of the store file
+        # with open(root_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
+        #     config_f.write(self.config.json(indent=4))

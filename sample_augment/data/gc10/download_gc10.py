@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import sys
@@ -13,11 +14,12 @@ class GC10Folder(Artifact):
 
 
 @step()
-def download_gc10(raw_data_directory: Path) -> GC10Folder:
+def download_gc10(shared_directory: Path) -> GC10Folder:
     import kaggle
-    gc10_path = raw_data_directory / 'gc10'
+    logging.debug(f"GC10 shared_dir: {shared_directory}")
+    gc10_path = shared_directory / 'gc10'
     lable_dir = gc10_path / 'lable'
-    new_lable_dir = raw_data_directory / 'gc10_labels'
+    new_lable_dir = shared_directory / 'gc10_labels'
 
     if not gc10_path.is_dir():
         log.info("Downloading GC10 dataset from kaggle..")

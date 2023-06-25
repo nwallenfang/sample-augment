@@ -11,6 +11,7 @@ from typing import Type, Dict, Any, Callable, List, Optional
 from pydantic import BaseModel
 
 from sample_augment.core.artifact import Artifact
+from sample_augment.core.config import EXCLUDED_CONFIG_KEYS
 from sample_augment.utils import log
 
 
@@ -91,16 +92,19 @@ class StepRegistry:
             input_configs = {}
             # go through args
             for name, param in zip(parameters.keys(), args):
+
                 if isinstance(param, Artifact):
                     input_artifacts.append(param)
                 else:
-                    input_configs[name] = param
+                    if name not in EXCLUDED_CONFIG_KEYS:
+                        input_configs[name] = param
             # go through kwargs
             for name, param in kwargs.items():
                 if isinstance(param, Artifact):
                     input_artifacts.append(param)
                 else:
-                    input_configs[name] = param
+                    if name not in EXCLUDED_CONFIG_KEYS:
+                        input_configs[name] = param
 
             # add this step's config args plus all consumed artifact's config args to dependencies
             produced.configs = input_configs

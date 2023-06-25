@@ -68,7 +68,7 @@ def read_xml_labels(label_directory: Path) -> Dict:
     """
     xml_labels = {}
 
-    for filename in os.listdir(label_directory):
+    for filename in next(os.walk(label_directory))[2]:
         # the beginning 'img_' is redundant, so cut it
         image_id = filename.split('.')[0][4:]
         with open(os.path.join(label_directory, filename)) as xml_file:
@@ -93,13 +93,15 @@ def read_xml_labels(label_directory: Path) -> Dict:
     return xml_labels
 
 
-def read_image_dir_labels(image_dir: Path) -> Dict:
+def read_image_dir_labels(gc10: GC10Folder) -> Dict:
     """
         Create interim/labels_dir.json. Get label info from the subdirectories
     """
     image_dir_labels = {}
-    for label in range(1, 11):
-        for filename in os.listdir(image_dir / f"{label:02d}"):
+    _, dirnames, _ = next(os.walk(gc10.image_dir))
+    num_classes = int(sorted(dirnames)[-1])
+    for label in range(1, num_classes + 1):
+        for filename in next(os.walk(gc10.image_dir / f"{label:02d}"))[2]:
             image_id = filename.split('.')[0][4:]  # cut out 'img_'
             image_dir_labels[image_id] = label
 
@@ -173,6 +175,19 @@ def remove_duplicates(primary: int, secondary: List[int]):
 
 class GC10Labels(Artifact):
     labels: Dict
+    number_of_classes: int
+    class_names = [
+        "punching_hole",
+        "welding_line",
+        "crescent_gap",
+        "water_spot",
+        "oil_spot",
+        "silk_spot",
+        "inclusion",
+        "rolled_pit",
+        "crease",
+        "waist_folding"
+    ]
 
 
 @step
@@ -182,7 +197,7 @@ def construct_processed_labels(gc10: GC10Folder) -> GC10Labels:
     """
 
     xml_labels = read_xml_labels(gc10.label_dir)
-    dir_labels = read_image_dir_labels(gc10.image_dir)
+    dir_labels = read_image_dir_labels(gc10)
 
     labels = dir_labels.copy()
 
@@ -206,4 +221,6 @@ def construct_processed_labels(gc10: GC10Folder) -> GC10Labels:
                 'y': y, 'secondary': secondary
             }
 
-    return GC10Labels(labels=labels)
+    _, dirnames, _ = next(os.walk(gc10.image_dir))
+    num_classes = int(sorted(dirnames)[-1])
+    return GC10Labels(labels=labels, number_of_classes=num_classes)
