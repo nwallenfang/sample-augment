@@ -1,11 +1,11 @@
 {
   "name": "colab",
-  "random_seed": 124,
+  "random_seed": 300,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 10,
 
-  "learning_rate": 0.005,
+  "learning_rate": 0.001,
   "num_epochs": 20,
   "batch_size": 32,
   "balance_classes": true,

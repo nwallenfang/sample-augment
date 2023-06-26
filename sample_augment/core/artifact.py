@@ -34,10 +34,12 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
     def fully_qualified_name(self):
         return f'{self.__module__}.{self.__class__.__name__}'
 
-    def _serialize_field(self, field, field_name: str, field_type, external_directory: Path):
+    def _serialize_field(self, field, field_name: str, field_type, external_directory: Path,
+                         extra_configs: Dict):
         # create "run identifier" subdir
         external_directory.mkdir(exist_ok=True)
-        filename = f'{self.config_hash}_{field_name}'
+        config_hash = self._calculate_config_hash({**self.configs, **extra_configs})
+        filename = f'{config_hash}_{field_name}'
         save_path = external_directory / filename
         origin = typing.get_origin(field_type)
 
@@ -49,7 +51,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
             for idx, tensor in enumerate(tensors):
                 # serialize each tensor the same way we do it for individual tensors
-                filename = f'{self.config_hash}_{field_name}_{idx}.pt'
+                filename = f'{config_hash}_{field_name}_{idx}.pt'
                 save_path = external_directory / filename
                 torch.save(tensor, str(save_path))
                 serialized_tensor_strings.append({
@@ -69,7 +71,10 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                     # call serialize_field method for "simple fields"
                     return [
                         self._serialize_field(subfield, f"{field_name}_{i}", type(subfield),
-                                              external_directory) for i, subfield in enumerate(field)
+                                              external_directory, extra_configs={
+                                **extra_configs, **self.configs
+                            })
+                        for i, subfield in enumerate(field)
                     ]
 
             # primitive type, simply assign
@@ -95,7 +100,9 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                     'path': f'{save_path.relative_to(path_utils.root_directory).as_posix()}'}
         elif issubclass(field_type, Artifact):
             # field is a sub-artifact. Recursively save it.
-            return field.serialize()
+            return field.serialize(extra_configs={
+                                **extra_configs, **self.configs
+                            })
         elif issubclass(field_type, Path):
             # make Path instances relative to config.root_dir
             relative_path = field.relative_to(path_utils.root_directory).as_posix()
@@ -144,7 +151,6 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             if isinstance(first_element, dict):  # list of complex objects
                 # complex object, we need to recursively deserialize each of these
                 # the fieldname only gets used in the Artifact branch.
-                # TODO check if element is an artifact, else deserialize as it is being done now
                 return [Artifact._deserialize_field("anonymous subfield", dict_subvalue, None)
                         for dict_subvalue in value]
             else:
@@ -169,7 +175,9 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         external_directory = path_utils.root_directory / self.__class__.__name__
         return (external_directory / f"{self.config_hash}.json").exists()
 
-    def serialize(self) -> Dict:
+    def serialize(self, extra_configs: Dict = None) -> Dict:
+        if extra_configs is None:
+            extra_configs = {}
         # if not self._serialize_this:
         #     return {}
 
@@ -181,7 +189,8 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         for field_name, field_type in self.__annotations__.items():
             field = getattr(self, field_name)
 
-            data[field_name] = self._serialize_field(field, field_name, field_type, external_directory)
+            data[field_name] = self._serialize_field(field, field_name, field_type, external_directory,
+                                                     extra_configs=extra_configs)
 
         data['configs'] = self.configs
 
@@ -190,7 +199,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
     def save_to_disk(self):
         if not self._serialize_this:
             return
-        data = self.serialize()
+        data = self.serialize(extra_configs={})
         external_directory = path_utils.root_directory / self.__class__.__name__
         external_directory.mkdir(exist_ok=True)
         artifact_path = external_directory / f"{self.config_hash}.json"

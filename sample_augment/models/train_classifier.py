@@ -15,8 +15,7 @@ from tqdm import tqdm  # For nice progress bar!
 
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
-from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split, \
-    TestSet
+from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
 from sample_augment.utils import log
 
 
@@ -136,7 +135,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
     train_acc_per_epoch = []
     val_acc_per_epoch = []
     train_accuracies = 0
-    val_accuracy = -1
+    val_accuracies = 0
 
     best_epoch = -1
     best_val_loss = float("inf")
@@ -170,9 +169,6 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         avg_train_loss = train_losses / len(train_loader)
         train_loss_per_epoch.append(avg_train_loss)
         train_acc_per_epoch.append(train_accuracies / len(train_loader))
-        # print(
-        #     f'Epoch [{epoch + 1}/{num_epochs}], '
-        #     f' Train Loss: {avg_train_loss:.4f}')
 
         model.eval()
         for batch_idx, (image, label) in enumerate(val_loader):
@@ -189,7 +185,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             # store metrics
             val_losses += val_loss.item()
 
-            val_accuracy = (predictions.argmax(dim=-1) == label).float().mean()
+            val_accuracies += (predictions.argmax(dim=-1) == label).float().mean()
 
         avg_val_loss = val_losses / len(val_loader)
         if avg_val_loss < best_val_loss:
@@ -202,9 +198,10 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             f'Epoch [{epoch + 1}/{num_epochs}], '
             f'Train Loss: {avg_train_loss:.3f}, '
             f'Val Loss: {avg_val_loss:.3f}, '
-            f'Val Accuracy: {val_accuracy.item():.2f}')
+            f'Val Accuracy: {val_accuracies.item():.2f}')
 
     log.info(f"Classifier training: Best model from epoch {best_epoch} with val_loss = {best_val_loss:.3f}")
+    # load model state from best performing epoch
     model.load_state_dict(best_model_state)
     return ClassifierMetrics(
         train_loss=np.array(train_loss_per_epoch),

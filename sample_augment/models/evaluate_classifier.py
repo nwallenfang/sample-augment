@@ -165,6 +165,7 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
                            min_instances: int,
                            random_seed: int,
                            n_folds: int,
+                           shared_directory: Path
                            ):
     # quick and dirty: for getting the splits these were trained on, take the same code
     train_val, _test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
@@ -201,9 +202,46 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
         })
 
         df = pd.concat([df, df_temp], ignore_index=True)
+
+    macro_precision = np.mean([metric_stats[class_name]['precision'][0] for class_name in classes])
+    macro_recall = np.mean([metric_stats[class_name]['recall'][0] for class_name in classes])
+    macro_f1 = np.mean([metric_stats[class_name]['f1-score'][0] for class_name in classes])
+
+    total_support = np.sum([metric_stats[class_name]['support'][0] for class_name in classes])
+    weights = [metric_stats[class_name]['support'][0] / total_support for class_name in classes]
+
+    weighted_precision = np.average([metric_stats[class_name]['precision'][0] for class_name in classes],
+                                    weights=weights)
+    weighted_recall = np.average([metric_stats[class_name]['recall'][0] for class_name in classes],
+                                 weights=weights)
+    weighted_f1 = np.average([metric_stats[class_name]['f1-score'][0] for class_name in classes],
+                             weights=weights)
+
+    # add to dataframe
+    df = pd.concat([
+        df,
+        pd.DataFrame({
+            'Class': ['Macro average'],
+            'Precision': [f"{macro_precision:.2f}"],
+            'Recall': [f"{macro_recall:.2f}"],
+            'F1-Score': [f"{macro_f1:.2f}"],
+            'Support': ['N/A']
+        })
+    ], ignore_index=True)
+
+    df = pd.concat([
+        df,
+        pd.DataFrame({
+            'Class': ['Weighted average'],
+            'Precision': [f"{weighted_precision:.2f}"],
+            'Recall': [f"{weighted_recall:.2f}"],
+            'F1-Score': [f"{weighted_f1:.2f}"],
+            'Support': ['N/A']
+        })
+    ], ignore_index=True)
     print(df)
 
-    # return metric_stats, df
+    df.to_csv(shared_directory / 'classifier_evaluation.csv', index=False)
 
 
 @step
@@ -288,7 +326,7 @@ def apply_secondary_labels(labels, predictions, sec_labels, test_data):
     misclassification_idx = [i for i in range(len(predictions)) if
                              torch.argmax(predictions[i]) != labels[i]]
     log.debug(f'test size: {len(predictions)}')
-    log.info(f'accuracy: {1.0 - len(misclassification_idx) / len(predictions)}:.2f')
+    log.info(f'accuracy: {1.0 - len(misclassification_idx) / len(predictions):.2f}')
     number_of_secondary_hits = 0
     # let's be lenient towards the model and change all misses
     # with secondary hits to their secondary labels
