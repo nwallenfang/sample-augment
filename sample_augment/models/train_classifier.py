@@ -193,12 +193,14 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             best_val_loss = avg_val_loss
             best_model_state = model.state_dict()  # Store the state dict of the best model so far
         val_loss_per_epoch.append(avg_val_loss)
+        avg_accuracy = val_accuracies / len(val_loader)
+        val_acc_per_epoch.append(avg_accuracy)
 
         log.info(
             f'Epoch [{epoch + 1}/{num_epochs}], '
             f'Train Loss: {avg_train_loss:.3f}, '
             f'Val Loss: {avg_val_loss:.3f}, '
-            f'Val Accuracy: {val_accuracies.item():.2f}')
+            f'Val Accuracy: {avg_accuracy:.2f}')
 
     log.info(f"Classifier training: Best model from epoch {best_epoch} with val_loss = {best_val_loss:.3f}")
     # load model state from best performing epoch

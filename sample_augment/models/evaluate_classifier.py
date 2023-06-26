@@ -287,6 +287,54 @@ def k_fold_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_di
     plt.savefig(shared_directory / "kfold_losses.png")
 
 
+@step
+def k_fold_fancy_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_directory: Path):
+    train_losses = []
+    validation_losses = []
+
+    for classifier in classifiers.classifiers:
+        train_losses.append(classifier.metrics.train_loss)
+        validation_losses.append(classifier.metrics.validation_loss)
+
+    # Convert to numpy arrays
+    train_losses = np.array(train_losses)
+    validation_losses = np.array(validation_losses)
+
+    # Compute mean and standard deviation
+    train_mean = np.mean(train_losses, axis=0)
+    validation_mean = np.mean(validation_losses, axis=0)
+    train_std = np.std(train_losses, axis=0)
+    validation_std = np.std(validation_losses, axis=0)
+
+    # Number of epochs
+    epochs = range(1, len(train_mean) + 1)
+
+    # Create the plot
+    plt.figure(figsize=(10, 7))
+
+    # Training and validation loss for each classifier in light color
+    for i in range(train_losses.shape[0]):
+        plt.plot(epochs, train_losses[i], color='blue', alpha=0.1)
+        plt.plot(epochs, validation_losses[i], color='red', alpha=0.1)
+
+    # Average training loss
+    plt.plot(epochs, train_mean, label='Mean Training Loss', color='blue', linewidth=2)
+    plt.fill_between(epochs, train_mean - train_std, train_mean + train_std, color='blue', alpha=0.2)
+
+    # Average validation loss
+    plt.plot(epochs, validation_mean, label='Mean Validation Loss', color='red', linewidth=2)
+    plt.fill_between(epochs, validation_mean - validation_std, validation_mean + validation_std, color='red',
+                     alpha=0.2)
+
+    # Labels, title and legend
+    plt.title('Average Cross-Entropy Loss per Epoch with Standard Deviation')
+    plt.xlabel('Epoch')
+    plt.ylabel('Cross-Entropy Loss')
+    plt.legend()
+
+    plt.savefig(shared_directory / "kfold_losses.png")
+
+
 def show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data):
     for i in range(10):
         i += 10
