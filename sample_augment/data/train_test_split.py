@@ -111,12 +111,31 @@ def stratified_k_fold_split(dataset: AugmentDataset, n_folds: int = 5, random_se
 
 
 class TrainSet(AugmentDataset):
-    pass
+    transform: typing.Optional[typing.Callable] = None
+
+    def __getitem__(self, index):
+        x = self.tensors[0][index]
+
+        if self.transform:
+            x = self.transform(x)
+
+        y = self.tensors[1][index].long()
+
+        return x, y
 
 
 class ValSet(AugmentDataset):
-    pass
+    transform: typing.Optional[typing.Callable] = None
 
+    def __getitem__(self, index):
+        x = self.tensors[0][index]
+
+        if self.transform:
+            x = self.transform(x)
+
+        y = self.tensors[1][index].long()
+
+        return x, y
 
 class TestSet(AugmentDataset):
     pass

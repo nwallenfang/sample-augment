@@ -1,13 +1,17 @@
 {
-  "name": "gc10_mini",
-  "random_seed": 125,
+  "name": "dataset",
+  "random_seed": 600,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 10,
 
-  "learning_rate": 0.01,
-  "num_epochs": 3,
-  "batch_size": 1,
+  "learning_rate": 0.001,
+  "num_epochs": 25,
+  "batch_size": 32,
   "balance_classes": true,
-  "n_folds": 2
+  "n_folds": 10,
+  "data_augment": false,
+  "color_jitter": 0.25,
+  "h_flip_p": 0.5,
+  "v_flip_p": 0.5
 }

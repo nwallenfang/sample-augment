@@ -46,7 +46,7 @@ def _read_root_diretory() -> Path:  # read root_dir and experiment name from env
                 log.info(f"Using default root_directory {_root_directory}")
 
             break
-    log.info(f"Root directory: {_root_directory}")
+    # log.info(f"Root directory: {_root_directory}")
     return _root_directory
 
 

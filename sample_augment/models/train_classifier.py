@@ -10,13 +10,19 @@ from torch import nn  # All neural network modules
 from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch.utils.data import DataLoader, WeightedRandomSampler  # Gives easier dataset management
 from torch.utils.data import Dataset
-from torchvision.transforms import transforms
+from torchvision.transforms import transforms, Normalize
 from tqdm import tqdm  # For nice progress bar!
 
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
 from sample_augment.utils import log
+
+_mean = torch.tensor([0.485, 0.456, 0.406])
+_std = torch.tensor([0.229, 0.224, 0.225])
+normalize = Normalize(mean=_mean, std=_std)
+# reverse operation for use in visualization
+inverse_normalize = Normalize((-_mean / _std).tolist(), (1.0 / _std).tolist())
 
 
 class CustomDenseNet(torchvision.models.DenseNet):
@@ -25,7 +31,7 @@ class CustomDenseNet(torchvision.models.DenseNet):
     def __init__(self, num_classes, load_pretrained=False):
         # Initialize with densenet201 configuration
         super().__init__(num_init_features=64, growth_rate=32, block_config=(6, 12, 48, 32),
-                         num_classes=1000)  # initially set to match the pre-trained model
+                         num_classes=1000)  # initially set num_classes to 1000 to match the pre-trained model
         if load_pretrained:
             # use the model pretrained on imagenet
             pretrained = torch.hub.load('pytorch/vision:v0.10.0', 'densenet201', weights='IMAGENET1K_V1')
@@ -64,21 +70,20 @@ class ClassifierMetrics(Artifact):
 
 
 # could be moved to a more central location
-def preprocess(dataset: AugmentDataset) -> AugmentDataset:
-    data = dataset.tensors[0]
-    assert data.dtype == torch.uint8, f"preprocess() expected imgs to be uint8, got {data.dtype}"
-
-    # convert to float32
-    data = data.float()
-    data /= 255.0
-
-    # ImageNet normalization factors
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    # convert labels to expected Long dtype as well
-    # we're modifying the dataset here.
-    dataset.tensors = (normalize(data), dataset.tensors[1].long())
-
-    return dataset  # don't modify dataset
+# def preprocess(dataset: AugmentDataset) -> AugmentDataset:
+#     data = dataset.tensors[0]
+#     assert data.dtype == torch.uint8, f"preprocess() expected imgs to be uint8, got {data.dtype}"
+#
+#     # convert to float32
+#     data = data.float()
+#     data /= 255.0
+#
+#     # ImageNet normalization factors
+#     # convert labels to expected Long dtype as well
+#     # we're modifying the dataset here.
+#     dataset.tensors = (normalize(data), dataset.tensors[1].long())
+#
+#     return dataset
 
 
 def create_weighted_random_sampler(dataset: Dataset):
@@ -112,7 +117,8 @@ def _set_random_seed(random_seed: int):
 
 
 def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
-                learning_rate: float, balance_classes: bool, random_seed: int) -> ClassifierMetrics:
+                learning_rate: float, random_seed: int,
+                balance_classes: bool) -> ClassifierMetrics:
     """
         this code is taken in large part from Michel's notebook,
         see docs/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
@@ -134,8 +140,6 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
     val_loss_per_epoch = []
     train_acc_per_epoch = []
     val_acc_per_epoch = []
-    train_accuracies = 0
-    val_accuracies = 0
 
     best_epoch = -1
     best_val_loss = float("inf")
@@ -145,11 +149,21 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         model.train()
         train_losses = 0
         val_losses = 0
+        train_accuracies = 0
+        val_accuracies = 0
 
         for batch_idx, (image, label) in enumerate(tqdm(train_loader, file=sys.stdout, desc="Training")):
             # Get data to cuda if possible
             image = image.to(device=device)
             label = label.to(device=device)
+
+            # Quick sanity check
+            # for i in range(10):
+            #     img = inverse_normalize(image[i].cpu()).numpy()  # Take the first image of the batch
+            #     plt.imshow(img.transpose(1, 2, 0))  # Assuming the image has shape (channels, height, width)
+            #     plt.title(f'Label: {label[i]}')
+            #     plt.axis('off')
+            #     plt.show()
 
             # forward
             predictions = model(image)  # Pass batch
@@ -185,7 +199,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             # store metrics
             val_losses += val_loss.item()
 
-            val_accuracies += (predictions.argmax(dim=-1) == label).float().mean()
+            val_accuracies += (predictions.argmax(dim=-1) == label).float().mean().item()
 
         avg_val_loss = val_losses / len(val_loader)
         if avg_val_loss < best_val_loss:
@@ -217,16 +231,27 @@ class TrainedClassifier(Artifact):
     # name: str
     model: torch.nn.Module
     # these following metrics are taken for each epoch
-    # TODO extra cred task: a decorator like @extractable would be nice. This decorator would mean that a
+    # extra cred task: a decorator like @extractable would be nice. This decorator would mean that a
     #  "virtual" step would be created that takes a TrainedClassifier and returns the subartifact
     #  ClassifierMetrics. Then in evaluate we can take just ClassiferMetrics as arg.
     metrics: ClassifierMetrics
 
 
+plain_transforms = transforms.Compose([
+    transforms.ConvertImageDtype(dtype=torch.float32),
+    normalize
+])
+
+
 @step
 def train_classifier(train_data: TrainSet, val_data: ValSet,
                      num_epochs: int, batch_size: int, learning_rate: float,
-                     balance_classes: bool, random_seed: int) -> TrainedClassifier:
+                     balance_classes: bool,
+                     random_seed: int,
+                     data_augment: bool,
+                     color_jitter: float,
+                     h_flip_p: float,
+                     v_flip_p: float) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
@@ -237,11 +262,29 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = CustomDenseNet(num_classes=train_data.num_classes, load_pretrained=True)
     model.to(device)
-    # train_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_train.pt')))
-    # val_data = AugmentDataset.load_from_file(Path(project_path('data/interim/gc10_val.pt')))
+    train_data = deepcopy(train_data)
+    val_data = deepcopy(val_data)
 
-    train_data = preprocess(deepcopy(train_data))
-    val_data = preprocess(deepcopy(val_data))
+    if data_augment:
+        augment_transforms = transforms.Compose([
+            transforms.ConvertImageDtype(dtype=torch.float32),
+            transforms.RandomVerticalFlip(p=v_flip_p),
+            transforms.RandomHorizontalFlip(p=h_flip_p),
+            # transforms.RandomRotation(180),  # would rotate randomly from within (-180, 180),
+            # which is not what we want
+            transforms.ColorJitter(brightness=color_jitter, contrast=color_jitter,
+                                   saturation=color_jitter),
+            normalize
+        ])
+        train_data.transform = augment_transforms
+        val_data.transform = plain_transforms
+    else:
+        train_data.transform = plain_transforms
+        val_data.transform = plain_transforms
+
+    # preprocess / normalize AFTER augmentation transforms
+    # train_data = typing.cast(TrainSet, preprocess(deepcopy(train_data)))
+    # val_data = typing.cast(ValSet, preprocess(deepcopy(val_data)))
 
     metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
                           batch_size=batch_size, learning_rate=learning_rate,
@@ -265,19 +308,26 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                             num_epochs: int,
                             batch_size: int,
                             learning_rate: float,
-                            balance_classes: bool) -> KFoldTrainedClassifiers:
+                            balance_classes: bool,
+                            data_augment: bool,
+                            color_jitter: float,
+                            h_flip_p: float,
+                            v_flip_p: float
+                            ) -> KFoldTrainedClassifiers:
     fold_random_seed = random_seed
     train_val, test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
     classifiers = []
     splits = stratified_k_fold_split(train_val, n_folds, random_seed, min_instances)
     for i, (train, val) in enumerate(splits.datasets):
         # different random seed when splitting for each fold
+        log.info(f"Training classifier on fold {i+1}")
         fold_random_seed += 1
 
         classifier: TrainedClassifier = train_classifier(TrainSet.from_existing(train, name="train_fold_{i}"),
                                                          ValSet.from_existing(val, name="val_fold_{i}"),
                                                          num_epochs, batch_size, learning_rate,
-                                                         balance_classes, fold_random_seed)
+                                                         balance_classes, fold_random_seed, data_augment,
+                                                         color_jitter, h_flip_p, v_flip_p)
         classifiers.append(classifier)
 
     return KFoldTrainedClassifiers(classifiers=classifiers)

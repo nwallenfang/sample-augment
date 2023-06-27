@@ -34,19 +34,28 @@ class ColorLogFormatter(logging.Formatter):
 
 
 def get_logger(name: str, level):
+    # If name is the root logger, clear its handlers
+    # if name == 'root' or name == '':
+    #     root_logger = logging.getLogger()
+    #     for handler in root_logger.handlers[:]:
+    #         root_logger.removeHandler(handler)
+
+
     module_logger = logging.getLogger(name)
     module_logger.setLevel(level)
+    module_logger.propagate = False  # Prevent this logger from passing messages to its parent
 
-    # create console handler and set level that should be printed
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(level)
+    if not module_logger.handlers:  # Only add handler if the logger has no handlers
+        # create console handler and set level that should be printed
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(level)
 
-    formatter = ColorLogFormatter()
-    handler.setFormatter(formatter)
-    module_logger.addHandler(handler)
+        formatter = ColorLogFormatter()
+        handler.setFormatter(formatter)
+        module_logger.addHandler(handler)
 
     return module_logger
 
 
 log_level = logging.INFO
-log = get_logger('main logger', log_level)
+log = get_logger('sampling-aug', log_level)

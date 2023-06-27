@@ -5,6 +5,7 @@ from pathlib import Path
 from pprint import pprint
 from typing import Dict
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -266,52 +267,18 @@ def k_fold_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_di
     # Number of epochs
     epochs = range(1, len(train_mean) + 1)
 
-    # Create the plot
-    plt.figure(figsize=(10, 7))
-
-    # Training loss
-    plt.plot(epochs, train_mean, label='Training Loss', color='blue')
-    plt.fill_between(epochs, train_mean - train_std, train_mean + train_std, color='blue', alpha=0.2)
-
-    # Validation loss
-    plt.plot(epochs, validation_mean, label='Validation Loss', color='red')
-    plt.fill_between(epochs, validation_mean - validation_std, validation_mean + validation_std, color='red',
-                     alpha=0.2)
-
-    # Labels, title and legend
-    plt.title('Average Cross-Entropy Loss per Epoch with Standard Deviation')
-    plt.xlabel('Epoch')
-    plt.ylabel('Cross-Entropy Loss')
-    plt.legend()
-
-    plt.savefig(shared_directory / "kfold_losses.png")
-
-
-@step
-def k_fold_fancy_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_directory: Path):
-    train_losses = []
-    validation_losses = []
-
-    for classifier in classifiers.classifiers:
-        train_losses.append(classifier.metrics.train_loss)
-        validation_losses.append(classifier.metrics.validation_loss)
-
-    # Convert to numpy arrays
-    train_losses = np.array(train_losses)
-    validation_losses = np.array(validation_losses)
-
-    # Compute mean and standard deviation
-    train_mean = np.mean(train_losses, axis=0)
-    validation_mean = np.mean(validation_losses, axis=0)
-    train_std = np.std(train_losses, axis=0)
-    validation_std = np.std(validation_losses, axis=0)
-
-    # Number of epochs
-    epochs = range(1, len(train_mean) + 1)
+    # Set the font to be serif, rather than sans
+    matplotlib.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
+    # Use LaTeX to handle all text layout
+    matplotlib.rc('text', usetex=True)
+    # Ensure that matplotlib's LaTeX output matches the LaTeX document
+    matplotlib.rc('figure', dpi=200)
+    matplotlib.rcParams.update({'font.size': 14})
 
     # Create the plot
     plt.figure(figsize=(10, 7))
-
+    x_ticks = np.arange(1, max(epochs) + 1, 5)
+    x_ticks = np.insert(x_ticks, 1, 1)  # Insert 1 at the beginning
     # Training and validation loss for each classifier in light color
     for i in range(train_losses.shape[0]):
         plt.plot(epochs, train_losses[i], color='blue', alpha=0.1)
@@ -327,12 +294,17 @@ def k_fold_fancy_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, sha
                      alpha=0.2)
 
     # Labels, title and legend
-    plt.title('Average Cross-Entropy Loss per Epoch with Standard Deviation')
+    # plt.title('Average Cross-Entropy Loss per Epoch with Standard Deviation')
     plt.xlabel('Epoch')
     plt.ylabel('Cross-Entropy Loss')
     plt.legend()
+    plt.xlim([1, len(train_mean)])
+    plt.ylim([0.0, 2.25])
+    y_ticks, _ = plt.yticks()
+    y_ticks = y_ticks[1:]
+    plt.yticks(y_ticks)
 
-    plt.savefig(shared_directory / "kfold_losses.png")
+    plt.savefig(shared_directory / "kfold_losses.pdf", bbox_inches='tight', format='pdf')
 
 
 def show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data):

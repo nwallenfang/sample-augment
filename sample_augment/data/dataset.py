@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional, Callable
 
 import numpy as np
 import torch
@@ -15,7 +15,6 @@ from tqdm import tqdm
 from sample_augment.core import Artifact, step
 from sample_augment.data.gc10.download_gc10 import GC10Folder
 from sample_augment.utils.log import log
-from sample_augment.utils.path_utils import project_path
 
 
 class ImageDataset(torchvision.datasets.ImageFolder):
@@ -97,26 +96,13 @@ class AugmentDataset(TensorDataset, Artifact):
         # very unperformant when called often
         return int(torch.max(self.tensors[1]) - torch.min(self.tensors[1])) + 1
 
-
-def test_duplicate_ids():
-    # TODO fit test into the new framework
-    preprocessing = Compose([
-        Resize((256, 256), interpolation=torchvision.transforms.InterpolationMode.BICUBIC,
-               antialias=True),
-        ToTensor(),
-        Grayscale(num_output_channels=3),
-        # These normalization factors might be used to bring GC10
-        # to the same distribution as ImageNet since we're using a
-        # DenseNet classifier that was pretrained on ImageNet.
-        # Optimally, the Generator should generate images with this distribution as well.
-        # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    image_dataset = ImageDataset(project_path('data/gc10-mini'), transform=preprocessing)
-    # tensor_dataset: AugmentDataset = image_folder_to_tensor_dataset(image_dataset)
-    # del image_dataset
-    # assert isinstance(tensor_dataset, TensorDataset)
-    dataset_dir = Path(project_path('data/interim/', create=True))
-    # tensor_dataset.save_to_file(dataset_dir)
+    # @property
+    # def transform(self):
+    #     return self._transform
+    #
+    # @transform.setter
+    # def transform(self, transform):
+    #     self._transform = transform
 
 
 class ImageFolderPath(Artifact):
