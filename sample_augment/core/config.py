@@ -15,7 +15,7 @@ class SubConfig(BaseModel, extra=Extra.allow, allow_mutation=False):
     pass
 
 
-EXCLUDED_CONFIG_KEYS: Set[str] = {"shared_directory", "name"}
+EXCLUDED_CONFIG_KEYS: Set[str] = {"shared_directory"}
 CONFIG_HASH_CUTOFF: int = 5
 
 
@@ -71,7 +71,6 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
 
     def __contains__(self, item):
         return item in self.__dict__
-
 
 
 def read_config(arg_config: Path = None) -> Config:

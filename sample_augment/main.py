@@ -33,7 +33,7 @@ def main(arg_config: Path = None):
     # experiment.dry_run()
     # TODO providing additional artifacts doesn't change the run identifier so this could bring issues
     # evaluate_k_classifiers, k_fold_plot_loss_over_epochs, imagefolder_to_tensors, k_fold_train_classifier
-    experiment.run("imagefolder_to_tensors")
+    experiment.run("k_fold_train_classifier")
     # , initial_artifacts=[GC10Folder(
     #                     image_dir=Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\raw\gc10-mini"),
     #                     label_dir=Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\raw"

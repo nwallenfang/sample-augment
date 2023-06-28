@@ -66,7 +66,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                 element_type = get_args(field_type)[0]
                 if issubclass(element_type, Artifact):
                     # call upper serialize methdod for Artifacts
-                    return [subartifact.serialize() for subartifact in field]
+                    return [subartifact.to_dict() for subartifact in field]
                 else:
                     # call serialize_field method for "simple fields"
                     return [
@@ -100,9 +100,9 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                     'path': f'{save_path.relative_to(path_utils.root_directory).as_posix()}'}
         elif issubclass(field_type, Artifact):
             # field is a sub-artifact. Recursively save it.
-            return field.serialize(extra_configs={
-                                **extra_configs, **self.configs
-                            })
+            return field.to_dict(extra_configs={
+                **extra_configs, **self.configs
+            })
         elif issubclass(field_type, Path):
             # make Path instances relative to config.root_dir
             relative_path = field.relative_to(path_utils.root_directory).as_posix()
@@ -147,7 +147,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             if origin is list or origin is List:  # checks if type_annotation is a list
                 element_type = get_args(type_annotation)[0]  # gets the type of the elements in the list
                 if issubclass(element_type, Artifact):  # if list of artifact, special artifact-wise deseres
-                    return [element_type.deserialize(subartifact_data) for subartifact_data in value]
+                    return [element_type.from_dict(subartifact_data) for subartifact_data in value]
             if isinstance(first_element, dict):  # list of complex objects
                 # complex object, we need to recursively deserialize each of these
                 # the fieldname only gets used in the Artifact branch.
@@ -170,19 +170,19 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         filtered_configs = {k: v for k, v in configs.items() if k not in keys_to_exclude}
         return hashlib.sha256(json.dumps(filtered_configs, sort_keys=True).encode()).hexdigest()[:6]
 
-    # TODO call this method (where?)
-    def is_serialized(self):
-        external_directory = path_utils.root_directory / self.__class__.__name__
-        return (external_directory / f"{self.config_hash}.json").exists()
+    def is_serialized(self, name: str):
+        self.configs['name'] = name
+        return self.complete_path.exists()
 
-    def serialize(self, extra_configs: Dict = None) -> Dict:
+    @property
+    def complete_path(self):
+        artifact_dir = path_utils.root_directory / self.__class__.__name__
+        return artifact_dir / f"{self.configs['name']}_{self.config_hash}.json"
+
+    def to_dict(self, extra_configs: Dict = None) -> Dict:
         if extra_configs is None:
             extra_configs = {}
-        # if not self._serialize_this:
-        #     return {}
 
-        # config_hash = (hashlib.sha256(json.dumps(self.config_dependencies, sort_keys=True).encode())
-        #                .hexdigest()[:6])
         external_directory = path_utils.root_directory / self.__class__.__name__
 
         data = {}
@@ -199,12 +199,13 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
     def save_to_disk(self):
         if not self._serialize_this:
             return
-        data = self.serialize(extra_configs={})
+        data = self.to_dict(extra_configs={})
         external_directory = path_utils.root_directory / self.__class__.__name__
+        # self.complete_path belongs to external directory. Create it if it doesn't exist yet
         external_directory.mkdir(exist_ok=True)
-        artifact_path = external_directory / f"{self.config_hash}.json"
-        log.info(f"Saving artifact to {artifact_path}")
-        with open(artifact_path, 'w') as f:
+
+        log.info(f"Saving artifact to {self.complete_path}")
+        with open(self.complete_path, 'w') as f:
             try:
                 json.dump(data, f, indent=4)
             except TypeError as err:
@@ -213,21 +214,19 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                 log.error(pprint.pformat(data))
                 sys.exit(-1)
 
-    @classmethod
-    def load_from_disk(cls, config_entries: Dict[str, Any]) -> "Artifact":
-        config_hash = cls._calculate_config_hash(config_entries)
-        artifact_path = path_utils.root_directory / cls.__name__ / f"{config_hash}.json"
-        with open(artifact_path) as artifact_json:
-            artifact = cls.deserialize(json.load(artifact_json))
-            return artifact
+    # @classmethod
+    # def load_from_disk(cls, config_entries: Dict[str, Any]) -> "Artifact":
+    #     config_hash = cls._calculate_config_hash(config_entries)
+    #     artifact_path = path_utils.root_directory / cls.__name__ / f"{config_hash}.json"
+    #     with open(artifact_path) as artifact_json:
+    #         artifact = cls.from_dict(json.load(artifact_json))
+    #         return artifact
 
     @classmethod
-    def deserialize(cls, data: Dict) -> "Artifact":
+    def from_dict(cls, data: Dict) -> "Artifact":
         subartifacts = {}
 
         for field_name, value in data.items():
-            # if field_name == 'config_dependencies':
-            #     pass
             if field_name not in cls.__fields__:
                 # field is not in pydantic model
                 continue
@@ -241,7 +240,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             if isinstance(field_type, type) and issubclass(field_type, Artifact):
                 # save subartifact in external dict and apply after the main loop
                 # since the field_name needs to change
-                subartifacts[field_name] = field_type.deserialize(value)
+                subartifacts[field_name] = field_type.from_dict(value)
             else:
                 data[field_name] = Artifact._deserialize_field(field_name, value,
                                                                cls.__annotations__[field_name] if

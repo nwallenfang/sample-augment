@@ -158,7 +158,7 @@ class StepRegistry:
             self.producers.setdefault(produced_artifact, []).append(new_step)
 
         self.all_steps[name] = new_step
-        log.debug(f'Registered step {name}.')
+        # log.debug(f'Registered step {name}.')
 
         return new_step
 

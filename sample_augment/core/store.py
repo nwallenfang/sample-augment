@@ -57,24 +57,25 @@ class Store:
             # (this is not default behavior and I don't know if it has any use)
             log.debug(f'Dropped produced {type(artifact).__name__}.')
 
-    def load_artifact(self, artifact_type: Type[Artifact], config_entries: Dict[str, Any]):
-        # if artifact is not in store currently, we can expect it to be loadable from disk
-        # since we are checking for that already in the beginning
-        deserialized_artifact = artifact_type.load_from_disk(config_entries)
-        self.artifacts[artifact_type.__name__] = deserialized_artifact
-        return deserialized_artifact
+    # def load_artifact(self, artifact_type: Type[Artifact], config_entries: Dict[str, Any]):
+    #     # if artifact is not in store currently, we can expect it to be loadable from disk
+    #     # since we are checking for that already in the beginning
+    #     deserialized_artifact = artifact_type.load_from_disk(config_entries)
+    #     self.artifacts[artifact_type.__name__] = deserialized_artifact
+    #     return deserialized_artifact
 
-    def save(self, store_filename: str):
+    def save(self, config_name: str, config_hash: str):
+        store_filename = f"{config_name}_{config_hash}.json"
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
-            # if artifact_name in self.initial_artifacts:
-            #     log.debug(f"Skipping saving {artifact_name}")
-            #     continue  # skip already serialized artifacts when this store was loaded from a previous run
-            artifact_dict = artifact.serialize()
-            if artifact_dict:
-                log.debug(f"Saving artifact {artifact_name}")
-                data[artifact.fully_qualified_name] = artifact_dict
+            assert artifact.is_serialized(config_name)
+            # artifact_dict = artifact.serialize()
+            # log.debug(f"Saving artifact {artifact_name}")
+            data[artifact.fully_qualified_name] = {
+                "path": artifact.complete_path.relative_to(path_utils.root_directory).as_posix(),
+                "configs": artifact.configs
+            }
 
         log.info(f"Saving store to {store_filename}")
         with open(path_utils.root_directory / store_filename, 'w') as f:
@@ -86,8 +87,6 @@ class Store:
                 log.error(data)
                 sys.exit(-1)
 
-        # return Path(self.root_directory / store_filename)
-
     @classmethod
     def load_from(cls, store_path: Path):
         # root_directory = store_path.parent  # the dir above the actual store file
@@ -96,10 +95,12 @@ class Store:
             data = json.load(f)
 
         artifacts = {}
-        for artifact_name, artifact_data in data.items():
+        for artifact_name, artifact_info in data.items():
             module_name, class_name = artifact_name.rsplit('.', 1)
+            artifact_path = path_utils.root_directory / artifact_info['path']
             ArtifactSubclass = getattr(import_module(module_name), class_name)
-            artifacts[class_name] = ArtifactSubclass.deserialize(artifact_data)
+            with open(artifact_path, 'r') as artifact_json:
+                artifacts[class_name] = ArtifactSubclass.from_dict(json.load(artifact_json))
 
         store = cls()
         store.artifacts = artifacts
@@ -116,16 +117,14 @@ class Store:
         return store  # , stored_config
 
     @staticmethod
-    def construct_store_from_cache(config: "Config") -> "Store":
+    def construct_store_from_cache(config) -> "Store":
         artifacts: Dict[str, Artifact] = {}
         for run_file_name in next(os.walk(path_utils.root_directory))[2]:
-            # TODO only choose run files with same name
             if run_file_name.endswith(".json"):
-                # this is an artifact file, get its config hash
                 run_json = json.load(open(path_utils.root_directory / run_file_name, 'r'))
 
-                for artifact_name, artifact_dict in run_json.items():
-                    artifact_configs = artifact_dict['configs']
+                for artifact_name, artifact_info in run_json.items():
+                    artifact_configs = artifact_info['configs']
 
                     for config_entry in artifact_configs.keys():
                         if config_entry not in config:
@@ -141,7 +140,8 @@ class Store:
                     # artifact is fine and can be loaded
                     module_name, class_name = artifact_name.rsplit('.', 1)
                     ArtifactSubclass = getattr(import_module(module_name), class_name)
-                    artifacts[class_name] = ArtifactSubclass.deserialize(artifact_dict)
-                    log.debug(f"Loaded artifact {artifact_name} from {run_file_name}.")
+                    artifact_dict = json.load(open(path_utils.root_directory / artifact_info['path'], 'r'))
+                    artifacts[class_name] = ArtifactSubclass.from_dict(artifact_dict)
+                    log.debug(f"Loaded artifact {class_name} from {run_file_name}.")
 
         return Store(artifacts=artifacts)
