@@ -69,7 +69,9 @@ class Store:
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
-            assert artifact.is_serialized(config_name)
+            if not artifact.is_serialized(config_name):
+                log.warning(f"store.save(): {artifact_name} is not yet serialized! skipping it")
+                continue
             # artifact_dict = artifact.serialize()
             # log.debug(f"Saving artifact {artifact_name}")
             data[artifact.fully_qualified_name] = {

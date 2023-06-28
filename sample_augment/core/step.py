@@ -12,7 +12,6 @@ from pydantic import BaseModel
 
 from sample_augment.core.artifact import Artifact
 from sample_augment.core.config import EXCLUDED_CONFIG_KEYS
-from sample_augment.utils import log
 
 
 class Step(Callable, BaseModel):
@@ -107,12 +106,13 @@ class StepRegistry:
                         input_configs[name] = param
 
             # add this step's config args plus all consumed artifact's config args to dependencies
-            produced.configs = input_configs
+            if produced:
+                produced.configs = input_configs
 
-            for artifact in input_artifacts:
-                produced.configs.update(artifact.configs)
+                for artifact in input_artifacts:
+                    produced.configs.update(artifact.configs)
 
-            return produced
+                return produced
 
         return wrapper
 

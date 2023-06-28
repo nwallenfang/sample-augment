@@ -6,6 +6,7 @@ from typing import Dict, List
 import numpy as np
 import torch
 import torchvision.models
+from sklearn.metrics import f1_score
 from torch import nn  # All neural network modules
 from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch.utils.data import DataLoader, WeightedRandomSampler  # Gives easier dataset management
@@ -67,6 +68,10 @@ class ClassifierMetrics(Artifact):
     validation_loss: np.ndarray
     train_accuracy: np.ndarray
     validation_accuracy: np.ndarray
+    validation_f1: np.ndarray
+    """the epoch from which the final model state was selected"""
+    # TODO add this
+    # epoch: int
 
 
 # could be moved to a more central location
@@ -116,6 +121,14 @@ def _set_random_seed(random_seed: int):
         torch.backends.cudnn.deterministic = True
 
 
+# Quick sanity check
+# for i in range(10):
+#     img = inverse_normalize(image[i].cpu()).numpy()  # Take the first image of the batch
+#     plt.imshow(img.transpose(1, 2, 0))  # Assuming the image has shape (channels, height, width)
+#     plt.title(f'Label: {label[i]}')
+#     plt.axis('off')
+#     plt.show()
+
 def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
                 learning_rate: float, random_seed: int,
                 balance_classes: bool) -> ClassifierMetrics:
@@ -141,9 +154,12 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
     train_acc_per_epoch = []
     val_acc_per_epoch = []
 
-    best_epoch = -1
     best_val_loss = float("inf")
+    best_f1_score = -float("inf")  # Track best F1 score instead of best loss
     best_model_state = None
+    val_f1_per_epoch = []
+
+    best_epoch = -1
 
     for epoch in range(num_epochs):
         model.train()
@@ -151,19 +167,12 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         val_losses = 0
         train_accuracies = 0
         val_accuracies = 0
+        val_f1s = 0
 
         for batch_idx, (image, label) in enumerate(tqdm(train_loader, file=sys.stdout, desc="Training")):
-            # Get data to cuda if possible
+            # move data to GPU if possible
             image = image.to(device=device)
             label = label.to(device=device)
-
-            # Quick sanity check
-            # for i in range(10):
-            #     img = inverse_normalize(image[i].cpu()).numpy()  # Take the first image of the batch
-            #     plt.imshow(img.transpose(1, 2, 0))  # Assuming the image has shape (channels, height, width)
-            #     plt.title(f'Label: {label[i]}')
-            #     plt.axis('off')
-            #     plt.show()
 
             # forward
             predictions = model(image)  # Pass batch
@@ -171,7 +180,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             train_accuracies += (predictions.argmax(dim=-1) == label).float().mean().item()
 
             # backward
-            optimizer.zero_grad()  #
+            optimizer.zero_grad()
             train_loss.backward()  # Calculate the gradients
 
             # gradient descent or adam step
@@ -186,44 +195,52 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
 
         model.eval()
         for batch_idx, (image, label) in enumerate(val_loader):
-            # Move data to GPU if possible
+            # move data to GPU if possible
             image = image.to(device=device)
             label = label.to(device=device)
 
-            # forward
             with torch.no_grad():
                 predictions = model(image)
 
             val_loss = criterion(predictions, label)
 
-            # store metrics
+            # calculate validation metrics
             val_losses += val_loss.item()
-
             val_accuracies += (predictions.argmax(dim=-1) == label).float().mean().item()
+            val_f1s += f1_score(label.cpu().numpy(),
+                                predictions.argmax(dim=-1).cpu().numpy(), average='macro')
 
         avg_val_loss = val_losses / len(val_loader)
-        if avg_val_loss < best_val_loss:
-            best_epoch = epoch
-            best_val_loss = avg_val_loss
-            best_model_state = model.state_dict()  # Store the state dict of the best model so far
         val_loss_per_epoch.append(avg_val_loss)
         avg_accuracy = val_accuracies / len(val_loader)
         val_acc_per_epoch.append(avg_accuracy)
+        avg_f1 = val_f1s / len(val_loader)
+        val_f1_per_epoch.append(avg_f1)
+
+        if avg_f1 > best_f1_score:
+            best_epoch = epoch
+            best_val_loss = avg_val_loss
+            best_f1_score = avg_f1
+            best_model_state = model.state_dict()  # Store the state dict of the best model so far
 
         log.info(
             f'Epoch [{epoch + 1}/{num_epochs}], '
-            f'Train Loss: {avg_train_loss:.3f}, '
-            f'Val Loss: {avg_val_loss:.3f}, '
-            f'Val Accuracy: {avg_accuracy:.2f}')
+            f'Train Loss: {avg_train_loss:.2f}, '
+            f'Val Loss: {avg_val_loss:.2f}, '
+            f'Val Acc: {avg_accuracy:.2f}, '
+            f'Val F1: {avg_f1:.3f}')
 
-    log.info(f"Classifier training: Best model from epoch {best_epoch} with val_loss = {best_val_loss:.3f}")
+    log.info(f"Classifier training: Best model from epoch {best_epoch} with val_loss = {best_val_loss:.3f} "
+             f"and f1_score = {best_f1_score:.3f}")
+
     # load model state from best performing epoch
     model.load_state_dict(best_model_state)
     return ClassifierMetrics(
         train_loss=np.array(train_loss_per_epoch),
         validation_loss=np.array(val_loss_per_epoch),
         train_accuracy=np.array(train_acc_per_epoch),
-        validation_accuracy=np.array(val_acc_per_epoch)
+        validation_accuracy=np.array(val_acc_per_epoch),
+        validation_f1=np.array(val_f1_per_epoch)
     )
 
 
@@ -320,7 +337,7 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
     splits = stratified_k_fold_split(train_val, n_folds, random_seed, min_instances)
     for i, (train, val) in enumerate(splits.datasets):
         # different random seed when splitting for each fold
-        log.info(f"Training classifier on fold {i+1}")
+        log.info(f"Training classifier on fold {i + 1}")
         fold_random_seed += 1
 
         classifier: TrainedClassifier = train_classifier(TrainSet.from_existing(train, name="train_fold_{i}"),
