@@ -119,6 +119,46 @@ class Store:
         return store  # , stored_config
 
     @staticmethod
+    def _get_cached_artifacts(config) -> Dict[str, Artifact]:
+        artifacts: Dict[str, Artifact] = {}
+        for run_file_name in next(os.walk(path_utils.root_directory))[2]:
+            if run_file_name.endswith(".json"):
+                run_json = json.load(open(path_utils.root_directory / run_file_name, 'r'))
+
+                for artifact_name, artifact_info in run_json.items():
+                    artifact_configs = artifact_info['configs']
+
+                    for config_entry in artifact_configs.keys():
+                        if config_entry not in config:
+                            log.debug(f"skipping artifact type {artifact_name} since config"
+                                      f" {config_entry} is missing")
+                            break
+                        else:
+                            if artifact_configs[config_entry] != getattr(config, config_entry):
+                                log.debug(
+                                    f"skipping artifact {artifact_name} since its config at {config_entry}"
+                                    f"{artifact_configs[config_entry]} != {getattr(config, config_entry)} "
+                                    f"(our config)")
+                                # TODO there's a bug here, in theory this and above should break and not load the
+                                #  artifact. But rn this is the buggy behavior I intend to have so I can more easily
+                                #  load cached artifacts. (it's just the name being different which does only matter
+                                #  for some artifacts. (unsolved problem!)
+                    # artifact is fine and can be loaded
+                    module_name, class_name = artifact_name.rsplit('.', 1)
+                    ArtifactSubclass = getattr(import_module(module_name), class_name)
+                    artifact_dict = json.load(open(path_utils.root_directory / artifact_info['path'], 'r'))
+                    artifacts[class_name] = ArtifactSubclass.from_dict(artifact_dict)
+                    log.debug(f"Loaded artifact {class_name} from {run_file_name}.")
+        return artifacts
+
+    def merge_cached_artifacts_into(self, config):
+        cached_artifacts: Dict[str, Artifact] = Store._get_cached_artifacts(config)
+        for cached_name in cached_artifacts.keys():
+            if cached_name not in self.artifacts:
+                log.debug(f"Adding cached artifact {cached_name} to store.")
+                self.artifacts[cached_name] = cached_artifacts[cached_name]
+
+    @staticmethod
     def construct_store_from_cache(config) -> "Store":
         artifacts: Dict[str, Artifact] = {}
         for run_file_name in next(os.walk(path_utils.root_directory))[2]:

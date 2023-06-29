@@ -1,17 +1,17 @@
 {
-  "name": "aug-01",
+  "name": "aug-02",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 10,
 
-  "learning_rate": 0.001,
+  "learning_rate": 0.0004,
   "num_epochs": 25,
   "batch_size": 32,
   "balance_classes": true,
   "n_folds": 10,
   "data_augment": true,
-  "color_jitter": 0.50,
+  "color_jitter": 0.25,
   "h_flip_p": 0.5,
   "v_flip_p": 0.5
 }

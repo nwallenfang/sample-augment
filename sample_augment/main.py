@@ -29,8 +29,7 @@ def main(arg_config: Path = None):
 
     # create Experiment instance
     experiment = Experiment(config)
-    # TODO re-add dry run
-    # experiment.dry_run()
+
     # TODO providing additional artifacts doesn't change the run identifier so this could bring issues
     # evaluate_k_classifiers, k_fold_plot_loss_over_epochs, imagefolder_to_tensors, k_fold_train_classifier
     experiment.run("k_fold_plot_loss_over_epochs")

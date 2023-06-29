@@ -5,7 +5,6 @@ from pathlib import Path
 from pprint import pprint
 from typing import Dict
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -23,6 +22,7 @@ from sample_augment.data.train_test_split import stratified_split, stratified_k_
     FoldDatasets
 from sample_augment.models.train_classifier import TrainedClassifier, CustomDenseNet, KFoldTrainedClassifiers
 from sample_augment.utils import log
+from sample_augment.utils.plot import prepare_latex_plot
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
 _std = torch.tensor([0.229, 0.224, 0.225])
@@ -208,7 +208,7 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
     macro_precision = np.mean([metric_stats[class_name]['precision'][0] for class_name in classes])
     macro_recall = np.mean([metric_stats[class_name]['recall'][0] for class_name in classes])
     macro_f1 = np.mean([metric_stats[class_name]['f1-score'][0] for class_name in classes])
-    macro_f1_std = np.std(np.mean([metric_stats[class_name]['f1-score'][0] for class_name in classes]))
+    macro_f1_std = np.std([metric_stats[class_name]['f1-score'][0] for class_name in classes])
 
     total_support = np.sum([metric_stats[class_name]['support'][0] for class_name in classes])
     weights = [metric_stats[class_name]['support'][0] / total_support for class_name in classes]
@@ -269,31 +269,24 @@ def k_fold_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_di
     # Number of epochs
     epochs = range(1, len(train_mean) + 1)
 
-    # Set the font to be serif, rather than sans
-    matplotlib.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
-    # Use LaTeX to handle all text layout
-    matplotlib.rc('text', usetex=True)
-    # Ensure that matplotlib's LaTeX output matches the LaTeX document
-    matplotlib.rc('figure', dpi=200)
-    matplotlib.rcParams.update({'font.size': 14})
-
+    prepare_latex_plot()
     # Create the plot
     plt.figure(figsize=(10, 7))
     x_ticks = np.arange(1, max(epochs) + 1, 5)
     x_ticks = np.insert(x_ticks, 1, 1)  # Insert 1 at the beginning
     # Training and validation loss for each classifier in light color
     for i in range(train_losses.shape[0]):
-        plt.plot(epochs, train_losses[i], color='blue', alpha=0.1)
-        plt.plot(epochs, validation_losses[i], color='red', alpha=0.1)
+        plt.plot(epochs, train_losses[i], color='orange', alpha=0.1)
+        plt.plot(epochs, validation_losses[i], color='blue', alpha=0.1)
 
     # Average training loss
-    plt.plot(epochs, train_mean, label='Mean Training Loss', color='blue', linewidth=2)
-    plt.fill_between(epochs, train_mean - train_std, train_mean + train_std, color='blue', alpha=0.2)
+    plt.plot(epochs, train_mean, label='Mean Training Loss', color='orange', linewidth=2)
+    plt.fill_between(epochs, train_mean - train_std, train_mean + train_std, color='orange', alpha=0.15)
 
     # Average validation loss
-    plt.plot(epochs, validation_mean, label='Mean Validation Loss', color='red', linewidth=2)
-    plt.fill_between(epochs, validation_mean - validation_std, validation_mean + validation_std, color='red',
-                     alpha=0.2)
+    plt.plot(epochs, validation_mean, label='Mean Validation Loss', color='blue', linewidth=2)
+    plt.fill_between(epochs, validation_mean - validation_std, validation_mean + validation_std, color='blue',
+                     alpha=0.15)
 
     # Labels, title and legend
     # plt.title('Average Cross-Entropy Loss per Epoch with Standard Deviation')
@@ -305,7 +298,10 @@ def k_fold_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_di
     y_ticks, _ = plt.yticks()
     y_ticks = y_ticks[1:]
     plt.yticks(y_ticks)
+    plt.xticks(x_ticks)
 
+    # dirty nested f-string - because I can
+    log.info(f"Saving KFold-Losses plot to {shared_directory / f'kfold_losses_{name}.pdf'}")
     plt.savefig(shared_directory / f"kfold_losses_{name}.pdf", bbox_inches='tight', format='pdf')
 
 

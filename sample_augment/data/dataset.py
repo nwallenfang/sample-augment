@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import List, Tuple, Union, Optional, Callable
+from typing import List, Tuple, Union
 
 import numpy as np
 import torch

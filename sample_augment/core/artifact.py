@@ -172,6 +172,10 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
     def is_serialized(self, name: str):
         self.configs['name'] = name
+        if self.complete_path.exists():
+            return True
+        # TODO check other Artifacts if they have the same config.
+        #   then it's serialized as well
         return self.complete_path.exists()
 
     @property

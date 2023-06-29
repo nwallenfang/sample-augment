@@ -31,12 +31,12 @@ class Experiment:
             store_file_path = root_directory / f"{config.name}_{config.run_identifier}.json"
             if store_file_path.exists() and self.load_store:
                 self.store = Store.load_from(store_file_path)
+                self.store.merge_cached_artifacts_into(config)
                 log.info(f"Continuing with store : {store_file_path.name}")
             else:
+                # can maybe be replace by merge_cached_artifacts_into() as well
                 self.store = Store.construct_store_from_cache(config)
         else:
-            # when providing an existing store, save a snapshot of the initial artifacts.
-            # when saving this store later, only add the new artifacts
             self.store = store
             # self.initial_artifacts = set(store.artifacts)
         log.info(f"Experiment initialized with artifacts: {[a for a in self.store.artifacts]}")
