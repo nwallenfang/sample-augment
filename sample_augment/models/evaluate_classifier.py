@@ -15,13 +15,14 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
 from tqdm import tqdm
 
+from sample_augment import utils
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.gc10.read_labels import GC10Labels
 from sample_augment.data.train_test_split import stratified_split, stratified_k_fold_split, ValSet, \
     FoldDatasets
 from sample_augment.models.train_classifier import TrainedClassifier, CustomDenseNet, KFoldTrainedClassifiers
-from sample_augment.utils import log
+from sample_augment.utils import log, plot
 from sample_augment.utils.plot import prepare_latex_plot
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
@@ -194,6 +195,7 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
 
     # Create a pandas DataFrame to display the results in a tabular format
     df = pd.DataFrame(columns=['Class', 'Precision', 'Recall', 'F1-Score', 'Support'])
+    total_support = 0
     for class_name, stats in metric_stats.items():
         df_temp = pd.DataFrame({
             'Class': [class_name],
@@ -202,33 +204,33 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
             'F1-Score': [f"{stats['f1-score'][0]:.2f} ± {stats['f1-score'][1]:.2f}"],
             'Support': [f"{int(stats['support'][0])}"]
         })
+        total_support += int(stats['support'][0])
 
         df = pd.concat([df, df_temp], ignore_index=True)
 
-    macro_precision = np.mean([metric_stats[class_name]['precision'][0] for class_name in classes])
-    macro_recall = np.mean([metric_stats[class_name]['recall'][0] for class_name in classes])
-    macro_f1 = np.mean([metric_stats[class_name]['f1-score'][0] for class_name in classes])
-    macro_f1_std = np.std([metric_stats[class_name]['f1-score'][0] for class_name in classes])
+    macro_precision = np.mean([metric['macro avg']['precision'] for metric in metrics])
+    macro_precision_std = np.std([metric['macro avg']['precision'] for metric in metrics])
+    macro_recall = np.mean([metric['macro avg']['recall'] for metric in metrics])
+    macro_recall_std = np.std([metric['macro avg']['recall'] for metric in metrics])
+    macro_f1 = np.mean([metric['macro avg']['f1-score'] for metric in metrics])
+    macro_f1_std = np.std([metric['macro avg']['f1-score'] for metric in metrics])
 
-    total_support = np.sum([metric_stats[class_name]['support'][0] for class_name in classes])
-    weights = [metric_stats[class_name]['support'][0] / total_support for class_name in classes]
-
-    weighted_precision = np.average([metric_stats[class_name]['precision'][0] for class_name in classes],
-                                    weights=weights)
-    weighted_recall = np.average([metric_stats[class_name]['recall'][0] for class_name in classes],
-                                 weights=weights)
-    weighted_f1 = np.average([metric_stats[class_name]['f1-score'][0] for class_name in classes],
-                             weights=weights)
+    weighted_precision = np.mean([metric['weighted avg']['precision'] for metric in metrics])
+    weighted_precision_std = np.std([metric['weighted avg']['precision'] for metric in metrics])
+    weighted_recall = np.mean([metric['weighted avg']['recall'] for metric in metrics])
+    weighted_recall_std = np.std([metric['weighted avg']['recall'] for metric in metrics])
+    weighted_f1 = np.mean([metric['weighted avg']['f1-score'] for metric in metrics])
+    weighted_f1_std = np.std([metric['weighted avg']['f1-score'] for metric in metrics])
 
     # add to dataframe
     df = pd.concat([
         df,
         pd.DataFrame({
             'Class': ['Macro average'],
-            'Precision': [f"{macro_precision:.2f}"],
-            'Recall': [f"{macro_recall:.2f}"],
+            'Precision': [f"{macro_precision:.2f} ± {macro_precision_std:.2f}"],
+            'Recall': [f"{macro_recall:.2f} ± {macro_recall_std:.2f}"],
             'F1-Score': [f"{macro_f1:.2f} ± {macro_f1_std:.2f}"],
-            'Support': ['N/A']
+            'Support': [total_support]
         })
     ], ignore_index=True)
 
@@ -236,10 +238,10 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
         df,
         pd.DataFrame({
             'Class': ['Weighted average'],
-            'Precision': [f"{weighted_precision:.2f}"],
-            'Recall': [f"{weighted_recall:.2f}"],
-            'F1-Score': [f"{weighted_f1:.2f}"],
-            'Support': ['N/A']
+            'Precision': [f"{weighted_precision:.2f} ± {weighted_precision_std:.2f}"],
+            'Recall': [f"{weighted_recall:.2f} ± {weighted_recall_std:.2f}"],
+            'F1-Score': [f"{weighted_f1:.2f} ± {weighted_f1_std:.2f}"],
+            'Support': [total_support]
         })
     ], ignore_index=True)
     print(df)
@@ -271,17 +273,18 @@ def k_fold_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_di
 
     prepare_latex_plot()
     # Create the plot
-    plt.figure(figsize=(10, 7))
+    plt.figure(figsize=(utils.plot.text_width, 7.0/10.0 * utils.plot.text_width))
     x_ticks = np.arange(1, max(epochs) + 1, 5)
+    x_ticks = x_ticks - 1
     x_ticks = np.insert(x_ticks, 1, 1)  # Insert 1 at the beginning
     # Training and validation loss for each classifier in light color
     for i in range(train_losses.shape[0]):
-        plt.plot(epochs, train_losses[i], color='orange', alpha=0.1)
+        plt.plot(epochs, train_losses[i], color='orange', alpha=0.15)
         plt.plot(epochs, validation_losses[i], color='blue', alpha=0.1)
 
     # Average training loss
     plt.plot(epochs, train_mean, label='Mean Training Loss', color='orange', linewidth=2)
-    plt.fill_between(epochs, train_mean - train_std, train_mean + train_std, color='orange', alpha=0.15)
+    plt.fill_between(epochs, train_mean - train_std, train_mean + train_std, color='orange', alpha=0.25)
 
     # Average validation loss
     plt.plot(epochs, validation_mean, label='Mean Validation Loss', color='blue', linewidth=2)
@@ -301,8 +304,11 @@ def k_fold_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_di
     plt.xticks(x_ticks)
 
     # dirty nested f-string - because I can
-    log.info(f"Saving KFold-Losses plot to {shared_directory / f'kfold_losses_{name}.pdf'}")
-    plt.savefig(shared_directory / f"kfold_losses_{name}.pdf", bbox_inches='tight', format='pdf')
+    log.info(f"Saving KFold-Losses plot to {shared_directory / f'kfold_losses_{name}.pgf'}")
+    plt.tight_layout()
+
+    plt.savefig(shared_directory / f"kfold_losses_{name}.pgf", bbox_inches='tight', backend="pgf")
+    plt.savefig(shared_directory / f"kfold_losses_{name}.pdf", bbox_inches='tight', backend="pgf")
 
 
 def show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data):
