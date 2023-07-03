@@ -20,7 +20,7 @@ def train_stylegan():
         'data': r"H:\thesis\sampling_aug\data\interim\gc10_train.pt",
         # 'custom_name' 'gc10_pre_FFHQ'
         'gpus': 2,
-        'snap': None,
+        'snap': None,  # snapshot interval (default 50)
         'metrics': None,
         'seed': 16,  # remember to change this when running the experiment a second time ;)
         'cond': True,
@@ -38,7 +38,7 @@ def train_stylegan():
         # "E:\\Master_Thesis_Nils\\stylegan-training\\00009-gc10_pre_FFHQ-cond-mirror-auto2-kimg5000"
         #      "-resumecelebahq256\\network-snapshot-000200.pkl",
         # 'celebahq256', # 'ffhq256',  # checkpoint for transfer learning / resuming interrupted run
-        'freezed': 3,  # int, 'Freeze-D', 'freeze the highest-resolution layers of the discriminator
+        'freezed': 0,  # int, 'Freeze-D', 'freeze the highest-resolution layers of the discriminator
                        # during transfer'
         'fp32': None,
         'nhwc': None,
