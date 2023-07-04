@@ -40,7 +40,6 @@ def get_logger(name: str, level):
     #     for handler in root_logger.handlers[:]:
     #         root_logger.removeHandler(handler)
 
-
     module_logger = logging.getLogger(name)
     module_logger.setLevel(level)
     module_logger.propagate = False  # Prevent this logger from passing messages to its parent

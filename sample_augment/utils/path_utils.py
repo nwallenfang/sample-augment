@@ -29,7 +29,12 @@ def _read_root_diretory() -> Path:  # read root_dir and experiment name from env
 
     # else there needs to be an env file containing the path
     env_path = project_root / '.env'
-    assert env_path.is_file(), "expecting .env file in project root with ROOT_DIR variable"
+    if not env_path.is_file():
+        log.warning("Expected .env file in project root with ROOT_DIRECTORY variable. Please provide the file or set "
+                    "it manually with os.environ['ROOT_DIRECTORY']")
+
+        assert env_path.is_file(), "Expected .env file in project root with ROOT_DIRECTORY variable. " \
+                                   "Please provide the file or set it manually with os.environ['ROOT_DIRECTORY']"
     with open(env_path, 'r') as env_file:
         for line in env_file:
             line = line.strip()

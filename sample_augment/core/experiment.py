@@ -132,5 +132,6 @@ class Experiment:
         self.store.save(self.config.name, identifier)
 
         # for now: don't save config file, all the config entries are part of the store file
-        # with open(root_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
-        #     config_f.write(self.config.json(indent=4))
+        config_directory = root_directory / "shared" / "configs"
+        with open(config_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
+            config_f.write(self.config.json(indent=4))

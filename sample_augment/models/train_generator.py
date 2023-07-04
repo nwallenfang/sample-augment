@@ -9,13 +9,13 @@ import torch
 # sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\')
 # sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\models\\stylegan2\\')
 
-import sample_augment.models.stylegan2.dnnlib as dnnlib
-from sample_augment.models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn
-
 
 def train_stylegan():
+    import sample_augment.models.stylegan2.dnnlib as dnnlib
+    from sample_augment.models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn
     out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
 
+    # TODO how to configure learning rate?
     config_kwargs = {
         'data': r"H:\thesis\sampling_aug\data\interim\gc10_train.pt",
         # 'custom_name' 'gc10_pre_FFHQ'

@@ -74,23 +74,6 @@ class ClassifierMetrics(Artifact):
     # epoch: int
 
 
-# could be moved to a more central location
-# def preprocess(dataset: AugmentDataset) -> AugmentDataset:
-#     data = dataset.tensors[0]
-#     assert data.dtype == torch.uint8, f"preprocess() expected imgs to be uint8, got {data.dtype}"
-#
-#     # convert to float32
-#     data = data.float()
-#     data /= 255.0
-#
-#     # ImageNet normalization factors
-#     # convert labels to expected Long dtype as well
-#     # we're modifying the dataset here.
-#     dataset.tensors = (normalize(data), dataset.tensors[1].long())
-#
-#     return dataset
-
-
 def create_weighted_random_sampler(dataset: Dataset):
     # create a weighted sampler that oversamples smaller classes to make each class
     # appear at the same frequency
@@ -260,12 +243,38 @@ plain_transforms = transforms.Compose([
 ])
 
 
+class WithProbability:
+    """
+        call a transform with a certain probability, else do nothing
+    """
+    def __init__(self, transform, p=0.5):
+        self.transform = transform
+        self.probability = p
+
+    def __call__(self, x):
+        if torch.rand(1).item() < self.probability:
+            x = self.transform(x)
+        return x
+
+
+class CircularTranslate:
+    def __init__(self, shift_range):
+        self.shift_range = shift_range
+
+    def __call__(self, img):
+        shift_x = random.randint(-self.shift_range, self.shift_range)
+        shift_y = random.randint(-self.shift_range, self.shift_range)
+        img = torch.roll(img, shifts=(shift_y, shift_x), dims=(1, 2))  # Shift along height and width dimensions
+        return img
+
+
 @step
 def train_classifier(train_data: TrainSet, val_data: ValSet,
                      num_epochs: int, batch_size: int, learning_rate: float,
                      balance_classes: bool,
                      random_seed: int,
                      data_augment: bool,
+                     geometric_augment: bool,
                      color_jitter: float,
                      h_flip_p: float,
                      v_flip_p: float) -> TrainedClassifier:
@@ -283,25 +292,30 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
     val_data = deepcopy(val_data)
 
     if data_augment:
-        augment_transforms = transforms.Compose([
+        base_transforms = [
             transforms.ConvertImageDtype(dtype=torch.float32),
             transforms.RandomVerticalFlip(p=v_flip_p),
             transforms.RandomHorizontalFlip(p=h_flip_p),
-            # transforms.RandomRotation(180),  # would rotate randomly from within (-180, 180),
-            # which is not what we want
-            transforms.ColorJitter(brightness=color_jitter, contrast=color_jitter,
-                                   saturation=color_jitter),
-            normalize
-        ])
+            transforms.ColorJitter(brightness=color_jitter, contrast=color_jitter, saturation=color_jitter),
+            normalize,
+        ]
+        geometric_transforms = [
+            # antialias argument needed for newer versions of torchvision
+            WithProbability(transform=CircularTranslate(shift_range=40), p=0.5),
+            # WithProbability(transform=transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)), p=0.5),
+            WithProbability(transform=transforms.RandomResizedCrop(256, scale=(0.85, 1.0), antialias=True), p=0.5),
+        ]
+        if geometric_augment:
+            # add geometric transforms to base_transforms (before ColorJitter)
+            base_transforms[2:2] = geometric_transforms
+
+        augment_transforms = transforms.Compose(base_transforms)
+
         train_data.transform = augment_transforms
         val_data.transform = plain_transforms
     else:
         train_data.transform = plain_transforms
         val_data.transform = plain_transforms
-
-    # preprocess / normalize AFTER augmentation transforms
-    # train_data = typing.cast(TrainSet, preprocess(deepcopy(train_data)))
-    # val_data = typing.cast(ValSet, preprocess(deepcopy(val_data)))
 
     metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
                           batch_size=batch_size, learning_rate=learning_rate,
@@ -327,6 +341,7 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                             learning_rate: float,
                             balance_classes: bool,
                             data_augment: bool,
+                            geometric_augment: bool,
                             color_jitter: float,
                             h_flip_p: float,
                             v_flip_p: float
@@ -344,7 +359,7 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                                                          ValSet.from_existing(val, name="val_fold_{i}"),
                                                          num_epochs, batch_size, learning_rate,
                                                          balance_classes, fold_random_seed, data_augment,
-                                                         color_jitter, h_flip_p, v_flip_p)
+                                                         geometric_augment, color_jitter, h_flip_p, v_flip_p)
         classifiers.append(classifier)
 
     return KFoldTrainedClassifiers(classifiers=classifiers)

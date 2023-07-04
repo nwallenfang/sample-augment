@@ -69,6 +69,9 @@ class Store:
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
+            if artifact is None:
+                # FIXME shouldn't be needed
+                continue
             if not artifact.is_serialized(config_name):
                 log.warning(f"store.save(): {artifact_name} is not yet serialized! skipping it")
                 continue

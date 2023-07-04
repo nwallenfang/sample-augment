@@ -3,7 +3,7 @@ from abc import abstractmethod, ABC
 from copy import deepcopy
 from pathlib import Path
 from pprint import pprint
-from typing import Dict
+from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -129,13 +129,13 @@ def predict_validation_set(classifier: TrainedClassifier, validation_set: ValSet
     return ValidationPredictions(predictions=predictions)
 
 
-class ClassificationF1Report(Artifact):
+class ClassificationReport(Artifact):
     report: Dict
 
 
 @step
 def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSet,
-                        gc10_labels: GC10Labels):
+                        gc10_labels: GC10Labels) -> ClassificationReport:
     # quickfix since the artifacts are not properly guarded from being mutated yet (TODO)
     val_set = preprocess(deepcopy(val_set))
     predictions = val_pred_artifact.predictions
@@ -156,7 +156,11 @@ def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSe
                                         zero_division=0, output_dict=False)
     log.info("\n" + report_text)
 
-    return ClassificationF1Report(report=report)
+    return ClassificationReport(report=report)
+
+
+class KFoldClassificationReport(Artifact):
+    reports: List[ClassificationReport]
 
 
 @step
@@ -169,15 +173,17 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
                            n_folds: int,
                            shared_directory: Path,
                            name: str
-                           ):
+                           ) -> KFoldClassificationReport:
     # quick and dirty: for getting the splits these were trained on, take the same code
     train_val, _test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
     splits: FoldDatasets = stratified_k_fold_split(train_val, n_folds, random_seed, min_instances)
 
     metrics = []
+    reports = []
     for classifier, (_train, val) in zip(classifiers.classifiers, splits.datasets):
         predictions: ValidationPredictions = predict_validation_set(classifier, ValSet.from_existing(val), 32)
-        report = evaluate_classifier(predictions, ValSet.from_existing(val), gc10_labels)
+        report: ClassificationReport = evaluate_classifier(predictions, ValSet.from_existing(val), gc10_labels)
+        reports.append(report)
         metrics.append(report.report)
 
     # Compute the mean and standard deviation for each metric
@@ -246,7 +252,9 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
     ], ignore_index=True)
     print(df)
 
-    df.to_csv(shared_directory / f'classifier_evaluation_{name}.csv', index=False)
+    df.to_csv(shared_directory / f'classifier_report_{name}.csv', index=False)
+
+    return KFoldClassificationReport(reports=reports)
 
 
 @step
@@ -273,7 +281,7 @@ def k_fold_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_di
 
     prepare_latex_plot()
     # Create the plot
-    plt.figure(figsize=(utils.plot.text_width, 7.0/10.0 * utils.plot.text_width))
+    plt.figure(figsize=(utils.plot.text_width, 7.0 / 10.0 * utils.plot.text_width))
     x_ticks = np.arange(1, max(epochs) + 1, 5)
     x_ticks = x_ticks - 1
     x_ticks = np.insert(x_ticks, 1, 1)  # Insert 1 at the beginning

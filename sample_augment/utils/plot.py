@@ -48,5 +48,5 @@ def prepare_latex_plot(width=text_width, height=text_height):
     #     "ytick.labelsize": 12,
     #     "pgf.preamble": r"\usepackage[utf8x]{inputenc} \usepackage[T1]{fontenc}"
     # })
-    plt.gcf().set_size_inches(text_width, text_height)
-    plt.tight_layout()
+    # plt.gcf().set_size_inches(text_width, text_height)
+    # plt.tight_layout()
