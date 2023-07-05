@@ -2,8 +2,10 @@ import json
 import os
 import re
 import tempfile
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 import torch
+
 
 # import sys
 # sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\')
@@ -13,9 +15,10 @@ def create_train_val_pt():
     # this only runs on python 3.10
     from sample_augment.data.dataset import AugmentDataset
     from sample_augment.utils import path_utils
-    from sample_augment.data.train_test_split import TrainTestValBundle, create_train_test_val
+    from sample_augment.data.train_test_split import create_train_test_val
     random_seed = 100
-    complete_dataset = AugmentDataset.from_dict(json.load(open(path_utils.root_directory / 'AugmentDataset/dataset_f00581.json')))
+    complete_dataset = AugmentDataset.from_dict(
+        json.load(open(path_utils.root_directory / 'AugmentDataset/dataset_f00581.json')))
     # do a train val split for now and train StyleGAN. If we're noticing that we're 
     # lacking data (or towards the end before testing), we can train it on combined train and val set
     bundle = create_train_test_val(complete_dataset, random_seed, test_ratio=0.2, val_ratio=0.1, min_instances=10)
@@ -23,7 +26,7 @@ def create_train_val_pt():
     # save the two tensors stacked to one pt file
     torch.save(train.tensors, path_utils.root_directory / 'stylegan_train_data.pt')
 
-# TODO tweak learning rate
+
 # TODO calculate improved precision and recall metrics
 
 def train_stylegan():
@@ -35,14 +38,14 @@ def train_stylegan():
     config_kwargs = {
         'data': r"E:\Master_Thesis_Nils\data\stylegan_train_data.pt",
         # 'custom_name' 'gc10_pre_FFHQ'
-        'gpus': 2,
+        'gpus': 1,
         'snap': None,  # snapshot interval (default 50)
         'metrics': None,
         'seed': 16,  # remember to change this when running the experiment a second time ;)
         'cond': True,
         'subset': None,
         'mirror': True,  # checked each class and x-flip can be done semantically for GC10
-        'cfg': None,
+        'cfg': 'config-gc10',
         'gamma': None,  # tune this parameter with values such as 0.1, 0.5, 1, 5, 10
         'kimg': 5000,
         'batch': None,
@@ -55,7 +58,7 @@ def train_stylegan():
         #      "-resumecelebahq256\\network-snapshot-000200.pkl",
         # 'celebahq256', # 'ffhq256',  # checkpoint for transfer learning / resuming interrupted run
         'freezed': 0,  # int, 'Freeze-D', 'freeze the highest-resolution layers of the discriminator
-                       # during transfer'
+        # during transfer'
         'fp32': None,
         'nhwc': None,
         'nobench': None,
@@ -115,6 +118,7 @@ def train_stylegan():
     torch.multiprocessing.set_start_method('spawn')
     with tempfile.TemporaryDirectory() as temp_dir:
         if args.num_gpus == 1:
+            # set GPU index depending on which one is free
             subprocess_fn(rank=0, args=args, temp_dir=temp_dir)
         else:
             torch.multiprocessing.spawn(fn=subprocess_fn, args=(args, temp_dir), nprocs=args.num_gpus)
