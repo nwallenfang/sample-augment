@@ -4,11 +4,27 @@ import re
 import tempfile
 
 import torch
-# import sys
 
+# import sys
 # sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\')
 # sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\models\\stylegan2\\')
 
+def create_train_val_pt():
+    # this only runs on python 3.10
+    from sample_augment.data.dataset import AugmentDataset
+    from sample_augment.utils import path_utils
+    from sample_augment.data.train_test_split import TrainTestValBundle, create_train_test_val
+    random_seed = 100
+    complete_dataset = AugmentDataset.from_dict(json.load(open(path_utils.root_directory / 'AugmentDataset/dataset_f00581.json')))
+    # do a train val split for now and train StyleGAN. If we're noticing that we're 
+    # lacking data (or towards the end before testing), we can train it on combined train and val set
+    bundle = create_train_test_val(complete_dataset, random_seed, test_ratio=0.2, val_ratio=0.1, min_instances=10)
+    train = bundle.train
+    # save the two tensors stacked to one pt file
+    torch.save(train.tensors, path_utils.root_directory / 'stylegan_train_data.pt')
+
+# TODO tweak learning rate
+# TODO calculate improved precision and recall metrics
 
 def train_stylegan():
     import sample_augment.models.stylegan2.dnnlib as dnnlib
@@ -17,7 +33,7 @@ def train_stylegan():
 
     # TODO how to configure learning rate?
     config_kwargs = {
-        'data': r"H:\thesis\sampling_aug\data\interim\gc10_train.pt",
+        'data': r"E:\Master_Thesis_Nils\data\stylegan_train_data.pt",
         # 'custom_name' 'gc10_pre_FFHQ'
         'gpus': 2,
         'snap': None,  # snapshot interval (default 50)
@@ -108,4 +124,5 @@ def train_stylegan():
 
 if __name__ == "__main__":
     # main()  # pylint: disable=no-value-for-parameter
+    # create_train_val_pt()
     train_stylegan()

@@ -127,9 +127,12 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                 module_name, class_name = value['class'].rsplit('.', 1)
                 ModelClass = getattr(import_module(module_name), class_name)
                 model = ModelClass(**value['kwargs'])
-                model.load_state_dict(
-                    torch.load(field_path,
-                               map_location=torch.device('cpu')))
+                if field_path.is_file():
+                    model.load_state_dict(
+                        torch.load(field_path,
+                                   map_location=torch.device('cpu')))
+                else:
+                    log.warning(f"Missing model {class_name} at {field_path}")
                 model.eval()
                 return model
             elif value['type'] == 'numpy.ndarray':
@@ -181,7 +184,10 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
     @property
     def complete_path(self):
         artifact_dir = path_utils.root_directory / self.__class__.__name__
-        return artifact_dir / f"{self.configs['name']}_{self.config_hash}.json"
+        if 'name' in self.configs:
+            return artifact_dir / f"{self.configs['name']}_{self.config_hash}.json"
+        else:
+            return artifact_dir / f"noname_{self.config_hash}.json"
 
     def to_dict(self, extra_configs: Dict = None) -> Dict:
         if extra_configs is None:

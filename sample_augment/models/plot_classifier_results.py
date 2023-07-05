@@ -2,7 +2,6 @@
 Have different configs/scenarios/runs with results that we want to compare
 """
 import json
-from pathlib import Path
 from typing import List, Dict
 
 import numpy as np
@@ -17,6 +16,7 @@ from sample_augment.data.dataset import AugmentDataset
 from sample_augment.models.evaluate_classifier import KFoldClassificationReport
 from sample_augment.models.train_classifier import WithProbability, CircularTranslate, KFoldTrainedClassifiers, \
     ClassifierMetrics
+from sample_augment.utils.path_utils import root_directory
 from sample_augment.utils.plot import prepare_latex_plot
 import seaborn as sns
 
@@ -64,17 +64,16 @@ def visualize_data_augmentation(train_data: AugmentDataset):
     plt.show()
 
 
-# TODO get KFoldEvaluation for each experiment (can I import it with pands from csv?) (will need it for class F1)
 def average_f1_per_fold():
     """
         create a plot showing the average best F1 per fold, maybe some folds are easier than others
     """
-    figure_directory = Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\shared\classifier_plots")
+    figure_directory = root_directory / "shared/classifier_plots"
     kfold_classifier_files = [
-        r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\KFoldTrainedClassifiers\aug-01_ecc814.json",
-        r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\KFoldTrainedClassifiers\aug-02_f0d3f1.json",
-        r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\KFoldTrainedClassifiers\aug-06-geometric-rework_feaf2f.json",
-        r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\KFoldTrainedClassifiers\noaug-04_7d609e.json",
+        root_directory / "KFoldTrainedClassifiers/aug-01_ecc814.json",
+        root_directory / "KFoldTrainedClassifiers/aug-02_f0d3f1.json",
+        root_directory / "KFoldTrainedClassifiers/aug-06-geometric-rework_feaf2f.json",
+        root_directory / "KFoldTrainedClassifiers/noaug-04_7d609e.json",
     ]
     run_name_overrides = {
         "aug-02": "higher-p ColorJitter"
@@ -107,33 +106,34 @@ def average_f1_per_fold():
 
     folds_index = np.array(range(1, 11))
 
+    # Calculate average F1 score for each fold and sort folds accordingly
+    avg_f1_scores_per_fold = np.median(f1_scores, axis=0)
+    sorted_fold_indices = np.argsort(avg_f1_scores_per_fold)
+    f1_scores = f1_scores[:, sorted_fold_indices]
+
     prepare_latex_plot()
     plt.figure(figsize=(5, 3))
     for idx, classifier_name in enumerate(classifier_metrics.keys()):
         plt.plot(folds_index, f1_scores[idx, :], marker='o', linestyle='-', label=classifier_name)
 
-    plt.xlabel('Fold')
-    plt.ylabel('Macro average F1 Score')
+    plt.xlabel('Folds ordered by Median F1 Score')
+    plt.ylabel('Macro Average F1 Score')
     plt.legend()
     plt.grid(True)
     plt.xticks(folds_index)
+
     plt.subplots_adjust(left=0.1, bottom=0.15)  # Adjust left and bottom padding
     plt.tight_layout()
     plt.savefig(figure_directory / "f1_over_folds.pdf", bbox_inches="tight")
 
 
-def kfold_evaluate_manually():
-    # TODO do it quick and dirty
-    pass
-
-
 def class_performance_boxplot():
     k = 10  # number of folds
-    figure_directory = Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\shared\classifier_plots")
+    figure_directory = root_directory / "/shared/classifier_plots"
     kfold_report_files = [
-        r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\KFoldClassificationReport\aug-06-geometric-rework_feaf2f.json",
-        r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\KFoldClassificationReport\noaug-04_22da73.json",
-        r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\KFoldClassificationReport\aug-04_f260d1.json"
+        root_directory / "KFoldClassificationReport/aug-06-geometric-rework_feaf2f.json",
+        root_directory / "KFoldClassificationReport/noaug-04_22da73.json",
+        root_directory / "KFoldClassificationReport/aug-04_f260d1.json"
     ]
     report_names = [
         "aug-06",
@@ -146,7 +146,7 @@ def class_performance_boxplot():
     class_precisions = np.empty((len(kfold_report_files), k))
     class_recalls = np.empty((len(kfold_report_files), k))
     class_f1s = np.empty((len(kfold_report_files), k))
-    support = -1
+    _support = -1
 
     for idx_file, report_file in enumerate(kfold_report_files):
         reports = KFoldClassificationReport.from_dict(json.load(open(report_file)))
@@ -155,7 +155,7 @@ def class_performance_boxplot():
             class_precisions[idx_file, idx_fold] = report.report[class_name]['precision']
             class_recalls[idx_file, idx_fold] = report.report[class_name]['recall']
             class_f1s[idx_file, idx_fold] = report.report[class_name]['f1-score']
-            support = report.report[class_name]['support']
+            _support = report.report[class_name]['support']
 
     prepare_latex_plot()
 
@@ -181,6 +181,7 @@ def class_performance_boxplot():
     # plt.yticks([i for i in range(support+1)])
     ax1.set_xlabel('')
     plt.xticks(range(0, len(kfold_report_files)), report_names)
+    plt.grid(True)
 
     ax2 = plt.subplot(1, 2, 2)
 
@@ -190,7 +191,7 @@ def class_performance_boxplot():
     ax2.set_ylim(-0.05, 1.05)
     ax2.set_xlabel('')
     plt.xticks(range(0, len(kfold_report_files)), report_names)
-
+    plt.grid(True)
     plt.tight_layout()
     plt.savefig(figure_directory / "boxplot.pdf", bbox_inches="tight")
 
@@ -205,8 +206,8 @@ def main():
     """
         CLI for running experiments concerning
     """
-    # average_f1_per_fold()
-    class_performance_boxplot()
+    average_f1_per_fold()
+    # class_performance_boxplot()
     # dataset = AugmentDataset.from_dict(
     #     json.load(open(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\AugmentDataset\dataset_f00581.json")))
     # visualize_data_augmentation(dataset)

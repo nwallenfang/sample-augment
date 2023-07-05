@@ -43,8 +43,8 @@ def _read_root_diretory() -> Path:  # read root_dir and experiment name from env
 
             key, value = line.split("=", 1)
 
-            assert key == 'ROOT_DIRECTORY'
-            _root_directory = Path(value)
+            assert key.strip() == 'ROOT_DIRECTORY', f'key is {key}, was expecting ROOT_DIRECTORY'
+            _root_directory = Path(value.strip())
             if not _root_directory.is_dir():
                 _root_directory = project_root / "data"
                 assert _root_directory.is_dir()
