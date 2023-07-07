@@ -1,6 +1,7 @@
+import inspect
 import sys
 from abc import abstractmethod, ABC
-from copy import deepcopy
+from copy import deepcopy, copy
 from pathlib import Path
 from pprint import pprint
 from typing import Dict, List
@@ -9,10 +10,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch.cuda
+import torchvision
 from sklearn.metrics import ConfusionMatrixDisplay, classification_report
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
+import torchvision.transforms as transforms
 from tqdm import tqdm
 
 from sample_augment import utils
@@ -21,7 +24,8 @@ from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.gc10.read_labels import GC10Labels
 from sample_augment.data.train_test_split import stratified_split, stratified_k_fold_split, ValSet, \
     FoldDatasets
-from sample_augment.models.train_classifier import TrainedClassifier, CustomDenseNet, KFoldTrainedClassifiers
+from sample_augment.models.train_classifier import TrainedClassifier, KFoldTrainedClassifiers, plain_transforms, \
+    CustomViT
 from sample_augment.utils import log, plot
 from sample_augment.utils.plot import prepare_latex_plot
 
@@ -61,16 +65,16 @@ class ConfusionMatrixMetric(Metric):
         plt.show()
 
 
-def preprocess(data: AugmentDataset) -> AugmentDataset:
-    img_data = data.tensors[0]
-
-    if img_data.dtype == torch.uint8:
-        img_data = img_data.float()
-        img_data /= 255.0
-
-    data.tensors = (normalize(img_data), data.tensors[1].long())
-
-    return data
+# def preprocess(data: AugmentDataset) -> AugmentDataset:
+#     img_data = data.tensors[0]
+#
+#     if img_data.dtype == torch.uint8:
+#         img_data = img_data.float()
+#         img_data /= 255.0
+#
+#     data.tensors = (normalize(img_data), data.tensors[1].long())
+#
+#     return data
 
 
 def show_image_with_label_and_prediction(image, label, prediction):
@@ -86,19 +90,31 @@ class ValidationPredictions(Artifact):
     predictions: Tensor
 
 
+def get_preprocess(model):
+    antialias_param_needed = 'antialias' in inspect.getfullargspec(transforms.RandomResizedCrop).args
+    optional_aa_arg = {"antialias": True} if antialias_param_needed else {}
+
+    _preprocess: List = copy(plain_transforms)
+    if isinstance(model, CustomViT):
+        _preprocess.insert(0, torchvision.transforms.Resize((224, 224), **optional_aa_arg))
+
+    return transforms.Compose(_preprocess)
+
+
 @step
 def predict_validation_set(classifier: TrainedClassifier, validation_set: ValSet, batch_size: int) -> \
         ValidationPredictions:
     # should read number of classes from the model, since it might change
     # But it doesn't seem like there is a canonical way of getting that.
     # Maybe just by passing in an input
-    assert isinstance(classifier.model, CustomDenseNet), "only support DenseNet for now , we need to read " \
-                                                         "num_classes"
+    assert hasattr(classifier.model, "num_classes"), "we need to have the num_classes attribute in our model"
     num_classes = classifier.model.num_classes
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+    log.info(f"Prediction device: {device}")
+    classifier.model.to(device)
     # deepcopy because consumed artifacts are not thrown away yet! (so state is mutable)
-    val_data = preprocess(deepcopy(validation_set))
+    val_data = deepcopy(validation_set)
+    val_data.tensors = get_preprocess(classifier.model)(val_data.image_tensor), val_data.label_tensor
     # val_data = preprocess(val_data)
 
     # metric has the option 'average' with values micro, macro, and weighted.
@@ -137,7 +153,7 @@ class ClassificationReport(Artifact):
 def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSet,
                         gc10_labels: GC10Labels) -> ClassificationReport:
     # quickfix since the artifacts are not properly guarded from being mutated yet (TODO)
-    val_set = preprocess(deepcopy(val_set))
+    # I removed the preprocessing of val_set since it's only used for the label info here, the data doesn't get accessed
     predictions = val_pred_artifact.predictions
     assert len(predictions) == len(val_set)
     imgs, labels = val_set.tensors[0], val_set.tensors[1]
@@ -160,6 +176,7 @@ def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSe
 
 
 class KFoldClassificationReport(Artifact):
+    """one report for each fold"""
     reports: List[ClassificationReport]
 
 

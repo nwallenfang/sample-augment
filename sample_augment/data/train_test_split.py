@@ -111,6 +111,7 @@ def stratified_k_fold_split(dataset: AugmentDataset, n_folds: int = 5, random_se
 
 
 class TrainSet(AugmentDataset):
+    _serialize_this = False
     transform: typing.Optional[typing.Callable] = None
 
     def __getitem__(self, index):
@@ -125,6 +126,7 @@ class TrainSet(AugmentDataset):
 
 
 class ValSet(AugmentDataset):
+    _serialize_this = False
     transform: typing.Optional[typing.Callable] = None
 
     def __getitem__(self, index):
@@ -137,8 +139,9 @@ class ValSet(AugmentDataset):
 
         return x, y
 
+
 class TestSet(AugmentDataset):
-    pass
+    _serialize_this = False
 
 
 class TrainTestValBundle(Artifact):

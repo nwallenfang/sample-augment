@@ -1,3 +1,4 @@
+import inspect
 import random
 import sys
 from copy import deepcopy
@@ -55,6 +56,86 @@ class CustomDenseNet(torchvision.models.DenseNet):
             nn.Linear(30, num_classes))
 
         self.num_classes = num_classes
+
+    def get_kwargs(self) -> Dict:
+        return {'num_classes': self.num_classes}
+
+
+class CustomResNet50(torchvision.models.ResNet):
+    def __init__(self, num_classes, load_pretrained=False):
+        # initially set num_classes to 1000 to match the pre-trained model
+        super(CustomResNet50, self).__init__(block=torchvision.models.resnet.Bottleneck,
+                                             layers=[3, 4, 6, 3], num_classes=1000)
+
+        # Freeze early layers
+        if load_pretrained:
+            # use the model pretrained on imagenet
+            pretrained = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', weights='IMAGENET1K_V2')
+            self.load_state_dict(pretrained.state_dict(), strict=False)
+        for param in self.parameters():
+            param.requires_grad = False
+
+        # Modify the classifier part of the model
+        self.fc = nn.Sequential(
+            nn.Linear(2048, 960),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(960, 240),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(240, 30),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(30, num_classes))
+
+        self.num_classes = num_classes
+
+    def get_kwargs(self):
+        return {'num_classes': self.num_classes}
+
+
+class CustomViT(torchvision.models.VisionTransformer):
+    def __init__(self, num_classes, load_pretrained=False):
+        # use same settings as vit_b_16 to get the same architecture
+        super().__init__(
+            image_size=224,
+            patch_size=16,
+            num_layers=12,
+            num_heads=12,
+            hidden_dim=768,
+            mlp_dim=3072,
+            num_classes=1000,
+            representation_size=None)
+
+        # Load the pretrained weights if requested
+        if load_pretrained:
+            # use the model pretrained on imagenet
+            weights = torchvision.models.vision_transformer.ViT_B_16_Weights.IMAGENET1K_V1
+            # pretrained = torch.hub.load('pytorch/vision:v0.10.0', 'vit_b_16', weights='IMAGENET1K_V1')
+            self.load_state_dict(weights.get_state_dict(progress=True), strict=False)
+
+        # Freeze the early layers
+        for param in self.parameters():
+            param.requires_grad = False
+
+        # Create a custom classifier head
+        self.heads = nn.Sequential(
+            nn.Linear(768, 960),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(960, 240),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(240, 30),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(30, num_classes)
+        )
+        self.num_classes = num_classes
+
+        # Unfreeze the custom classifier head
+        for param in self.heads.parameters():
+            param.requires_grad = True
 
     def get_kwargs(self) -> Dict:
         return {'num_classes': self.num_classes}
@@ -237,16 +318,17 @@ class TrainedClassifier(Artifact):
     metrics: ClassifierMetrics
 
 
-plain_transforms = transforms.Compose([
+plain_transforms = [
     transforms.ConvertImageDtype(dtype=torch.float32),
     normalize
-])
+]
 
 
 class WithProbability:
     """
         call a transform with a certain probability, else do nothing
     """
+
     def __init__(self, transform, p=0.5):
         self.transform = transform
         self.probability = p
@@ -286,11 +368,14 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
     old default train params: num_epochs = 20, batch_size = 64, learning_rate = 0.001
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = CustomDenseNet(num_classes=train_data.num_classes, load_pretrained=True)
+    # model = CustomDenseNet(num_classes=train_data.num_classes, load_pretrained=True)
+    # model = CustomResNet50(num_classes=train_data.num_classes, load_pretrained=True)
+    model = CustomViT(num_classes=train_data.num_classes, load_pretrained=True)
     model.to(device)
     train_data = deepcopy(train_data)
     val_data = deepcopy(val_data)
-
+    antialias_param_needed = 'antialias' in inspect.getfullargspec(transforms.RandomResizedCrop).args
+    optional_aa_arg = {"antialias": True} if antialias_param_needed else {}
     if data_augment:
         base_transforms = [
             transforms.ConvertImageDtype(dtype=torch.float32),
@@ -299,28 +384,46 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
             transforms.ColorJitter(brightness=color_jitter, contrast=color_jitter, saturation=color_jitter),
             normalize,
         ]
+
+        # if antialias_param_needed:  # needed in newer torchvision versions
+        # noinspection PyArgumentList
+        random_crop = transforms.RandomResizedCrop(256, scale=(0.85, 1.0), **optional_aa_arg)
+        # else:
+        #     random_crop = transforms.RandomResizedCrop(256, scale=(0.85, 1.0))
+
         geometric_transforms = [
             # antialias argument needed for newer versions of torchvision
             WithProbability(transform=CircularTranslate(shift_range=40), p=0.5),
             # WithProbability(transform=transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)), p=0.5),
-            WithProbability(transform=transforms.RandomResizedCrop(256, scale=(0.85, 1.0), antialias=True), p=0.5),
+            WithProbability(transform=random_crop, p=0.5)
         ]
         if geometric_augment:
             # add geometric transforms to base_transforms (before ColorJitter)
             base_transforms[2:2] = geometric_transforms
 
-        augment_transforms = transforms.Compose(base_transforms)
-
-        train_data.transform = augment_transforms
-        val_data.transform = plain_transforms
+        train_data.transform = transforms.Compose(base_transforms)
+        val_data.transform = transforms.Compose(plain_transforms)
     else:
-        train_data.transform = plain_transforms
-        val_data.transform = plain_transforms
+        train_data.transform = transforms.Compose(plain_transforms)
+        val_data.transform = transforms.Compose(plain_transforms)
+
+    if isinstance(model, CustomViT):
+        log.info("Using a VisionTransformer, resizing inputs to 224x224.")
+        train_data.transform = transforms.Compose([
+            transforms.Resize((224, 224), **optional_aa_arg),
+            train_data.transform
+        ])
+        val_data.transform = transforms.Compose([
+            transforms.Resize((224, 224), **optional_aa_arg),
+            val_data.transform
+        ])
 
     metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
                           batch_size=batch_size, learning_rate=learning_rate,
                           balance_classes=balance_classes, random_seed=random_seed)
 
+    del train_data
+    del val_data
     return TrainedClassifier(
         model=model,
         metrics=metrics

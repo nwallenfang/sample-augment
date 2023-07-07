@@ -11,6 +11,7 @@
   "balance_classes": true,
   "n_folds": 10,
   "data_augment": false,
+  "geometric_augment": false,
   "color_jitter": 0.25,
   "h_flip_p": 0.5,
   "v_flip_p": 0.5

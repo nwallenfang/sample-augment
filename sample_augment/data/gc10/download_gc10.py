@@ -9,6 +9,7 @@ from sample_augment.utils.log import log
 
 
 class GC10Folder(Artifact):
+    _serialize_this = False
     image_dir: Path
     label_dir: Path
 
