@@ -7,7 +7,7 @@ import torch
 from PIL import Image
 
 import sample_augment.models.stylegan2.legacy as legacy
-from sample_augment.utils.path_utils import root_directory
+from sample_augment.utils.path_utils import root_dir
 
 """
     this file probably needs python 3.7 and torch 1.7 same as train_generator.
@@ -42,7 +42,7 @@ class StyleGANGenerator:
         if out_dir:
             self.out_dir = out_dir
         else:
-            self.out_dir = root_directory / "shared" / "generated"
+            self.out_dir = root_dir / "shared" / "generated"
 
         os.makedirs(self.out_dir, exist_ok=True)
 
@@ -103,22 +103,13 @@ class StyleGANGenerator:
         return imgs
 
 
-def real_vs_fake_grid_classwise():
-    # TODO
-    pass
-
-
-def run_classifier_on_generated_images():
-    pass
-
-
 if __name__ == '__main__':
-    generator = StyleGANGenerator(pkl_path=root_directory / 'TrainedStyleGAN/network-snapshot-001000.pkl')
+    num_classes = 10
+    num_imgs_per_class = 9
+    generator = StyleGANGenerator(pkl_path=root_dir / 'TrainedStyleGAN/network-snapshot-001000.pkl')
 
-    for class_idx in range(10):
-        print(f'--- {GC10_CLASSES[class_idx]} ---')
-        generated_imgs = generator.generate_images(class_idx=class_idx, seeds=list(range(9)), save_to_outdir=True)
-        # for i in range(generated_imgs.shape[0]):
-
-    # plt.imshow(generated_imgs[0])
-    # plt.show()
+    for class_index in range(num_classes):
+        print(f'--- {GC10_CLASSES[class_index]} ---')
+        generated_imgs = generator.generate_images(class_idx=class_index,
+                                                   seeds=list(range(num_imgs_per_class)),
+                                                   save_to_outdir=True)

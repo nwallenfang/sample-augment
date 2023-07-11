@@ -56,7 +56,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
                 torch.save(tensor, str(save_path))
                 serialized_tensor_strings.append({
                     'type': 'torch.Tensor',
-                    'path': save_path.relative_to(path_utils.root_directory).as_posix()
+                    'path': save_path.relative_to(path_utils.root_dir).as_posix()
                 })
             return serialized_tensor_strings
         if not inspect.isclass(field_type):
@@ -85,19 +85,19 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             save_path = save_path.with_suffix('.pt')
             torch.save(field, str(save_path))
             return {'type': 'torch.Tensor',
-                    'path': f'{save_path.relative_to(path_utils.root_directory).as_posix()}'}
+                    'path': f'{save_path.relative_to(path_utils.root_dir).as_posix()}'}
         elif issubclass(field_type, torch.nn.Module):
             save_path = save_path.with_suffix('.pt')
             torch.save(field.state_dict(), str(save_path))
             return {'type': 'torch.nn.Module',
                     'class': f'{field.__class__.__module__}.{field.__class__.__name__}',
                     'kwargs': field.get_kwargs(),  # TODO ensure that every model has this
-                    'path': f'{save_path.relative_to(path_utils.root_directory).as_posix()}'}
+                    'path': f'{save_path.relative_to(path_utils.root_dir).as_posix()}'}
         elif issubclass(field_type, np.ndarray):
             save_path = save_path.with_suffix('.npy')
             np.save(str(save_path), field)
             return {'type': 'numpy.ndarray',
-                    'path': f'{save_path.relative_to(path_utils.root_directory).as_posix()}'}
+                    'path': f'{save_path.relative_to(path_utils.root_dir).as_posix()}'}
         elif issubclass(field_type, Artifact):
             # field is a sub-artifact. Recursively save it.
             return field.to_dict(extra_configs={
@@ -105,7 +105,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
             })
         elif issubclass(field_type, Path):
             # make Path instances relative to config.root_dir
-            relative_path = field.relative_to(path_utils.root_directory).as_posix()
+            relative_path = field.relative_to(path_utils.root_dir).as_posix()
             return {
                 'type': 'pathlib.Path',
                 'path': relative_path
@@ -117,7 +117,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
     def _deserialize_field(field_name: str, value: Any, type_annotation: Optional[Type[Any]]) -> Any:
 
         if isinstance(value, dict) and 'path' in value:
-            field_path = path_utils.root_directory / value['path']
+            field_path = path_utils.root_dir / value['path']
             if value['type'] == 'torch.Tensor':
                 # TODO down the line it could be good/performant to do "lazy loading", so only load once
                 #   this artifact is actually being used
@@ -183,7 +183,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
     @property
     def complete_path(self):
-        artifact_dir = path_utils.root_directory / self.__class__.__name__
+        artifact_dir = path_utils.root_dir / self.__class__.__name__
         if 'name' in self.configs:
             return artifact_dir / f"{self.configs['name']}_{self.config_hash}.json"
         else:
@@ -193,7 +193,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         if extra_configs is None:
             extra_configs = {}
 
-        external_directory = path_utils.root_directory / self.__class__.__name__
+        external_directory = path_utils.root_dir / self.__class__.__name__
 
         data = {}
         for field_name, field_type in self.__annotations__.items():
@@ -210,7 +210,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         if not self._serialize_this:
             return
         data = self.to_dict(extra_configs={})
-        external_directory = path_utils.root_directory / self.__class__.__name__
+        external_directory = path_utils.root_dir / self.__class__.__name__
         # self.complete_path belongs to external directory. Create it if it doesn't exist yet
         external_directory.mkdir(exist_ok=True)
 
@@ -277,3 +277,8 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
             user_friendly_error_message = "\n".join(formatted_errors)
             log.error(f"Validation errors from deserialization:\n{user_friendly_error_message}")
+
+    @classmethod
+    def from_file(cls, path: Union[str, Path]) -> "Artifact":
+        with open(path) as json_file:
+            return cls.from_dict(json.load(json_file))

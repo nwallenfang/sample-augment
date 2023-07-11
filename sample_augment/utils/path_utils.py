@@ -55,4 +55,5 @@ def _read_root_diretory() -> Path:  # read root_dir and experiment name from env
     return _root_directory
 
 
-root_directory: Path = _read_root_diretory()
+root_dir: Path = _read_root_diretory()
+shared_dir: Path = root_dir / "shared"

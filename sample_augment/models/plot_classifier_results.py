@@ -16,7 +16,7 @@ from sample_augment.data.dataset import AugmentDataset
 from sample_augment.models.evaluate_classifier import KFoldClassificationReport
 from sample_augment.models.train_classifier import WithProbability, CircularTranslate, KFoldTrainedClassifiers, \
     ClassifierMetrics
-from sample_augment.utils.path_utils import root_directory
+from sample_augment.utils.path_utils import root_dir
 from sample_augment.utils.plot import prepare_latex_plot
 import seaborn as sns
 
@@ -68,12 +68,13 @@ def average_f1_per_fold():
     """
         create a plot showing the average best F1 per fold, maybe some folds are easier than others
     """
-    figure_directory = root_directory / "shared/classifier_plots"
+    figure_directory = root_dir / "shared/classifier_plots"
     kfold_classifier_files = [
-        root_directory / "KFoldTrainedClassifiers/aug-01_ecc814.json",
-        root_directory / "KFoldTrainedClassifiers/aug-02_f0d3f1.json",
-        root_directory / "KFoldTrainedClassifiers/aug-06-geometric-rework_feaf2f.json",
-        root_directory / "KFoldTrainedClassifiers/noaug-04_7d609e.json",
+        root_dir / "KFoldTrainedClassifiers/aug-01_ecc814.json",
+        root_dir / "KFoldTrainedClassifiers/aug-02_f0d3f1.json",
+        # root_dir / "KFoldTrainedClassifiers/aug-06-geometric-rework_feaf2f.json",
+        root_dir / "KFoldTrainedClassifiers/noaug-04_7d609e.json",
+        root_dir / "KFoldTrainedClassifiers/vit-data-aug_325105.json",
     ]
     run_name_overrides = {
         "aug-02": "higher-p ColorJitter"
@@ -129,16 +130,18 @@ def average_f1_per_fold():
 
 def class_performance_boxplot():
     k = 10  # number of folds
-    figure_directory = root_directory / "/shared/classifier_plots"
+    figure_directory = root_dir / "shared/classifier_plots"
     kfold_report_files = [
-        root_directory / "KFoldClassificationReport/aug-06-geometric-rework_feaf2f.json",
-        root_directory / "KFoldClassificationReport/noaug-04_22da73.json",
-        root_directory / "KFoldClassificationReport/aug-04_f260d1.json"
+        root_dir / "KFoldClassificationReport/aug-06-geometric-rework_feaf2f.json",
+        root_dir / "KFoldClassificationReport/noaug-04_22da73.json",
+        root_dir / "KFoldClassificationReport/aug-04_f260d1.json",
+        root_dir / "KFoldClassificationReport/vit-data-aug_325105.json",
     ]
     report_names = [
         "aug-06",
         "noaug-04",
-        "aug-04"
+        "aug-04",
+        "vit-aug"
     ]
     class_name = "rolled_pit"
     _class_idx = 7
@@ -206,8 +209,8 @@ def main():
     """
         CLI for running experiments concerning
     """
-    average_f1_per_fold()
-    # class_performance_boxplot()
+    # average_f1_per_fold()
+    class_performance_boxplot()
     # dataset = AugmentDataset.from_dict(
     #     json.load(open(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\AugmentDataset\dataset_f00581.json")))
     # visualize_data_augmentation(dataset)

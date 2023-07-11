@@ -7,7 +7,7 @@ from sample_augment.core import Step, Config, get_step, Store, Artifact
 from sample_augment.core.config import EXCLUDED_CONFIG_KEYS
 from sample_augment.core.step import step_registry, StepRegistry
 from sample_augment.utils.log import log
-from sample_augment.utils.path_utils import root_directory
+from sample_augment.utils.path_utils import root_dir
 
 
 class Experiment:
@@ -28,7 +28,7 @@ class Experiment:
         # load the latest state object. If this Experiment has been done before, we will have cached results
         # the state contains the config file
         if store is None:
-            store_file_path = root_directory / f"{config.name}_{config.run_identifier}.json"
+            store_file_path = root_dir / f"{config.name}_{config.run_identifier}.json"
             if store_file_path.exists() and self.load_store:
                 self.store = Store.load_from(store_file_path)
                 self.store.merge_cached_artifacts_into(config)
@@ -132,6 +132,6 @@ class Experiment:
         self.store.save(self.config.name, identifier)
 
         # for now: don't save config file, all the config entries are part of the store file
-        config_directory = root_directory / "shared" / "configs"
+        config_directory = root_dir / "shared" / "configs"
         with open(config_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
             config_f.write(self.config.json(indent=4))

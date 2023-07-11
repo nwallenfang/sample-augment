@@ -17,13 +17,13 @@ def create_train_val_pt():
     from sample_augment.data.train_test_split import create_train_test_val
     random_seed = 100
     complete_dataset = AugmentDataset.from_dict(
-        json.load(open(path_utils.root_directory / 'AugmentDataset/dataset_f00581.json')))
+        json.load(open(path_utils.root_dir / 'AugmentDataset/dataset_f00581.json')))
     # do a train val split for now and train StyleGAN. If we're noticing that we're 
     # lacking data (or towards the end before testing), we can train it on combined train and val set
     bundle = create_train_test_val(complete_dataset, random_seed, test_ratio=0.2, val_ratio=0.1, min_instances=10)
     train = bundle.train
     # save the two tensors stacked to one pt file
-    torch.save(train.tensors, path_utils.root_directory / 'stylegan_train_data.pt')
+    torch.save(train.tensors, path_utils.root_dir / 'stylegan_train_data.pt')
 
 
 # TODO calculate improved precision and recall metrics
@@ -56,7 +56,7 @@ def train_stylegan():
         # "E:\\Master_Thesis_Nils\\stylegan-training\\00009-gc10_pre_FFHQ-cond-mirror-auto2-kimg5000"
         #      "-resumecelebahq256\\network-snapshot-000200.pkl",
         # 'celebahq256', # 'ffhq256',  # checkpoint for transfer learning / resuming interrupted run
-        'freezed': 0,  # int, 'Freeze-D', 'freeze the highest-resolution layers of the discriminator
+        'freezed': None,  # int, 'Freeze-D', 'freeze the highest-resolution layers of the discriminator
         # during transfer'
         'fp32': None,
         'nhwc': None,
@@ -126,6 +126,6 @@ def train_stylegan():
 # ----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    # main()  # pylint: disable=no-value-for-parameter
-    # create_train_val_pt()
+    # IF STUCK ON 'Setting up Pytorch plugin..'
+    # need to remove the torch_extensions cache!!!! (C:\Users\user\AppData\Local\torch_extensions)
     train_stylegan()

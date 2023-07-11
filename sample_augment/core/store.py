@@ -78,12 +78,12 @@ class Store:
             # artifact_dict = artifact.serialize()
             # log.debug(f"Saving artifact {artifact_name}")
             data[artifact.fully_qualified_name] = {
-                "path": artifact.complete_path.relative_to(path_utils.root_directory).as_posix(),
+                "path": artifact.complete_path.relative_to(path_utils.root_dir).as_posix(),
                 "configs": artifact.configs
             }
 
         log.info(f"Saving store to {store_filename}")
-        with open(path_utils.root_directory / store_filename, 'w') as f:
+        with open(path_utils.root_dir / store_filename, 'w') as f:
             try:
                 json.dump(data, f, indent=4)
             except TypeError as err:
@@ -102,7 +102,7 @@ class Store:
         artifacts = {}
         for artifact_name, artifact_info in data.items():
             module_name, class_name = artifact_name.rsplit('.', 1)
-            artifact_path = path_utils.root_directory / artifact_info['path']
+            artifact_path = path_utils.root_dir / artifact_info['path']
             ArtifactSubclass = getattr(import_module(module_name), class_name)
             with open(artifact_path, 'r') as artifact_json:
                 artifacts[class_name] = ArtifactSubclass.from_dict(json.load(artifact_json))
@@ -124,9 +124,9 @@ class Store:
     @staticmethod
     def _get_cached_artifacts(config) -> Dict[str, Artifact]:
         artifacts: Dict[str, Artifact] = {}
-        for run_file_name in next(os.walk(path_utils.root_directory))[2]:
+        for run_file_name in next(os.walk(path_utils.root_dir))[2]:
             if run_file_name.endswith(".json"):
-                run_json = json.load(open(path_utils.root_directory / run_file_name, 'r'))
+                run_json = json.load(open(path_utils.root_dir / run_file_name, 'r'))
 
                 for artifact_name, artifact_info in run_json.items():
                     artifact_configs = artifact_info['configs']
@@ -149,7 +149,7 @@ class Store:
                     # artifact is fine and can be loaded
                     module_name, class_name = artifact_name.rsplit('.', 1)
                     ArtifactSubclass = getattr(import_module(module_name), class_name)
-                    artifact_dict = json.load(open(path_utils.root_directory / artifact_info['path'], 'r'))
+                    artifact_dict = json.load(open(path_utils.root_dir / artifact_info['path'], 'r'))
                     artifacts[class_name] = ArtifactSubclass.from_dict(artifact_dict)
                     log.debug(f"Loaded artifact {class_name} from {run_file_name}.")
         return artifacts
@@ -164,9 +164,9 @@ class Store:
     @staticmethod
     def construct_store_from_cache(config) -> "Store":
         artifacts: Dict[str, Artifact] = {}
-        for run_file_name in next(os.walk(path_utils.root_directory))[2]:
+        for run_file_name in next(os.walk(path_utils.root_dir))[2]:
             if run_file_name.endswith(".json"):
-                run_json = json.load(open(path_utils.root_directory / run_file_name, 'r'))
+                run_json = json.load(open(path_utils.root_dir / run_file_name, 'r'))
 
                 for artifact_name, artifact_info in run_json.items():
                     artifact_configs = artifact_info['configs']
@@ -185,7 +185,7 @@ class Store:
                     # artifact is fine and can be loaded
                     module_name, class_name = artifact_name.rsplit('.', 1)
                     ArtifactSubclass = getattr(import_module(module_name), class_name)
-                    artifact_dict = json.load(open(path_utils.root_directory / artifact_info['path'], 'r'))
+                    artifact_dict = json.load(open(path_utils.root_dir / artifact_info['path'], 'r'))
                     artifacts[class_name] = ArtifactSubclass.from_dict(artifact_dict)
                     log.debug(f"Loaded artifact {class_name} from {run_file_name}.")
 

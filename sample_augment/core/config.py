@@ -24,7 +24,7 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     name: str = "test"
 
     # path for files that get saved by steps and are not Artifacts themselves
-    shared_directory: Path = path_utils.root_directory / "shared"
+    shared_directory: Path = path_utils.root_dir / "shared"
 
     # checkpoint_directory: Path = Path("./checkpoints")
 
@@ -63,7 +63,7 @@ class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
 
     @validator('shared_directory', pre=True)
     def assemble_figure_path(cls, value):
-        fig_dir: Path = path_utils.root_directory / value
+        fig_dir: Path = path_utils.root_dir / value
 
         fig_dir.mkdir(exist_ok=True)
         assert fig_dir.exists()
