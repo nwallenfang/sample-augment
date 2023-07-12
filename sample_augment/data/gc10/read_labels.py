@@ -189,6 +189,9 @@ class GC10Labels(Artifact):
         "waist_folding"
     ]
 
+class SanitizedGC10Labels(GC10Labels):
+    pass
+
 
 @step
 def construct_processed_labels(gc10: GC10Folder) -> GC10Labels:
@@ -224,3 +227,6 @@ def construct_processed_labels(gc10: GC10Folder) -> GC10Labels:
     _, dirnames, _ = next(os.walk(gc10.image_dir))
     num_classes = int(sorted(dirnames)[-1])
     return GC10Labels(labels=labels, number_of_classes=num_classes)
+
+def sanitize_labels(gc10_labels: GC10Labels) -> SanitizedGC10Labels:
+    pass

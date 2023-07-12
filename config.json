@@ -1,5 +1,5 @@
 {
-  "name": "dataset",
+  "name": "synth-aug",
   "random_seed": 600,
   "test_ratio": 0.2,
   "val_ratio": 0.1,

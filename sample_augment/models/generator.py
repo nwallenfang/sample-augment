@@ -1,10 +1,12 @@
 import os
 from pathlib import Path
+import sys
 from typing import Union
 
 import numpy as np
 import torch
 from PIL import Image
+from torch import Tensor
 
 import sample_augment.models.stylegan2.legacy as legacy
 from sample_augment.utils.path_utils import root_dir
@@ -32,6 +34,7 @@ class StyleGANGenerator:
     pkl_path: Path
     """where generated images will get saved"""
     out_dir: Path
+    name: str
     device: torch.device
 
     def __init__(self, pkl_path: Union[str, Path], out_dir=None):
@@ -39,10 +42,15 @@ class StyleGANGenerator:
             self.pkl_path = Path(pkl_path)
         else:
             self.pkl_path = pkl_path
+        
+        self.name = pkl_path.name.split('.')[0].split('_')[0]
+
         if out_dir:
             self.out_dir = out_dir
         else:
-            self.out_dir = root_dir / "shared" / "generated"
+            self.out_dir = root_dir / "shared" / "generated" / self.name
+        self.out_dir.mkdir(exist_ok=True)
+            
 
         os.makedirs(self.out_dir, exist_ok=True)
 
@@ -53,7 +61,6 @@ class StyleGANGenerator:
 
             if self.device.type == 'cpu':
                 # see https://github.com/NVlabs/stylegan2-ada-pytorch/issues/105
-                print("cpu")
                 import functools
                 self.G.forward = functools.partial(self.G.forward, force_fp32=True)
 
@@ -99,14 +106,19 @@ class StyleGANGenerator:
             imgs[seed_idx] = img[0].cpu().numpy()
             if save_to_outdir:
                 Image.fromarray(img[0].cpu().numpy(), 'RGB').save(
-                    f'{self.out_dir}/{GC10_CLASSES[class_idx]}_seed{seed:04d}.png')
+                    f'{self.out_dir}/{GC10_CLASSES[class_idx]}_{seed:04d}.png')
         return imgs
 
 
 if __name__ == '__main__':
     num_classes = 10
-    num_imgs_per_class = 9
-    generator = StyleGANGenerator(pkl_path=root_dir / 'TrainedStyleGAN/network-snapshot-001000.pkl')
+    if len(sys.argv) > 1:
+        num_imgs_per_class = int(sys.argv[1])
+    else:
+        num_imgs_per_class = 200
+
+    # now that we calc more imgs per class, we could do a class-wise diversity metric
+    generator = StyleGANGenerator(pkl_path=root_dir / 'TrainedStyleGAN/ada-018_005000.pkl')
 
     for class_index in range(num_classes):
         print(f'--- {GC10_CLASSES[class_index]} ---')

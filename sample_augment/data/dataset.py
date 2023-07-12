@@ -1,4 +1,6 @@
+import pprint
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import List, Tuple, Union
 
@@ -149,11 +151,15 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath) -> AugmentDataset
     # to check for duplicates, since gc10 contains some duplicate images
     duplicate_dict = {}
     remove_these_idx = []
+    remove_info = []
     removed_duplicates = 0
+
+    class_counts = Counter(image_dataset.targets)
+    print(class_counts)
 
     for i, (img_path, _img_class) in tqdm(enumerate(image_dataset.imgs), file=sys.stdout):
         path_obj = Path(img_path)
-        # FIXME this way of calculating the ids is gc10 specific...
+        # gc10 specific way of calculating img_id !
         img_id = path_obj.stem[4:]
         img_ids.append(img_id)
 
@@ -164,6 +170,7 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath) -> AugmentDataset
             # if true_labels:
             #     image_dataset.targets[i] = true_labels[img_id]
             remove_these_idx.append(i)
+            remove_info.append((img_id, _img_class))
             removed_duplicates += 1
             continue
 
@@ -171,6 +178,7 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath) -> AugmentDataset
 
     if removed_duplicates > 0:
         log.warning(f'Removed {removed_duplicates} duplicates from the dataset.')
+        log.info(pprint.pformat(remove_info))
 
     # filter duplicates
     unique_indices = list(set(range(len(image_dataset))) - set(remove_these_idx))
@@ -178,6 +186,10 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath) -> AugmentDataset
     label_tensor = torch.tensor([image_dataset.targets[i] for i in unique_indices],
                                 dtype=torch.int)
     img_ids = [img_ids[idx] for idx in unique_indices]
+
+    # TODO label sanitization / hierarchy, add "true labels" back for this
+    #   check the count of waist_folding there, is it 31 or less? it's easier to use that dict
+    #   instead of messing with our duplicate method.
 
     # convert image_tensors to uint8 since that's the format needed for training on StyleGAN
     image_data: np.ndarray = image_tensor.numpy()
@@ -189,7 +201,7 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath) -> AugmentDataset
     image_data *= 255  # Now scale by 255
     image_data = image_data.astype(np.uint8)
     image_tensor = torch.from_numpy(image_data)
-    # TODO test that new img ids are correct
+
     tensor_dataset = AugmentDataset(name="complete", tensors=(image_tensor, label_tensor),
                                     img_ids=img_ids,
                                     root_dir=root_dir)
