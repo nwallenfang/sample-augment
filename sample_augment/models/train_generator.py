@@ -44,15 +44,16 @@ def train_stylegan():
         'cond': True,
         'subset': None,
         'mirror': True,  # checked each class and x-flip can be done semantically for GC10
-        'cfg': 'config-gc10',
+        'cfg': 'config-gc10-continue',
         'gamma': None,  # tune this parameter with values such as 0.1, 0.5, 1, 5, 10
-        'kimg': 5000,
+        'kimg': 10000,
         'batch': None,
         'aug': None,
         'p': None,
         'target': None,  # ADA target value, might need tweaking
         'augpipe': 'bgc-gc10',  # custom augmentation pipeline without 90 degree rotations
-        'resume': 'ffhq256',
+        # 'resume': 'ffhq256',
+        'resume': r"E:\Master_Thesis_Nils\stylegan-training\00020-gc10-cond-mirror-config-gc10-kimg5000-bgc-gc10-resumeffhq256\network-snapshot-004800.pkl",
         # "E:\\Master_Thesis_Nils\\stylegan-training\\00009-gc10_pre_FFHQ-cond-mirror-auto2-kimg5000"
         #      "-resumecelebahq256\\network-snapshot-000200.pkl",
         # 'celebahq256', # 'ffhq256',  # checkpoint for transfer learning / resuming interrupted run

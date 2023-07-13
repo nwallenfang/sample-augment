@@ -72,6 +72,9 @@ class Store:
             if artifact is None:
                 # FIXME shouldn't be needed
                 continue
+            if 'name' in artifact.configs and artifact.configs['name'] != config_name:
+                log.debug(f"Skipping artifact {artifact_name} since it has another name.")
+                continue
             if not artifact.is_serialized(config_name):
                 log.warning(f"store.save(): {artifact_name} is not yet serialized! skipping it")
                 continue

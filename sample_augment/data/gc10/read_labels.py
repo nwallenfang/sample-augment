@@ -5,17 +5,22 @@ The final result of this script is a combined label file `labels.json`.
 """
 import collections
 import os
+from copy import copy
 from pathlib import Path
 from typing import Dict, List
 
 import matplotlib
+import pandas as pd
+import seaborn as sns
 import xmltodict
+from matplotlib import pyplot as plt, gridspec
 
 from sample_augment.core import step, Artifact
 from sample_augment.data.gc10.download_gc10 import GC10Folder
+from sample_augment.utils import log
 # from sample_augment.data.gc10.download import load_gc10_if_missing
-from sample_augment.utils.path_utils import project_path
-from sample_augment.utils.plot import show_image
+from sample_augment.utils.path_utils import project_path, shared_dir
+from sample_augment.utils.plot import show_image, prepare_latex_plot
 
 # from sample_augment.data/gc10/Defect Descriptions.xlsx, which also contains some example images
 LABEL_TO_NAME = {
@@ -154,7 +159,7 @@ MANUAL_MISMATCH_LABELS = {
     # could be rolled_pit or welding_line. I put it as rolled pit since we have fewer of those.
     "06_425505500_00052": 8,
     # I can't see a silk spot. punching_hole fits, welding line would fit as well
-    "07_425391800_00054": 1,
+    "07_425391800_00054": 2,
     # both punching hole and welding line
     "07_425502900_00052": 2,
     # the image has light wait folding, but also a welding line and a punching hole
@@ -188,6 +193,7 @@ class GC10Labels(Artifact):
         "crease",
         "waist_folding"
     ]
+
 
 class SanitizedGC10Labels(GC10Labels):
     pass
@@ -228,5 +234,177 @@ def construct_processed_labels(gc10: GC10Folder) -> GC10Labels:
     num_classes = int(sorted(dirnames)[-1])
     return GC10Labels(labels=labels, number_of_classes=num_classes)
 
+
+def class_wise_label_count_ratio(labels):
+    # Create a dictionary where keys are classes and values are lists of instances
+    class_instances = collections.defaultdict(list)
+
+    for img_id, label_info in labels.items():
+        primary_class = label_info['y']
+        all_class_labels = [primary_class] + label_info['secondary']
+        class_instances[primary_class].append(all_class_labels)
+
+    # Calculate the ratio of instances having only one label for each class
+    class_ratios = {}
+
+    for class_label, instances in class_instances.items():
+        ratio_single_label = sum(len(instance) == 1 for instance in instances) / len(instances)
+        class_ratios[class_label] = ratio_single_label
+
+    class_ratios = {int(k): v for k, v in class_ratios.items()}
+
+    # Print the ratio for each class
+    # for class_label, ratio in sorted(class_ratios.items()):
+    #     print(f"Class {class_label}, single ratio: {ratio:.2f}")
+
+    # primary and secondary
+    all_labels = {img_id: labels[img_id]['secondary'] + [labels[img_id]['y']] for img_id in labels}
+
+    # ratio of instances having only one label
+    # ratio_single_label = sum([len(instance) == 1 for instance in all_labels.values()]) / len(all_labels)
+    # print(f"ratio of instances with just a single label: {ratio_single_label:.2f}")
+
+
+# def ratio_of_secondary_classes(labels: Dict, primary_class_idx: int, class_names: List[str]):
+#     # all_labels = {img_id: labels[img_id]['secondary'] + [labels[img_id]['y']] for img_id in labels}
+#     class_labels = {img_id: label['secondary'] for img_id, label in labels.items()
+#                     if primary_class_idx == label['y']}
+#     secondary_counter = collections.defaultdict(int)
+#
+#     for img_id, secondary in class_labels.items():
+#         for sec in secondary:
+#             secondary_counter[class_names[sec]] += 1
+#
+#     log.info(f"Secondaries for class {class_names[primary_class_idx]} ({len(class_labels)} instances)")
+#     pprint(dict(secondary_counter), sort_dicts=False)
+#
+#     total_instances = sum(secondary_counter.values())
+#     secondary_counter = {key: (value / total_instances) for key, value in secondary_counter.items()}
+#     return secondary_counter
+def ratio_of_secondary_classes(labels: Dict, primary_class_idx: int, class_names: List[str]):
+    class_labels = {img_id: label['secondary'] for img_id, label in labels.items() if primary_class_idx == label['y']}
+    secondary_counter = collections.defaultdict(int)
+
+    for img_id, secondary in class_labels.items():
+        for sec in secondary:
+            secondary_counter[class_names[sec]] += 1
+
+    # Compute proportion of instances without a secondary class
+    no_secondary_count = len([img_id for img_id, sec in class_labels.items() if not sec])
+    total_count = len(class_labels)
+    no_secondary_ratio = no_secondary_count / total_count
+
+    # Include the no_secondary_ratio in the secondary_ratios dictionary
+    secondary_ratios = {k: v / total_count for k, v in secondary_counter.items()}
+    secondary_ratios[class_names[primary_class_idx]] = no_secondary_ratio
+
+    return secondary_ratios
+
+
+def assign_instance_to(new_class_idx: int, img_id: str, all_labels: Dict):
+    labels_tmp: List[int] = copy(all_labels[img_id])
+    labels_tmp.remove(new_class_idx)  # rm welding_line
+    return {
+        'y': new_class_idx,
+        'secondary': labels_tmp
+    }
+
+
+@step
 def sanitize_labels(gc10_labels: GC10Labels) -> SanitizedGC10Labels:
-    pass
+    class_name_to_idx = {name: idx for idx, name in enumerate(gc10_labels.class_names)}
+    # sanity check: number of class instances
+    labels: Dict = copy(gc10_labels.labels)
+    # make labels 0-indexed to have it be the same as pytorch Dataset
+    labels = {img_id: {'y': label['y'] - 1, 'secondary': [sec - 1 for sec in label['secondary']]}
+              for img_id, label in labels.items()}
+
+    # basically ignore the distinction of y and secondary, it's all the same to us
+    all_labels = {img_id: labels[img_id]['secondary'] + [labels[img_id]['y']] for img_id in labels}
+
+    sanitized_labels = copy(labels)
+
+    def move_combination_into(combined: List[str], into_class: str):
+        for img_id, label in sanitized_labels.items():
+            if all([(class_name_to_idx[class_name] in all_labels[img_id]) for class_name in combined]):
+                sanitized_labels[img_id] = assign_instance_to(class_name_to_idx[into_class], img_id, all_labels)
+
+    # when instance is labelled welding_line and punching_hole, put it into welding line!
+    move_combination_into(['punching_hole', 'welding_line'], into_class='welding_line')
+
+    # TODO move all primary punching holes into their secondary classes
+
+    # log.info("--- labels ---")
+    # class_wise_label_count_ratio(labels)
+
+    log.info("--- sanitized ---")
+    class_wise_label_count_ratio(sanitized_labels)
+
+    ratio_of_secondary_classes(sanitized_labels, class_name_to_idx['punching_hole'], gc10_labels.class_names)
+
+    primary_labels = [labels[img_id]['y'] for img_id in labels]
+    class_counts = collections.Counter(primary_labels)
+    log.info(class_counts)
+
+    # Heatmap data generation
+    class_names = [" ".join(class_name.split("_")) for class_name in gc10_labels.class_names]
+    total_counts = []
+    heatmap_data = []
+    for primary_class_idx in range(len(class_names)):
+        secondary_distribution = ratio_of_secondary_classes(sanitized_labels, primary_class_idx, class_names)
+        # Append the distribution to heatmap data, while making sure each secondary class has an entry
+        heatmap_data.append([round(secondary_distribution.get(class_name, 0), 2) for class_name in class_names])
+        # Calculate the total counts for each primary class
+        total_counts.append(sum([val for val in secondary_distribution.values()]))
+
+    class_counts = dict(class_counts)
+    total_counts = [class_counts[i] for i in range(10)]
+
+    # Then, you can call the heatmap plotting function
+    plot_heatmap(heatmap_data, class_names, class_names, total_counts)
+
+    return SanitizedGC10Labels(labels=labels, number_of_classes=gc10_labels.number_of_classes)
+
+
+def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts):
+    df = pd.DataFrame(distributions, index=primary_classes, columns=secondary_classes)
+
+    prepare_latex_plot()
+    fig = plt.figure(figsize=(8, 5))
+    # Define the grid space
+    gs = gridspec.GridSpec(1, 2, width_ratios=[4, 1])
+
+    # Define two subplots
+    ax0 = plt.subplot(gs[0])
+    ax1 = plt.subplot(gs[1])
+
+    # Create a heatmap on the first subplot
+    # cbar_ax = fig.add_axes([0.1, .3, .03, .4]) # Adjust the size and position as needed
+    hmap = sns.heatmap(df, annot=True, cmap='YlGnBu', ax=ax0, cbar=False)
+    ax0.set_xlabel('Secondary Label')
+    ax0.set_xticklabels(ax0.get_xticklabels(), rotation=45, ha="right")
+    ax0.set_ylabel('Primary Label')
+    ax0.set_title("Relative Distribution of Secondary Labels")
+
+    # Display total counts on the second subplot
+    # seaborn heatmap and bar chart have inverted y axis
+    ax1.barh(list(range(len(total_counts))), total_counts[::-1], color='lightgray')
+    ax1.set_xlabel('Absolute Counts')
+    ax1.get_yaxis().set_visible(False)  # Hide the y-axis labels
+    ax1.set_ylim(-0.5, len(total_counts) - 0.5)  # Adjust y limits to match the heatmap
+
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig(shared_dir / "figures/label-exploration" / "secondary_labels.pdf", bbox_inches="tight")
+
+
+# def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts):
+#     df = pd.DataFrame(distributions, index=primary_classes, columns=secondary_classes)
+#     df['Total'] = total_counts
+#     prepare_latex_plot()
+#     plt.figure(figsize=(8, 6))
+#     sns.heatmap(df, annot=True, cmap='YlGnBu')
+#     # plt.title('Secondary Class Distribution for Each Primary Class')
+#     plt.xlabel('Secondary Classes')
+#     plt.ylabel('Primary Classes')
+#     plt.savefig(shared_dir / "figures/label-exploration" / "secondary_labels.pdf", bbox_inches="tight")

@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 from sample_augment.core import Artifact, step
 from sample_augment.data.gc10.download_gc10 import GC10Folder
+from sample_augment.data.gc10.read_labels import SanitizedGC10Labels
 from sample_augment.utils.log import log
 
 
@@ -118,7 +119,7 @@ def gc10_adapter(gc10_data: GC10Folder) -> ImageFolderPath:
 
 # meta: don't really like having to create an artifact for single attributes but fine
 @step()
-def imagefolder_to_tensors(image_folder_path: ImageFolderPath) -> AugmentDataset:
+def imagefolder_to_tensors(image_folder_path: ImageFolderPath, sanitized_labels: SanitizedGC10Labels) -> AugmentDataset:
     """
         ImageFolder dataset is designed for big datasets that don't fit into RAM (think ImageNet).
         For GC10 we can easily load the whole dataset into RAM transform the ImageDataset into a
@@ -154,9 +155,6 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath) -> AugmentDataset
     remove_info = []
     removed_duplicates = 0
 
-    class_counts = Counter(image_dataset.targets)
-    print(class_counts)
-
     for i, (img_path, _img_class) in tqdm(enumerate(image_dataset.imgs), file=sys.stdout):
         path_obj = Path(img_path)
         # gc10 specific way of calculating img_id !
@@ -178,18 +176,20 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath) -> AugmentDataset
 
     if removed_duplicates > 0:
         log.warning(f'Removed {removed_duplicates} duplicates from the dataset.')
-        log.info(pprint.pformat(remove_info))
+        log.info(f'Duplicates: {pprint.pformat(remove_info)}')
 
     # filter duplicates
     unique_indices = list(set(range(len(image_dataset))) - set(remove_these_idx))
     image_tensor = torch.stack([image_dataset[i][0] for i in tqdm(unique_indices, file=sys.stdout)])
-    label_tensor = torch.tensor([image_dataset.targets[i] for i in unique_indices],
+    # label_tensor = torch.tensor([image_dataset.targets[i] for i in unique_indices],
+    #                             dtype=torch.int)
+    label_tensor = torch.tensor([sanitized_labels.labels[img_ids[i]]['y'] for i in unique_indices],
                                 dtype=torch.int)
     img_ids = [img_ids[idx] for idx in unique_indices]
 
-    # TODO label sanitization / hierarchy, add "true labels" back for this
-    #   check the count of waist_folding there, is it 31 or less? it's easier to use that dict
-    #   instead of messing with our duplicate method.
+    class_counts = torch.bincount(label_tensor)
+    print(label_tensor)
+    log.info(f"counts: {class_counts}")
 
     # convert image_tensors to uint8 since that's the format needed for training on StyleGAN
     image_data: np.ndarray = image_tensor.numpy()

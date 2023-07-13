@@ -125,7 +125,7 @@ class Experiment:
         # TODO clean this up, it's a true mess
         if hasattr(self.store, "previous_run_identifier"):
             identifier = self.store.previous_run_identifier
-            log.info(f"Using previous store's id {identifier}.")
+            log.debug(f"Using previous store's id {identifier}.")
         else:
             identifier = self.config.run_identifier
 
