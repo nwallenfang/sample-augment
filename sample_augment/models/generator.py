@@ -118,7 +118,7 @@ if __name__ == '__main__':
         num_imgs_per_class = 200
 
     # now that we calc more imgs per class, we could do a class-wise diversity metric
-    generator = StyleGANGenerator(pkl_path=root_dir / 'TrainedStyleGAN/ada-018_005000.pkl')
+    generator = StyleGANGenerator(pkl_path=root_dir / 'TrainedStyleGAN/apa-020_004400.pkl')
 
     for class_index in range(num_classes):
         print(f'--- {GC10_CLASSES[class_index]} ---')
