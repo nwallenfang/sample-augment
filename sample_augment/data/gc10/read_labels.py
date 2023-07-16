@@ -389,7 +389,7 @@ def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts
     # Display total counts on the second subplot
     # seaborn heatmap and bar chart have inverted y axis
     ax1.barh(list(range(len(total_counts))), total_counts[::-1], color='lightgray')
-    ax1.set_xlabel('Absolute Counts')
+    ax1.set_xlabel('Number of Instances')
     ax1.get_yaxis().set_visible(False)  # Hide the y-axis labels
     ax1.set_ylim(-0.5, len(total_counts) - 0.5)  # Adjust y limits to match the heatmap
 

@@ -90,7 +90,7 @@ class AugmentDataset(TensorDataset, Artifact):
     @validator("tensors")
     def validate_image_tensor_dtype(cls, value):
         if not value[0].dtype == torch.uint8:
-            raise ValueError(f"invalid image tensor dtype {value[0].dtype}")
+            raise ValueError(f"invalid image tensor dtype {value[0].dtype}, expecting uint8")
         else:
             return value
 

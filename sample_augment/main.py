@@ -32,7 +32,7 @@ def main(arg_config: Path = None):
 
     # TODO providing additional artifacts doesn't change the run identifier so this could bring issues
     # evaluate_k_classifiers, k_fold_plot_loss_over_epochs, imagefolder_to_tensors, k_fold_train_classifier
-    experiment.run("synth_augment")
+    experiment.run("test_augmented")
     # , initial_artifacts=[
     #         KFoldTrainedClassifiers.from_dict(json.load(open(
     #             r'C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\KFoldTrainedClassifiers\noaug-04_7d609e.json')))]

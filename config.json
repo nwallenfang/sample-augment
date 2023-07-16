@@ -14,5 +14,7 @@
   "geometric_augment": false,
   "color_jitter": 0.25,
   "h_flip_p": 0.5,
-  "v_flip_p": 0.5
+  "v_flip_p": 0.5,
+
+  "generator_name": "apa-020"
 }

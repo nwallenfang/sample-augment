@@ -70,7 +70,7 @@ def stratified_split(dataset: AugmentDataset,
 
 
 class FoldDatasets(Artifact):
-    _serialize_this = False
+    serialize_this = False
     datasets: typing.List[typing.Tuple[AugmentDataset, AugmentDataset]]
 
 
@@ -111,7 +111,7 @@ def stratified_k_fold_split(dataset: AugmentDataset, n_folds: int = 5, random_se
 
 
 class TrainSet(AugmentDataset):
-    _serialize_this = False
+    serialize_this = False
     transform: typing.Optional[typing.Callable] = None
 
     def __getitem__(self, index):
@@ -126,7 +126,7 @@ class TrainSet(AugmentDataset):
 
 
 class ValSet(AugmentDataset):
-    _serialize_this = False
+    serialize_this = False
     transform: typing.Optional[typing.Callable] = None
 
     def __getitem__(self, index):
@@ -141,14 +141,14 @@ class ValSet(AugmentDataset):
 
 
 class TestSet(AugmentDataset):
-    _serialize_this = False
+    serialize_this = False
 
 
 class TrainTestValBundle(Artifact):
     train: TrainSet
     val: ValSet
     test: TestSet
-    _serialize_this = False
+    serialize_this = False
 
 
 # helper classes and steps to have clean interfaces

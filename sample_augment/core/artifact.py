@@ -27,7 +27,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         Represents a piece of data that gets produced/consumed in some Step.
         Supports automatic (de-)serialization.
     """
-    _serialize_this = True
+    serialize_this = True
     configs: Dict[str, Any] = Field(default_factory=dict)
 
     @property
@@ -169,7 +169,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
 
     @staticmethod
     def _calculate_config_hash(configs: Dict):
-        keys_to_exclude = {'shared_directory'}
+        keys_to_exclude = {'shared_directory', 'transform'}
         filtered_configs = {k: v for k, v in configs.items() if k not in keys_to_exclude}
         return hashlib.sha256(json.dumps(filtered_configs, sort_keys=True).encode()).hexdigest()[:6]
 
@@ -189,6 +189,22 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         else:
             return artifact_dir / f"noname_{self.config_hash}.json"
 
+    @staticmethod
+    def collect_annotations(cls):
+        """
+        Collects and returns all the field annotations from the given class and its parent classes recursively.
+
+        Returns:
+            dict: A dictionary mapping field names to their types, including fields from the input class and all its
+             parent classes.
+        """
+        annotations = {}
+        if issubclass(cls, BaseModel):
+            for base in cls.__bases__:
+                annotations.update(Artifact.collect_annotations(base))
+            annotations.update(cls.__annotations__)
+        return annotations
+
     def to_dict(self, extra_configs: Dict = None) -> Dict:
         if extra_configs is None:
             extra_configs = {}
@@ -196,7 +212,10 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         external_directory = path_utils.root_dir / self.__class__.__name__
 
         data = {}
-        for field_name, field_type in self.__annotations__.items():
+        # Go through the inheritance chain to collect all fields of itself and parent classes
+        # noinspection PyTypeChecker
+        all_annotations = Artifact.collect_annotations(self.__class__)
+        for field_name, field_type in all_annotations.items():
             field = getattr(self, field_name)
 
             data[field_name] = self._serialize_field(field, field_name, field_type, external_directory,
@@ -207,7 +226,7 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
         return data
 
     def save_to_disk(self):
-        if not self._serialize_this:
+        if not self.serialize_this:
             return
         data = self.to_dict(extra_configs={})
         external_directory = path_utils.root_dir / self.__class__.__name__
