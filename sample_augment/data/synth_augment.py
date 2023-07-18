@@ -7,8 +7,9 @@ from PIL import Image
 from torchvision.transforms import ToTensor
 
 from sample_augment.core import step
-from sample_augment.data.train_test_split import TrainSet
+from sample_augment.data.train_test_split import TrainSet, ValSet
 from sample_augment.models.generator import GC10_CLASSES
+from sample_augment.models.train_classifier import TrainedClassifier, train_classifier
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir
 
@@ -76,5 +77,19 @@ def synth_augment(training_set: TrainSet, generator_name: str = "apa-020") -> Au
 
 
 @step
-def test_augmented(sett: AugmentedTrainSet):
-    print(sett.name)
+def train_augmented_classifier(train_data: AugmentedTrainSet, val_data: ValSet,
+                               num_epochs: int, batch_size: int, learning_rate: float,
+                               balance_classes: bool,
+                               random_seed: int,
+                               data_augment: bool,
+                               geometric_augment: bool,
+                               color_jitter: float,
+                               h_flip_p: float,
+                               v_flip_p: float) -> TrainedClassifier:
+    return train_classifier(train_data, val_data, num_epochs, batch_size, learning_rate, balance_classes, random_seed,
+                            data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p)
+
+
+@step
+def look_at_augmented_train_set(augmented: AugmentedTrainSet):
+    print(augmented.name)

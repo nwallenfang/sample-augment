@@ -181,8 +181,10 @@ class StepRegistry:
         def add_dependencies(node):
             visited.add(node)
             for artifact in node.consumes.values():
-                if artifact not in self.producers:
-                    raise ValueError(f"No step found that produces {artifact}")
+                # if artifact not in self.producers:
+                if artifact.__full_name__.split('.')[-1] not in (cls.__full_name__.split('.')[-1]
+                                                                 for cls in self.producers):
+                    raise ValueError(f"No step found that produces {artifact.__name__}")
 
                 for producer in self.producers[artifact]:
                     if producer not in visited:

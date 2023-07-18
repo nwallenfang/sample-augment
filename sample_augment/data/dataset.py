@@ -1,6 +1,5 @@
 import pprint
 import sys
-from collections import Counter
 from pathlib import Path
 from typing import List, Tuple, Union
 
@@ -188,7 +187,6 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath, sanitized_labels:
     img_ids = [img_ids[idx] for idx in unique_indices]
 
     class_counts = torch.bincount(label_tensor)
-    print(label_tensor)
     log.info(f"counts: {class_counts}")
 
     # convert image_tensors to uint8 since that's the format needed for training on StyleGAN

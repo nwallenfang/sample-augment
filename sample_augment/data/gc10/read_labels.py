@@ -20,7 +20,7 @@ from sample_augment.data.gc10.download_gc10 import GC10Folder
 from sample_augment.utils import log
 # from sample_augment.data.gc10.download import load_gc10_if_missing
 from sample_augment.utils.path_utils import project_path, shared_dir
-from sample_augment.utils.plot import show_image, prepare_latex_plot
+from sample_augment.utils.plot import show_image, prepare_latex_plot, CREATE_PLOTS
 
 # from sample_augment.data/gc10/Defect Descriptions.xlsx, which also contains some example images
 LABEL_TO_NAME = {
@@ -338,6 +338,7 @@ def sanitize_labels(gc10_labels: GC10Labels) -> SanitizedGC10Labels:
     # class_wise_label_count_ratio(labels)
 
     log.info("--- sanitized ---")
+    # ids_test = get_ids_with_labels(labels, primary_class=class_name_to_idx[''])
     class_wise_label_count_ratio(sanitized_labels)
 
     ratio_of_secondary_classes(sanitized_labels, class_name_to_idx['punching_hole'], gc10_labels.class_names)
@@ -346,24 +347,31 @@ def sanitize_labels(gc10_labels: GC10Labels) -> SanitizedGC10Labels:
     class_counts = collections.Counter(primary_labels)
     log.info(class_counts)
 
-    # Heatmap data generation
-    class_names = [" ".join(class_name.split("_")) for class_name in gc10_labels.class_names]
-    total_counts = []
-    heatmap_data = []
-    for primary_class_idx in range(len(class_names)):
-        secondary_distribution = ratio_of_secondary_classes(sanitized_labels, primary_class_idx, class_names)
-        # Append the distribution to heatmap data, while making sure each secondary class has an entry
-        heatmap_data.append([round(secondary_distribution.get(class_name, 0), 2) for class_name in class_names])
-        # Calculate the total counts for each primary class
-        total_counts.append(sum([val for val in secondary_distribution.values()]))
+    if CREATE_PLOTS:
+        # Heatmap data generation
+        class_names = [" ".join(class_name.split("_")) for class_name in gc10_labels.class_names]
+        total_counts = []
+        heatmap_data = []
+        for primary_class_idx in range(len(class_names)):
+            secondary_distribution = ratio_of_secondary_classes(sanitized_labels, primary_class_idx, class_names)
+            # Append the distribution to heatmap data, while making sure each secondary class has an entry
+            heatmap_data.append([round(secondary_distribution.get(class_name, 0), 2) for class_name in class_names])
+            # Calculate the total counts for each primary class
+            total_counts.append(sum([val for val in secondary_distribution.values()]))
 
-    class_counts = dict(class_counts)
-    total_counts = [class_counts[i] for i in range(10)]
+        class_counts = dict(class_counts)
+        total_counts = [class_counts[i] for i in range(10)]
 
-    # Then, you can call the heatmap plotting function
-    plot_heatmap(heatmap_data, class_names, class_names, total_counts)
+        # Then, you can call the heatmap plotting function
+        plot_heatmap(heatmap_data, class_names, class_names, total_counts)
 
     return SanitizedGC10Labels(labels=labels, number_of_classes=gc10_labels.number_of_classes)
+
+
+def get_ids_with_labels(labels: Dict, primary_class: int, secondary_class: int):
+    # TODO if I continue with the sanitation process, look at rolled_pit instances I could
+    #  get from other classes
+    pass
 
 
 def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts):
@@ -396,7 +404,6 @@ def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts
     plt.tight_layout()
     # plt.show()
     plt.savefig(shared_dir / "figures/label-exploration" / "secondary_labels.pdf", bbox_inches="tight")
-
 
 # def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts):
 #     df = pd.DataFrame(distributions, index=primary_classes, columns=secondary_classes)

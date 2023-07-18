@@ -1,5 +1,5 @@
 {
-  "name": "vit-data-aug",
+  "name": "no-synth-aug-baseline",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
@@ -14,5 +14,7 @@
   "geometric_augment": false,
   "color_jitter": 0.25,
   "h_flip_p": 0.5,
-  "v_flip_p": 0.5
+  "v_flip_p": 0.5,
+
+  "generator_name": "apa-020"
 }

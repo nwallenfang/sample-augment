@@ -10,6 +10,8 @@ from typing import *
 
 import numpy as np
 import torch
+# noinspection PyProtectedMember
+from pydantic.main import ModelMetaclass
 from pydantic import BaseModel, parse_obj_as, ValidationError, Field
 
 from sample_augment.utils import log, path_utils
@@ -22,7 +24,18 @@ def is_tuple_of_tensors(field_type):
     return False
 
 
-class Artifact(BaseModel, arbitrary_types_allowed=True):
+class ArtifactMeta(ModelMetaclass):
+    """
+        due to a problem with producers and consumers in the StepRegistry sometimes having the fully-qualified name
+        sometimes not...
+    """
+
+    def __init__(cls, name, bases, attrs):
+        super().__init__(name, bases, attrs)
+        cls.__full_name__ = f"{cls.__module__}.{name}"
+
+
+class Artifact(BaseModel, metaclass=ArtifactMeta):
     """
         Represents a piece of data that gets produced/consumed in some Step.
         Supports automatic (de-)serialization.
@@ -301,3 +314,6 @@ class Artifact(BaseModel, arbitrary_types_allowed=True):
     def from_file(cls, path: Union[str, Path]) -> "Artifact":
         with open(path) as json_file:
             return cls.from_dict(json.load(json_file))
+
+    class Config:
+        arbitrary_types_allowed = True

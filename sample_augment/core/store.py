@@ -75,9 +75,12 @@ class Store:
             if 'name' in artifact.configs and artifact.configs['name'] != config_name:
                 log.debug(f"Skipping artifact {artifact_name} since it has another name.")
                 continue
-            if not artifact.is_serialized(config_name) and artifact.serialize_this:
+            if not artifact.serialize_this:
+                continue
+            if not artifact.is_serialized(config_name):
                 log.warning(f"store.save(): {artifact_name} is not yet serialized! skipping it")
                 continue
+
             # artifact_dict = artifact.serialize()
             # log.debug(f"Saving artifact {artifact_name}")
             data[artifact.fully_qualified_name] = {
