@@ -88,7 +88,8 @@ class Experiment:
 
         self.store.completed_steps.append(step.name)
 
-    def run(self, target_name: str, initial_artifacts: List[Artifact] = None):
+    def run(self, target_name: str, fixed: Optional[List[str] | str], initial_artifacts: List[Artifact] = None):
+        # TODO allow for a step to fixed, that affects the pipeline (when there are multiple steps producing an artifact)
         target = get_step(target_name)
         pipeline = self._calc_pipeline(initial_artifacts, target)
 
