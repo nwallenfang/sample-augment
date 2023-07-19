@@ -151,19 +151,19 @@ class ClassificationReport(Artifact):
 
 @step
 def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSet,
-                        gc10_labels: GC10Labels) -> ClassificationReport:
+                        gc10_labels: GC10Labels, threshold: float) -> ClassificationReport:
     # quickfix since the artifacts are not properly guarded from being mutated yet (TODO)
     # I removed the preprocessing of val_set since it's only used for the label info here, the data doesn't get accessed
     predictions = val_pred_artifact.predictions
     assert len(predictions) == len(val_set)
     imgs, labels = val_set.tensors[0], val_set.tensors[1]
-    secondary_labels = gc10_labels.labels
+    # secondary_labels = gc10_labels.labels
 
-    apply_secondary_labels(labels, predictions, secondary_labels, val_set)
+    # apply_secondary_labels(labels, predictions, secondary_labels, val_set)
     # ConfusionMatrixMetric(labels=classes).calculate(predictions, labels).show()
     # show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data)
     # debug_class_distribution(classes, labels, sec_labels)
-    predicted_labels = torch.argmax(predictions, dim=1)
+    predicted_labels = (predictions > threshold).float()
     report = classification_report(labels.numpy(), predicted_labels.numpy(),
                                    target_names=gc10_labels.class_names[:gc10_labels.number_of_classes],
                                    zero_division=0, output_dict=True)

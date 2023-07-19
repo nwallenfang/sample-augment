@@ -94,6 +94,7 @@ def synth_augment_seperate(training_set: TrainSet, generator_name: str) -> Separ
     # it's doubtful to say the least that StyleGAN will be able to learn the class with 8 (or even 11) instances.
     # possibly we'll have to resort to putting the validation instances into for the small classes into the train set
     # for StyleGAN and accept that our F1 estimation will be a little optimistic for these classes
+    # TODO -- not done yet
     class_counts = np.bincount(training_set.tensors[1].numpy())
     _median_count = int(np.median(class_counts) + 0.5)
     target_count = 200  # = median_count
@@ -140,6 +141,13 @@ def synth_augment_seperate(training_set: TrainSet, generator_name: str) -> Separ
                              tensors=(augmented_tensors, augmented_labels))
 
 
+class SynthTrainedClassifier(TrainedClassifier):
+    # noinspection PyMissingConstructor
+    def __init__(self, trained_classifier: TrainedClassifier):
+        # Copy all attributes from the superclass instance to the subclass instance
+        self.__dict__ = trained_classifier.__dict__.copy()
+
+
 @step
 def train_augmented_classifier(train_data: AugmentedTrainSet, val_data: ValSet,
                                num_epochs: int, batch_size: int, learning_rate: float,
@@ -149,9 +157,10 @@ def train_augmented_classifier(train_data: AugmentedTrainSet, val_data: ValSet,
                                geometric_augment: bool,
                                color_jitter: float,
                                h_flip_p: float,
-                               v_flip_p: float) -> TrainedClassifier:
-    return train_classifier(train_data, val_data, num_epochs, batch_size, learning_rate, balance_classes, random_seed,
-                            data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p)
+                               v_flip_p: float) -> SynthTrainedClassifier:
+    return SynthTrainedClassifier(
+        train_classifier(train_data, val_data, num_epochs, batch_size, learning_rate, balance_classes, random_seed,
+                         data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p))
 
 
 @step

@@ -28,7 +28,7 @@ def stratified_split(dataset: AugmentDataset,
     """
     np.random.seed(random_seed)
 
-    labels = dataset.label_tensor
+    labels = dataset.primary_label_tensor
 
     n = len(dataset)
     indices = list(range(n))
@@ -120,7 +120,7 @@ class TrainSet(AugmentDataset):
         if self.transform:
             x = self.transform(x)
 
-        y = self.tensors[1][index].long()
+        y = self.tensors[1][index].float()
 
         return x, y
 
@@ -135,7 +135,7 @@ class ValSet(AugmentDataset):
         if self.transform:
             x = self.transform(x)
 
-        y = self.tensors[1][index].long()
+        y = self.tensors[1][index].float()
 
         return x, y
 

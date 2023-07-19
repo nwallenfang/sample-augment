@@ -161,7 +161,9 @@ def create_weighted_random_sampler(dataset: Dataset):
 
     # calling len on dataset is fine
     # noinspection PyTypeChecker
-    labels = [dataset[i][1] for i in range(len(dataset))]
+    assert isinstance(dataset, AugmentDataset)
+
+    labels = [dataset.primary_label_tensor[i] for i in range(len(dataset))]
     class_counts = np.bincount(labels)
     num_samples = len(labels)
 
@@ -195,7 +197,7 @@ def _set_random_seed(random_seed: int):
 
 def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
                 learning_rate: float, random_seed: int,
-                balance_classes: bool) -> ClassifierMetrics:
+                balance_classes: bool, threshold: float) -> ClassifierMetrics:
     """
         this code is taken in large part from Michel's notebook,
         see docs/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
@@ -210,7 +212,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
     val_loader = DataLoader(dataset=val_set, batch_size=batch_size, shuffle=True)
 
     # Loss and optimizer
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     train_loss_per_epoch = []
@@ -239,9 +241,13 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             label = label.to(device=device)
 
             # forward
-            predictions = model(image)  # Pass batch
-            train_loss = criterion(predictions, label)  # Calculate the loss
-            train_accuracies += (predictions.argmax(dim=-1) == label).float().mean().item()
+            logits = model(image)  # Pass batch
+            # get sigmoid probabilities
+            predictions = torch.sigmoid(logits)
+
+            train_loss = criterion(logits, label)  # Calculate the loss
+            # train_accuracies += (predictions.argmax(dim=-1) == label).float().mean().item()
+            train_accuracies += ((predictions > threshold) == label).float().mean().item()
 
             # backward
             optimizer.zero_grad()
@@ -264,15 +270,16 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             label = label.to(device=device)
 
             with torch.no_grad():
-                predictions = model(image)
+                logits = model(image)
+                predictions = torch.sigmoid(logits)
 
-            val_loss = criterion(predictions, label)
+            val_loss = criterion(logits, label)
 
             # calculate validation metrics
             val_losses += val_loss.item()
-            val_accuracies += (predictions.argmax(dim=-1) == label).float().mean().item()
+            val_accuracies += ((predictions > threshold) == label).float().mean().item()
             val_f1s += f1_score(label.cpu().numpy(),
-                                predictions.argmax(dim=-1).cpu().numpy(), average='macro')
+                                (predictions > threshold).cpu().numpy(), average='macro')
 
         avg_val_loss = val_losses / len(val_loader)
         val_loss_per_epoch.append(avg_val_loss)

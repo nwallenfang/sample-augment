@@ -29,18 +29,18 @@ class ImageDataset(torchvision.datasets.ImageFolder):
 
 
 class AugmentDataset(TensorDataset, Artifact):
-    # TODO move DataSet class into its own script
     """
         PyTorch TensorDataset with the extension that we're also saving the paths to the
         original images.
     """
     name: str
     root_dir: Path
-    # TODO verify that these are just the step names or else make them so
     img_ids: List[str]
     # redeclare these so they are turned into Pydantic fields
     # needed for proper serialization of this class
     tensors: Tuple[Tensor, ...]
+
+    primary_label_tensor: Tensor
 
     def __init__(self, name: str, tensors: Tuple[Tensor, Tensor], img_ids: List[str],
                  root_dir: Path, **kwargs):
@@ -57,13 +57,15 @@ class AugmentDataset(TensorDataset, Artifact):
         # copies the tensors, so this is a copy rather than a view
         # so potential for optimization, which we will ignore for now.
         subset_tensors: Tuple[Tensor, Tensor] = self.tensors[0][indices], self.tensors[1][indices]
+        primary_subset = self.primary_label_tensor[indices]
         subset_img_ids = [self.img_ids[i] for i in indices]
 
         return AugmentDataset(
             name=name if name else "subset",
             root_dir=self.root_dir,
             img_ids=subset_img_ids,
-            tensors=subset_tensors
+            tensors=subset_tensors,
+            primary_label_tensor=primary_subset
         )
 
     @classmethod
@@ -75,7 +77,8 @@ class AugmentDataset(TensorDataset, Artifact):
         new_dataset = cls(name=name if name else existing_dataset.name, tensors=(existing_dataset.tensors[0],
                                                                                  existing_dataset.tensors[1]),
                           img_ids=existing_dataset.img_ids,
-                          root_dir=existing_dataset.root_dir)
+                          root_dir=existing_dataset.root_dir,
+                          primary_label_tensor=existing_dataset.primary_label_tensor)
         return new_dataset
 
     @property
@@ -95,8 +98,7 @@ class AugmentDataset(TensorDataset, Artifact):
 
     @property
     def num_classes(self):
-        # very unperformant when called often
-        return int(torch.max(self.tensors[1]) - torch.min(self.tensors[1])) + 1
+        return len(self.tensors[1][0])  # assuming all label vectors have the same length
 
     # @property
     # def transform(self):
@@ -116,8 +118,19 @@ def gc10_adapter(gc10_data: GC10Folder) -> ImageFolderPath:
     return ImageFolderPath(image_dir=gc10_data.image_dir)
 
 
+def create_multilabel_tensor(labels, ids, num_classes=10):
+    multilabel_tensor = torch.zeros((len(ids), num_classes), dtype=torch.int)
+    for i, img_id in enumerate(ids):
+        primary_class = labels[img_id]['y']
+        secondary_classes = labels[img_id]['secondary']
+        multilabel_tensor[i, primary_class] = 1
+        for class_ in secondary_classes:
+            multilabel_tensor[i, class_] = 1
+    return multilabel_tensor
+
+
 # meta: don't really like having to create an artifact for single attributes but fine
-@step()
+@step
 def imagefolder_to_tensors(image_folder_path: ImageFolderPath, sanitized_labels: SanitizedGC10Labels) -> AugmentDataset:
     """
         ImageFolder dataset is designed for big datasets that don't fit into RAM (think ImageNet).
@@ -182,12 +195,13 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath, sanitized_labels:
     image_tensor = torch.stack([image_dataset[i][0] for i in tqdm(unique_indices, file=sys.stdout)])
     # label_tensor = torch.tensor([image_dataset.targets[i] for i in unique_indices],
     #                             dtype=torch.int)
-    label_tensor = torch.tensor([sanitized_labels.labels[img_ids[i]]['y'] for i in unique_indices],
-                                dtype=torch.int)
+    single_label_tensor = torch.tensor([sanitized_labels.labels[img_ids[i]]['y'] for i in unique_indices],
+                                       dtype=torch.int)
     img_ids = [img_ids[idx] for idx in unique_indices]
+    multi_label_tensor = create_multilabel_tensor(sanitized_labels.labels, img_ids)
 
-    class_counts = torch.bincount(label_tensor)
-    log.info(f"counts: {class_counts}")
+    # class_counts = torch.bincount(label_tensor)
+    # log.info(f"counts: {class_counts}")
 
     # convert image_tensors to uint8 since that's the format needed for training on StyleGAN
     image_data: np.ndarray = image_tensor.numpy()
@@ -200,7 +214,8 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath, sanitized_labels:
     image_data = image_data.astype(np.uint8)
     image_tensor = torch.from_numpy(image_data)
 
-    tensor_dataset = AugmentDataset(name="complete", tensors=(image_tensor, label_tensor),
+    tensor_dataset = AugmentDataset(name="complete", tensors=(image_tensor, multi_label_tensor),
+                                    primary_label_tensor=single_label_tensor,
                                     img_ids=img_ids,
                                     root_dir=root_dir)
     return tensor_dataset
