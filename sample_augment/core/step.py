@@ -199,9 +199,11 @@ class StepRegistry:
     def reduce_steps(pipeline: List[Step], initial_artifacts: List[Type[Artifact]]):
         # remove all steps from pipeline whose produced artifacts are contained in initial artifacts
         filtered_pipeline = []
+        initial_artifacts_names = [cls.__name__ for cls in initial_artifacts]
+
         for pipeline_step in pipeline:
             # for now this expects every step to only produce a single Artifact!
-            if pipeline_step.produces in initial_artifacts:
+            if pipeline_step.produces and pipeline_step.produces.__name__ in initial_artifacts_names:
                 continue
             else:
                 filtered_pipeline.append(pipeline_step)

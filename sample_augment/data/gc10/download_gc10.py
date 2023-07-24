@@ -16,13 +16,14 @@ class GC10Folder(Artifact):
 
 @step()
 def download_gc10(shared_directory: Path) -> GC10Folder:
-    import kaggle
     logging.debug(f"GC10 shared_dir: {shared_directory}")
     gc10_path = shared_directory / 'gc10'
     lable_dir = gc10_path / 'lable'
     new_lable_dir = shared_directory / 'gc10_labels'
 
     if not gc10_path.is_dir():
+        import kaggle
+
         log.info("Downloading GC10 dataset from kaggle..")
         kaggle.api.authenticate()  # throws IOError if API key is not configured
         # noinspection PyBroadException

@@ -23,7 +23,9 @@ def create_train_val_pt():
     bundle = create_train_test_val(complete_dataset, random_seed, test_ratio=0.2, val_ratio=0.1, min_instances=10)
     train = bundle.train
     # save the two tensors stacked to one pt file
-    torch.save(train.tensors, path_utils.root_dir / 'stylegan_train_data.pt')
+    # let's stack the primary tensor in there as well just in case
+    
+    torch.save(train.tensors +  (train.primary_label_tensor,), path_utils.root_dir / 'stylegan_train_data.pt')
 
 
 # TODO calculate improved precision and recall metrics
@@ -32,8 +34,7 @@ def train_stylegan():
     import sample_augment.models.stylegan2.dnnlib as dnnlib
     from sample_augment.models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn
     out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
-
-    # TODO how to configure learning rate?
+    # TODO in theory we could add a method that uploads our tensorboard events file to gdrive or somewhere so we can check it remotely.
     config_kwargs = {
         'data': r"E:\Master_Thesis_Nils\data\stylegan_train_data.pt",
         # 'custom_name' 'gc10_pre_FFHQ'
@@ -44,16 +45,16 @@ def train_stylegan():
         'cond': True,
         'subset': None,
         'mirror': True,  # checked each class and x-flip can be done semantically for GC10
-        'cfg': 'config-gc10-continue',
+        'cfg': 'config-gc10',
         'gamma': None,  # tune this parameter with values such as 0.1, 0.5, 1, 5, 10
-        'kimg': 10000,
+        'kimg': 12500,
         'batch': None,
         'aug': None,
         'p': None,
         'target': None,  # ADA target value, might need tweaking
         'augpipe': 'bgc-gc10',  # custom augmentation pipeline without 90 degree rotations
-        # 'resume': 'ffhq256',
-        'resume': r"E:\Master_Thesis_Nils\stylegan-training\00020-gc10-cond-mirror-config-gc10-kimg5000-bgc-gc10-resumeffhq256\network-snapshot-004800.pkl",
+        'resume': 'ffhq256',
+        # 'resume': r"E:\Master_Thesis_Nils\stylegan-training\00020-gc10-cond-mirror-config-gc10-kimg5000-bgc-gc10-resumeffhq256\network-snapshot-004800.pkl",
         # "E:\\Master_Thesis_Nils\\stylegan-training\\00009-gc10_pre_FFHQ-cond-mirror-auto2-kimg5000"
         #      "-resumecelebahq256\\network-snapshot-000200.pkl",
         # 'celebahq256', # 'ffhq256',  # checkpoint for transfer learning / resuming interrupted run
@@ -63,7 +64,8 @@ def train_stylegan():
         'nhwc': None,
         'nobench': None,
         'allow_tf32': None,
-        'workers': 1  # could try setting number of workers to 1, since the data is fully in RAM
+        'workers': 1, # could try setting number of workers to 1, since the data is fully in RAM
+        'with_dataaug': True 
     }
     dry_run = False
 
@@ -129,4 +131,5 @@ def train_stylegan():
 if __name__ == "__main__":
     # IF STUCK ON 'Setting up Pytorch plugin..'
     # need to remove the torch_extensions cache!!!! (C:\Users\user\AppData\Local\torch_extensions)
+    # create_train_val_pt()
     train_stylegan()

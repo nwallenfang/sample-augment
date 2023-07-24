@@ -7,11 +7,13 @@ from pprint import pprint
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
 import pandas as pd
 import torch.cuda
 import torchvision
-from sklearn.metrics import ConfusionMatrixDisplay, classification_report
+from sklearn.metrics import ConfusionMatrixDisplay, classification_report, roc_curve
+from sklearn.preprocessing import label_binarize
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
@@ -27,6 +29,7 @@ from sample_augment.data.train_test_split import stratified_split, stratified_k_
 from sample_augment.models.train_classifier import TrainedClassifier, KFoldTrainedClassifiers, plain_transforms, \
     CustomViT
 from sample_augment.utils import log, plot
+from sample_augment.utils.path_utils import shared_dir
 from sample_augment.utils.plot import prepare_latex_plot
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
@@ -149,6 +152,31 @@ class ClassificationReport(Artifact):
     report: Dict
 
 
+def show_prediction(image, prediction, class_names, true_labels, name: str, img_id: str, threshold=0.5):
+    # Assume image is torch.Tensor, prediction is torch.Tensor, class_names is list of strings,
+    # true_labels is list of strings
+    prediction = prediction.cpu().numpy()
+    image = image.cpu().numpy()
+    image = np.transpose(image, (1, 2, 0))  # assuming image tensor is (C, H, W)
+
+    prepare_latex_plot()
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+
+    # Show image
+    ax[0].imshow(image)
+    ax[0].axis('off')
+
+    # Show prediction
+    colors = ['blue' if class_name in true_labels else 'orange' for class_name in class_names]
+    ax[1].axhline(y=threshold, color='r', linestyle='--')
+    sns.barplot(x=class_names, y=prediction, palette=colors, ax=ax[1])
+    ax[1].set_ylabel('Prediction')
+    ax[1].tick_params(axis='x', rotation=90)  # rotate x-axis labels for better visibility
+
+    plt.tight_layout()
+    plt.savefig(shared_dir / "figures" / "predictions" / f"{name}_{img_id}.pdf", bbox_inches="tight")
+
+
 @step
 def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSet,
                         gc10_labels: GC10Labels, threshold: float) -> ClassificationReport:
@@ -159,6 +187,13 @@ def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSe
     imgs, labels = val_set.tensors[0], val_set.tensors[1]
     # secondary_labels = gc10_labels.labels
 
+    for i in range(10):
+        true_class_names = [gc10_labels.class_names[j] for j in labels[i].nonzero().flatten().tolist()]
+        show_prediction(imgs[i], torch.sigmoid(predictions[i]), gc10_labels.class_names, true_labels=true_class_names,
+                        name=val_pred_artifact.configs['name'], img_id=val_set.img_ids[i], threshold=threshold)
+
+    torch.save(val_set.tensors[1], shared_dir / 'validation_labels.pt')
+    sys.exit(-1)
     # apply_secondary_labels(labels, predictions, secondary_labels, val_set)
     # ConfusionMatrixMetric(labels=classes).calculate(predictions, labels).show()
     # show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data)
@@ -396,7 +431,8 @@ def apply_secondary_labels(labels, predictions, sec_labels, test_data):
 def plot_loss_over_epochs(classifier: TrainedClassifier, shared_directory: Path):
     # log.info(f"Training:   {classifier.metrics.train_loss}")
     # log.info(f"Validation: {classifier.metrics.validation_loss}")
-    plt.figure(figsize=(10, 7))
+    prepare_latex_plot()
+    plt.figure(figsize=(8, 5))
 
     plt.plot(classifier.metrics.train_loss, label='Training Loss', color='blue')
     plt.plot(classifier.metrics.validation_loss, label='Validation Loss', color='red')
@@ -406,8 +442,52 @@ def plot_loss_over_epochs(classifier: TrainedClassifier, shared_directory: Path)
     plt.ylabel('Cross-Entropy Loss')
     plt.legend()
 
-    plt.savefig(shared_directory / "losses.png")
+    plt.savefig(shared_directory / "figures" / f"{classifier.configs['name']}_losses.pdf")
 
 
 if __name__ == '__main__':
     evaluate_classifier()
+
+
+def plot_roc_curves(fpr: Dict[int, np.ndarray],
+                    tpr: Dict[int, np.ndarray],
+                    roc_auc: Dict[int, float]) -> None:
+    # TODO wire this one up
+    """Plot ROC curves for each class."""
+    plt.figure(figsize=(10, 8))
+
+    for i in range(len(fpr)):
+        plt.plot(fpr[i], tpr[i],
+                 label='ROC curve of class {0} (area = {1:0.2f})'
+                       ''.format(i, roc_auc[i]))
+
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlim([-0.05, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic to Multi-Class')
+    plt.legend(loc="lower right")
+    plt.show()
+
+
+def calculate_optimal_thresholds(true_labels: np.ndarray,
+                                 probabilities: np.ndarray) -> Dict[int, float]:
+    # TODO wire this one up with evaluate_classifier()
+    """Calculate optimal threshold for each class using Youden's J statistic."""
+    # Ensure the true labels are binary
+    if len(true_labels.shape) > 1 and true_labels.shape[1] > 1:
+        binary_labels = true_labels
+    else:
+        binary_labels = label_binarize(true_labels, classes=np.unique(true_labels))
+
+    opt_threshold_dict = dict()
+
+    # Compute optimal threshold for each class
+    for i in range(binary_labels.shape[1]):
+        fpr, tpr, thresholds = roc_curve(binary_labels[:, i], probabilities[:, i])
+        j_scores = tpr - fpr
+        opt_idx = np.argmax(j_scores)
+        opt_threshold_dict[i] = thresholds[opt_idx]
+
+    return opt_threshold_dict

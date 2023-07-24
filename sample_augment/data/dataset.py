@@ -98,6 +98,7 @@ class AugmentDataset(TensorDataset, Artifact):
 
     @property
     def num_classes(self):
+        # assumption: multilabel
         return len(self.tensors[1][0])  # assuming all label vectors have the same length
 
     # @property
@@ -200,6 +201,11 @@ def imagefolder_to_tensors(image_folder_path: ImageFolderPath, sanitized_labels:
     img_ids = [img_ids[idx] for idx in unique_indices]
     multi_label_tensor = create_multilabel_tensor(sanitized_labels.labels, img_ids)
 
+    class_counts = torch.sum(multi_label_tensor, dim=0)
+
+    # Print the class counts
+    for i, count in enumerate(class_counts):
+        log.info(f"Class {sanitized_labels.class_names[i]}: {count}")
     # class_counts = torch.bincount(label_tensor)
     # log.info(f"counts: {class_counts}")
 

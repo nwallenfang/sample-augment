@@ -1,6 +1,6 @@
 {
   "name": "dataset",
-  "random_seed": 600,
+  "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 10,
