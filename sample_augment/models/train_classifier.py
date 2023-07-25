@@ -17,6 +17,7 @@ from tqdm import tqdm  # For nice progress bar!
 
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
+from sample_augment.data.synth_augment import TrainSetWithSynthetic
 from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
 from sample_augment.utils import log
 
@@ -357,6 +358,33 @@ class CircularTranslate:
         return img
 
 
+# class AugmentedDataset(AugmentDataset):
+#     def __init__(self, original_with_synthetic: TrainSetWithSynthetic, synth_p: float, name: str,
+#                  tensors: Tuple[Tensor, Tensor], img_ids: List[str], root_dir: Path, **kwargs):
+#         super().__init__(name, tensors, img_ids, root_dir, **kwargs)
+#         self.original_with_synthetic = original_with_synthetic
+#         self.synth_p = synth_p
+#
+#     def __len__(self):
+#         return len(self.original_with_synthetic)
+#
+#     def __getitem__(self, idx):
+#         image, label = self.original_with_synthetic.__getitem__(idx)
+#         if np.random.rand() < self.synth_p:
+#             same_class_indices = (self.original_with_synthetic.synthetic_labels == label).nonzero(as_tuple=True)[0]
+#             if len(same_class_indices) > 0:  # If there are synthetic instances from the same class
+#                 # Replace the real instance with a synthetic one
+#                 chosen_idx = np.random.choice(same_class_indices)
+#                 image, label = (self.original_with_synthetic.synthetic_images[chosen_idx],
+#                                 self.original_with_synthetic.synthetic_labels[chosen_idx])
+#                 # Apply the same transformation to the synthetic image
+#                 if self.original_with_synthetic.transform is not None:
+#                     image = self.original_with_synthetic.transform(image)
+#                 else:
+#                     log.warning("synthetic dataset transform is None!")
+#         return image, label
+
+
 @step
 def train_classifier(train_data: TrainSet, val_data: ValSet,
                      num_epochs: int, batch_size: int, learning_rate: float,
@@ -366,7 +394,9 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
                      geometric_augment: bool,
                      color_jitter: float,
                      h_flip_p: float,
-                     v_flip_p: float) -> TrainedClassifier:
+                     v_flip_p: float,
+                     threshold: float,
+                     synth_p: float) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
@@ -408,6 +438,11 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
             # add geometric transforms to base_transforms (before ColorJitter)
             base_transforms[2:2] = geometric_transforms
 
+        # add synthetic augmentation if synthetic data is present
+        # can't use isinstance due to the pesky importing / class use issue....
+        if train_data.__full_name__ == 'data.synth_augment.TrainSetWithSynthetic':
+            log.info(f"Doing synthetic Data Augmentation with probability {synth_p}.")
+
         train_data.transform = transforms.Compose(base_transforms)
         val_data.transform = transforms.Compose(plain_transforms)
     else:
@@ -427,7 +462,7 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
 
     metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
                           batch_size=batch_size, learning_rate=learning_rate,
-                          balance_classes=balance_classes, random_seed=random_seed)
+                          balance_classes=balance_classes, random_seed=random_seed, threshold=threshold)
 
     del train_data
     del val_data
@@ -473,3 +508,27 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
         classifiers.append(classifier)
 
     return KFoldTrainedClassifiers(classifiers=classifiers)
+
+
+class SynthTrainedClassifier(TrainedClassifier):
+    # noinspection PyMissingConstructor
+    def __init__(self, trained_classifier: TrainedClassifier):
+        # Copy all attributes from the superclass instance to the subclass instance
+        self.__dict__ = trained_classifier.__dict__.copy()
+
+
+@step
+def train_augmented_classifier(train_data: TrainSetWithSynthetic, val_data: ValSet,
+                               num_epochs: int, batch_size: int, learning_rate: float,
+                               balance_classes: bool,
+                               random_seed: int,
+                               data_augment: bool,
+                               geometric_augment: bool,
+                               color_jitter: float,
+                               h_flip_p: float,
+                               v_flip_p: float,
+                               threshold: float,
+                               synth_p: float) -> SynthTrainedClassifier:
+    return SynthTrainedClassifier(
+        train_classifier(train_data, val_data, num_epochs, batch_size, learning_rate, balance_classes, random_seed,
+                         data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, threshold, synth_p))

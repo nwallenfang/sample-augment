@@ -50,13 +50,20 @@ class Step(Callable, BaseModel):
         return hash(self.name)
 
 
+"""
+    Fully qualified artifact class name, but without the 'sample_augment' or whatever package-level part.
+    So for example 'test.test_step.DummyState'.
+"""
+ArtifactName = str
+
+
 class StepRegistry:
     # TODO document this class well since the code is complex
     all_steps = {}
     # For more advanced use-cases, it would make sense to have the data structure for the steps be a
     # graph instead of these two dicts
-    producers: Dict[Type[Artifact], List[Step]] = {}
-    consumers: Dict[Type[Artifact], List[Step]] = {}
+    producers: Dict[ArtifactName, List[Step]] = {}
+    consumers: Dict[ArtifactName, List[Step]] = {}
 
     def __repr__(self):
         return f"{str(self.all_steps)}"
@@ -152,10 +159,10 @@ class StepRegistry:
         )
 
         for artifact in new_step.consumes.values():
-            self.consumers.setdefault(artifact, []).append(new_step)
+            self.consumers.setdefault(artifact.__full_name__, []).append(new_step)
 
         if produced_artifact:
-            self.producers.setdefault(produced_artifact, []).append(new_step)
+            self.producers.setdefault(produced_artifact.__full_name__, []).append(new_step)
 
         self.all_steps[name] = new_step
         # log.debug(f'Registered step {name}.')
@@ -181,12 +188,13 @@ class StepRegistry:
         def add_dependencies(node):
             visited.add(node)
             for artifact in node.consumes.values():
-                # if artifact not in self.producers:
-                if artifact.__full_name__.split('.')[-1] not in (cls.__full_name__.split('.')[-1]
-                                                                 for cls in self.producers):
+                # if artifact.__full_name__.split('.')[-1] not in (cls.__full_name__.split('.')[-1]
+                #                                                  for cls in self.producers):
+                # if is not produced anywhere, raise an error
+                if artifact.__full_name__ not in self.producers:
                     raise ValueError(f"No step found that produces {artifact.__name__}")
 
-                for producer in self.producers[artifact]:
+                for producer in self.producers[artifact.__full_name__]:
                     if producer not in visited:
                         add_dependencies(producer)
             step_stack.append(node)
@@ -199,11 +207,11 @@ class StepRegistry:
     def reduce_steps(pipeline: List[Step], initial_artifacts: List[Type[Artifact]]):
         # remove all steps from pipeline whose produced artifacts are contained in initial artifacts
         filtered_pipeline = []
-        initial_artifacts_names = [cls.__name__ for cls in initial_artifacts]
+        initial_artifacts_names = [cls.__full_name__ for cls in initial_artifacts]
 
         for pipeline_step in pipeline:
             # for now this expects every step to only produce a single Artifact!
-            if pipeline_step.produces and pipeline_step.produces.__name__ in initial_artifacts_names:
+            if pipeline_step.produces and pipeline_step.produces.__full_name__ in initial_artifacts_names:
                 continue
             else:
                 filtered_pipeline.append(pipeline_step)

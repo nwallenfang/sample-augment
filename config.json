@@ -17,5 +17,6 @@
   "v_flip_p": 0.5,
 
   "generator_name": "apa-020",
-  "threshold": 0.5
+  "threshold": 0.5,
+  "synth_p": 0.1
 }

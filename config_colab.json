@@ -1,5 +1,5 @@
 {
-  "name": "multilabel-vit",
+  "name": "multilabel-synth-augment",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
@@ -17,5 +17,6 @@
   "v_flip_p": 0.5,
 
   "generator_name": "apa-020",
-  "threshold": 0.8
+  "threshold": 0.8,
+  "synth_p": 0.15
 }

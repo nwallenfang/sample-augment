@@ -32,7 +32,11 @@ class ArtifactMeta(ModelMetaclass):
 
     def __init__(cls, name, bases, attrs):
         super().__init__(name, bases, attrs)
+        # FIXME sometimes this way of doing it returns 'sample_augment.test...' instead of what we wish to get 'test..'
+        #  fixed this in a quick and dirty manner.
         cls.__full_name__ = f"{cls.__module__}.{name}"
+        if 'sample_augment' in cls.__full_name__:
+            cls.__full_name__ = cls.__full_name__[len('sample_augment')+1:]
 
 
 class Artifact(BaseModel, metaclass=ArtifactMeta):

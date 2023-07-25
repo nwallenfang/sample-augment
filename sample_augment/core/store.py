@@ -112,6 +112,9 @@ class Store:
             ArtifactSubclass = getattr(import_module(module_name), class_name)
             with open(artifact_path, 'r') as artifact_json:
                 artifacts[class_name] = ArtifactSubclass.from_dict(json.load(artifact_json))
+                if artifacts[class_name] is None:
+                    log.warning(f"Error loading {class_name}, skipping it.")
+                    del artifacts[class_name]
 
         store = cls()
         store.artifacts = artifacts
@@ -157,6 +160,9 @@ class Store:
                     ArtifactSubclass = getattr(import_module(module_name), class_name)
                     artifact_dict = json.load(open(path_utils.root_dir / artifact_info['path'], 'r'))
                     artifacts[class_name] = ArtifactSubclass.from_dict(artifact_dict)
+                    if artifacts[class_name] is None:
+                        log.warning(f"Skipping {class_name}. (error in from_dict)")
+                        del artifacts[class_name]
                     log.debug(f"Loaded artifact {class_name} from {run_file_name}.")
         return artifacts
 
@@ -193,6 +199,10 @@ class Store:
                     ArtifactSubclass = getattr(import_module(module_name), class_name)
                     artifact_dict = json.load(open(path_utils.root_dir / artifact_info['path'], 'r'))
                     artifacts[class_name] = ArtifactSubclass.from_dict(artifact_dict)
-                    log.debug(f"Loaded artifact {class_name} from {run_file_name}.")
+                    if artifacts[class_name] is None:
+                        log.warning(f"Error loading {class_name}, skipping it.")
+                        del artifacts[class_name]
+                    else:
+                        log.debug(f"Loaded artifact {class_name} from {run_file_name}.")
 
         return Store(artifacts=artifacts)
