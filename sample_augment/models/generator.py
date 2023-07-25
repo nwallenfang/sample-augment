@@ -1,12 +1,11 @@
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Union
 
 import numpy as np
 import torch
 from PIL import Image
-from torch import Tensor
 
 import sample_augment.models.stylegan2.legacy as legacy
 from sample_augment.utils.path_utils import root_dir
@@ -28,6 +27,18 @@ GC10_CLASSES = [
     "crease",
     "waist_folding"
 ]
+GC10_CLASSES_TEXT = [
+    "punching hole",
+    "welding line",
+    "crescent gap",
+    "water spot",
+    "oil spot",
+    "silk spot",
+    "inclusion",
+    "rolled pit",
+    "crease",
+    "waist folding"
+]
 
 
 class StyleGANGenerator:
@@ -42,7 +53,7 @@ class StyleGANGenerator:
             self.pkl_path = Path(pkl_path)
         else:
             self.pkl_path = pkl_path
-        
+
         self.name = pkl_path.name.split('.')[0].split('_')[0]
 
         if out_dir:
@@ -50,7 +61,6 @@ class StyleGANGenerator:
         else:
             self.out_dir = root_dir / "shared" / "generated" / self.name
         self.out_dir.mkdir(exist_ok=True)
-            
 
         os.makedirs(self.out_dir, exist_ok=True)
 
