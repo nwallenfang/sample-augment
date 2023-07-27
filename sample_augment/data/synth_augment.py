@@ -13,6 +13,7 @@ from sample_augment.data.train_test_split import TrainSet
 from sample_augment.models.generator import GC10_CLASSES, StyleGANGenerator
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir, root_dir
+from sample_augment.utils.plot import show_image_tensor
 
 
 class UnifiedTrainSet(TrainSet):
@@ -94,7 +95,7 @@ class TrainSetWithSynthetic(TrainSet):
     def __getitem__(self, idx):
         # the super __getitem__ already has self.transform applied
         image, label = super().__getitem__(idx)
-        
+
         if np.random.rand() < self.synth_p:
             # FIXME something is very imperformant here
             #  maybe we do need an additional data structure matching label to indices
@@ -198,8 +199,9 @@ def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: f
     generator = StyleGANGenerator(pkl_path=root_dir / f'TrainedStyleGAN/{generator_name}.pkl')
 
     for label_idx, label_comb in enumerate(unique_label_combinations):
-        synthetic_instances = generator.generate_online(label_vector=label_comb,
-                                                        n=10)
+        # TODO fix this after generator refactoring
+        synthetic_instances = generator.generate(label_vector=label_comb,
+                                                 n=10)
         synthetic_imgs_np[label_idx * n:(label_idx + 1) * n] = synthetic_instances
         synthetic_labels.extend([label_comb for _ in range(n)])
         synthetic_ids.extend([f"{generator_name}_{label_comb}_{i}" for i in range(n)])
@@ -224,14 +226,11 @@ def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: f
                                  synth_p=synth_p)
 
 
-from sample_augment.utils.plot import show_image_tensor
-
-
 @step
 def look_at_augmented_train_set(augmented: TrainSetWithSynthetic):
     for i in range(50):
         _img = augmented[i]
-    label_combo = 6
+
     for label_combo in range(19, 24):
         for i in range(10 * label_combo, 10 * (label_combo + 1)):
             img_arr = augmented.synthetic_images[i]
