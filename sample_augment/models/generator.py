@@ -87,6 +87,13 @@ class StyleGANGenerator:
             Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{self.out_dir}/proj{idx:02d}.png')
         return
 
+    def generate_from_latent_w_tensor(self, ws: torch.Tensor):
+        assert ws.shape[1:] == (self.G.num_ws, self.G.w_dim)
+        for idx, w in enumerate(ws):
+            img = self.G.synthesis(w.unsqueeze(0), noise_mode='const')
+            img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+            Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{self.out_dir}/proj{idx:02d}.png')
+
     def generate_images(self,
                         truncation_psi: float = 1.0,
                         noise_mode='const',

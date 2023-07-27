@@ -20,10 +20,12 @@ def project_training_subset(training_set: TrainSet, generator_name: str, number_
         class_indices = np.where(training_set.primary_label_tensor == class_idx)[0]
         sample_indices = np.random.choice(class_indices, size=number_per_class, replace=False)
 
+        # TODO how can it be that the same picture (index) got used for two different primary classes??
+        #  for context it's 488 for welding_line and crescent_gap
         for instance_idx in sample_indices:
             # Fetch image data and run projection
             target_image_data = training_set.image_tensor[instance_idx].numpy()
-            target_class_label = training_set.label_tensor[instance_idx]  # TODO put into projector
+            target_class_label = training_set.label_tensor[instance_idx]
             target_classname = GC10_CLASSES[class_idx]
             projected_fname = f"{target_classname}_{instance_idx}"
 
