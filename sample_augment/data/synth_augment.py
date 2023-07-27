@@ -198,8 +198,9 @@ def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: f
     generator = StyleGANGenerator(pkl_path=root_dir / f'TrainedStyleGAN/{generator_name}.pkl')
 
     for label_idx, label_comb in enumerate(unique_label_combinations):
-        synthetic_instances = generator.generate_online(label_vector=label_comb,
-                                                        n=10)
+        # TODO fix this after generator refactoring
+        synthetic_instances = generator.generate(label_vector=label_comb,
+                                                 n=10)
         synthetic_imgs_np[label_idx * n:(label_idx + 1) * n] = synthetic_instances
         synthetic_labels.extend([label_comb for _ in range(n)])
         synthetic_ids.extend([f"{generator_name}_{label_comb}_{i}" for i in range(n)])
