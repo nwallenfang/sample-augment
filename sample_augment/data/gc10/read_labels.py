@@ -20,7 +20,7 @@ from sample_augment.data.gc10.download_gc10 import GC10Folder
 from sample_augment.utils import log
 # from sample_augment.data.gc10.download import load_gc10_if_missing
 from sample_augment.utils.path_utils import project_path, shared_dir
-from sample_augment.utils.plot import show_image, prepare_latex_plot, CREATE_PLOTS
+from sample_augment.utils.plot import show_image_tensor, prepare_latex_plot, CREATE_PLOTS
 
 # from sample_augment.data/gc10/Defect Descriptions.xlsx, which also contains some example images
 LABEL_TO_NAME = {
@@ -147,8 +147,8 @@ def compare_dir_and_xml_labels(xml_labels: Dict, dir_labels: Dict):
         secondary_labels = [LABEL_TO_NAME[label] for label in xml_labels[name]['secondary']]
         img_text = f"dir: {LABEL_TO_NAME[dir_labels[name]]}, xml: {LABEL_TO_NAME[xml_labels[name]['y']]}\n \
          secondary: {secondary_labels}"
-        show_image(img, title=name, text=img_text,
-                   save_path=project_path(f'reports/figures/label-exploration/mismatch_{name}.png'))
+        show_image_tensor(img, title=name, text=img_text,
+                          save_path=project_path(f'reports/figures/label-exploration/mismatch_{name}.png'))
         mismatch_index += 1
 
 

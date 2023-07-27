@@ -279,8 +279,11 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             # calculate validation metrics
             val_losses += val_loss.item()
             val_accuracies += ((predictions > threshold) == label).float().mean().item()
+            # if the model doesn't predict any class (zero_division), give it a score
+            # of 0
             val_f1s += f1_score(label.cpu().numpy(),
-                                (predictions > threshold).cpu().numpy(), average='macro')
+                                (predictions > threshold).cpu().numpy(), average='macro',
+                                zero_division=0)
 
         avg_val_loss = val_losses / len(val_loader)
         val_loss_per_epoch.append(avg_val_loss)
@@ -512,9 +515,10 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
 
 class SynthTrainedClassifier(TrainedClassifier):
     # noinspection PyMissingConstructor
-    def __init__(self, trained_classifier: TrainedClassifier):
+    def __init__(self, trained_classifier: TrainedClassifier, **kwargs):
         # Copy all attributes from the superclass instance to the subclass instance
-        self.__dict__ = trained_classifier.__dict__.copy()
+        super().__init__(model=trained_classifier.model, metrics=trained_classifier.metrics, **kwargs)
+
 
 
 @step

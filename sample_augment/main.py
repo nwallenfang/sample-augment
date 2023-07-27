@@ -22,6 +22,7 @@ def main(arg_config: Path = None):
     # evaluate_k_classifiers, k_fold_plot_loss_over_epochs, imagefolder_to_tensors, k_fold_train_classifier
     # experiment.run("train_augmented_classifier")
     # experiment.run("evaluate_classifier")
+    # experiment.run('look_at_augmented_train_set')
     experiment.run("train_augmented_classifier")
 
 

@@ -22,7 +22,6 @@ def oversample_latents(projected_dir):
             for file in os.listdir(class_dir):
                 if file.endswith(".npz"):
                     latent_vector = np.load(os.path.join(class_dir, file))['w']
-                    # Reshape the latent vector
                     X.append(latent_vector.reshape(-1))
                     y.append(class_name)
             class_names.append(class_name)
@@ -31,11 +30,10 @@ def oversample_latents(projected_dir):
     X = np.array(X)
     y = np.array(y)
 
-    # Apply Label Encoding to class names
+    # Apply scikit-learn Label-Encoding to class names
     le = LabelEncoder()
     y_encoded = le.fit_transform(y)
 
-    # Apply SMOTE
     smote = SMOTE()
     X_res, y_res = smote.fit_resample(X, y_encoded)
 
@@ -66,7 +64,6 @@ def plot_tsne_of_latents(directory, random_state=42):
         label = next((class_name for class_name in GC10_CLASSES if class_name in filename), None)
         labels.append(label)
 
-    # Convert the list of latent vectors into a single numpy array
     latent_vectors = np.concatenate(latent_vectors)
 
     # Flatten the latent vectors
@@ -76,18 +73,14 @@ def plot_tsne_of_latents(directory, random_state=42):
     le = LabelEncoder()
     labels_encoded = le.fit_transform(labels)
 
-    # Fit and transform the flattened latent vectors
     tsne = TSNE(n_components=2, random_state=random_state)
     latent_vectors_2d = tsne.fit_transform(latent_vectors_flattened)
 
-    # Plot the transformed latent vectors
     plt.figure(figsize=(10, 8))
     scatter = plt.scatter(latent_vectors_2d[:, 0], latent_vectors_2d[:, 1], c=labels_encoded, cmap='tab10')
 
-    # Generate the legend
     legend1 = plt.legend(*scatter.legend_elements(), title="Classes")
 
-    # Replace the labels in the legend
     for t, l in zip(legend1.texts, le.classes_):
         t.set_text(l)
 

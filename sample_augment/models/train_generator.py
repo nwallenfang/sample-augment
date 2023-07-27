@@ -1,3 +1,4 @@
+import comet_ml
 import json
 import os
 import re

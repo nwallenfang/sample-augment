@@ -8,6 +8,7 @@ import torch
 from PIL import Image
 
 import sample_augment.models.stylegan2.legacy as legacy
+from sample_augment.utils import log
 from sample_augment.utils.path_utils import root_dir
 
 """
@@ -65,7 +66,7 @@ class StyleGANGenerator:
         os.makedirs(self.out_dir, exist_ok=True)
 
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-
+        log.info(f'Generator device: {self.device}')
         with open(self.pkl_path, 'rb') as f:
             self.G = legacy.load_network_pkl(f)['G_ema'].to(self.device)
 
@@ -74,33 +75,26 @@ class StyleGANGenerator:
                 import functools
                 self.G.forward = functools.partial(self.G.forward, force_fp32=True)
 
-    # custom generate method without the click context for programmatic access
+    def generate_from_latent_w(self, latent_w: str):
+        print(f'Generating images from projected W "{latent_w}"')
+        ws = np.load(latent_w)['w']
+        ws = torch.tensor(ws, device=self.device)  # pylint: disable=not-callable
+        assert ws.shape[1:] == (self.G.num_ws, self.G.w_dim)
+        for idx, w in enumerate(ws):
+            # TODO check out the synthesis method
+            img = self.G.synthesis(w.unsqueeze(0), noise_mode=latent_w)
+            img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+            Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{self.out_dir}/proj{idx:02d}.png')
+        return
+
     def generate_images(self,
                         truncation_psi: float = 1.0,
                         noise_mode='const',
                         save_to_outdir=False,
                         seeds=None,
-                        class_idx=None,
-                        projected_w=None):
+                        class_idx=None):
 
         # Synthesize the result of a W projection.
-        if projected_w is not None:
-            if seeds is not None:
-                print('warn: --seeds is ignored when using --projected-w')
-            print(f'Generating images from projected W "{projected_w}"')
-            ws = np.load(projected_w)['w']
-            ws = torch.tensor(ws, device=self.device)  # pylint: disable=not-callable
-            assert ws.shape[1:] == (self.G.num_ws, self.G.w_dim)
-            for idx, w in enumerate(ws):
-                # TODO check out the synthesis method
-                img = self.G.synthesis(w.unsqueeze(0), noise_mode=noise_mode)
-                img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-                Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{self.out_dir}/proj{idx:02d}.png')
-            return
-
-        if seeds is None:
-            print('--seeds option is required when not using --projected-w')
-
         assert self.G.c_dim != 0, "expected conditional network"
         # one-hot encoded class
         label = torch.zeros([1, self.G.c_dim], device=self.device)
@@ -109,7 +103,7 @@ class StyleGANGenerator:
         imgs = np.empty((len(seeds), 256, 256, 3), dtype=np.uint8)
         # Generate images.
         for seed_idx, seed in enumerate(seeds):
-            print('Generating image for seed %d (%d/%d) ...' % (seed, seed_idx, len(seeds)))
+            # print('Generating image for seed %d (%d/%d) ...' % (seed, seed_idx, len(seeds)))
             z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.G.z_dim)).to(self.device)
             img = self.G(z, label, truncation_psi=truncation_psi, noise_mode=noise_mode)
             img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
@@ -117,6 +111,28 @@ class StyleGANGenerator:
             if save_to_outdir:
                 Image.fromarray(img[0].cpu().numpy(), 'RGB').save(
                     f'{self.out_dir}/{GC10_CLASSES[class_idx]}_{seed:04d}.png')
+        return imgs
+
+    def generate_online(self, label_vector, n=1, truncation_psi: float = 1.0,
+                        noise_mode='const'):
+        """
+            fixed seed and multilabel support. Generate into RAM, so without saving to
+            a file. 
+            n: number of instances to generate
+            
+        """
+        assert n >= 1
+        imgs = np.empty((n, 256, 256, 3), dtype=np.uint8)
+        if isinstance(label_vector, np.ndarray):
+            label_vector = torch.from_numpy(label_vector)
+        label = torch.unsqueeze(label_vector, 0).to(self.device)
+        
+        for i, seed in enumerate(list(range(n))):
+            z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.G.z_dim)).to(self.device)
+            img = self.G(z, label, truncation_psi=truncation_psi, noise_mode=noise_mode)
+            img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+            imgs[i] = img.to('cpu')
+
         return imgs
 
 

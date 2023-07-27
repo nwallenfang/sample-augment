@@ -10,9 +10,9 @@ from torchvision.transforms import ToTensor
 
 from sample_augment.core import step
 from sample_augment.data.train_test_split import TrainSet
-from sample_augment.models.generator import GC10_CLASSES
+from sample_augment.models.generator import GC10_CLASSES, StyleGANGenerator
 from sample_augment.utils import log
-from sample_augment.utils.path_utils import shared_dir
+from sample_augment.utils.path_utils import shared_dir, root_dir
 
 
 class UnifiedTrainSet(TrainSet):
@@ -92,22 +92,27 @@ class TrainSetWithSynthetic(TrainSet):
         return super().__len__()
 
     def __getitem__(self, idx):
+        # the super __getitem__ already has self.transform applied
         image, label = super().__getitem__(idx)
-        primary_label = self.primary_label_tensor[idx]
+        
         if np.random.rand() < self.synth_p:
-            same_class_indices = (self.synthetic_labels == primary_label).nonzero(as_tuple=True)[0]
-            if len(same_class_indices) > 0:  # If there are synthetic instances from the same class
+            # FIXME something is very imperformant here
+            #  maybe we do need an additional data structure matching label to indices
+            #  and / or the synthetic data should be on GPU
+            matching_rows = (self.synthetic_labels.bool() == label.bool()).all(dim=1)
+            matching_indices = torch.where(matching_rows)[0]
+
+            if len(matching_indices) > 0:  # If there are synthetic instances with the same label
                 # Replace the real instance with a synthetic one
-                chosen_idx = np.random.choice(same_class_indices)
+
+                chosen_idx = np.random.choice(matching_indices.cpu().numpy())
                 synthetic_image, synthetic_label = (self.synthetic_images[chosen_idx],
                                                     self.synthetic_labels[chosen_idx])
-                # TODO should we run data augmentation on synthetic images as well?
-                #  if not need two different transform objects
-                synthetic_image = self.transform(synthetic_image)
-                synth_label_one_hot = torch.zeros_like(label)
-                synth_label_one_hot[primary_label] = 1.0
-                log.info(f"synthetic {self.synthetic_ids[chosen_idx.item()]}")
-                return synthetic_image, synth_label_one_hot
+                if self.transform is not None:
+                    synthetic_image = self.transform(synthetic_image)
+                else:
+                    log.warning('Using TrainSetWithSynthetic without a transform set.')
+                return synthetic_image, synthetic_label
 
         return image, label
 
@@ -134,6 +139,7 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
         n_missing = target_count - class_counts[class_idx]
         if n_missing <= 0:
             log.info(f"Augment: skip {class_name}")
+            # TODO this skipping doesn't make anymore sense now with synth_p, no?
             continue
 
         # Find the images for the class_name
@@ -172,5 +178,63 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
 
 
 @step
-def look_at_augmented_train_set(augmented: UnifiedTrainSet):
-    print(augmented.name)
+def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: float) -> TrainSetWithSynthetic:
+    """
+    A synthetic augmentation type based on label distribution.
+    """
+
+    label_matrix = training_set.label_tensor.numpy()
+    unique_label_combinations = np.unique(label_matrix, axis=0)
+
+    # around 50
+    log.info(f"Number of unique label combinations: {len(unique_label_combinations)}")
+    n = 10  # generate 10 synthetic instances per label combination
+    n_combinations = len(unique_label_combinations)
+
+    synthetic_imgs_np = np.empty(shape=(n * n_combinations, 256, 256, 3), dtype=np.uint8)
+    synthetic_labels = []
+    synthetic_ids = []
+
+    generator = StyleGANGenerator(pkl_path=root_dir / f'TrainedStyleGAN/{generator_name}.pkl')
+
+    for label_idx, label_comb in enumerate(unique_label_combinations):
+        synthetic_instances = generator.generate_online(label_vector=label_comb,
+                                                        n=10)
+        synthetic_imgs_np[label_idx * n:(label_idx + 1) * n] = synthetic_instances
+        synthetic_labels.extend([label_comb for _ in range(n)])
+        synthetic_ids.extend([f"{generator_name}_{label_comb}_{i}" for i in range(n)])
+
+    synthetic_imgs_tensor = torch.from_numpy(synthetic_imgs_np)
+    synthetic_labels = torch.from_numpy(np.array(synthetic_labels))
+    log.info(f"Label size: {synthetic_labels.size()}")
+
+    # Convert tensors to uint8
+    # synthetic_imgs_tensor = (synthetic_imgs_tensor * 255).byte()
+
+    # permute synthetic tensor to be (N, C, H, W), same as training data
+    synthetic_imgs_tensor = synthetic_imgs_tensor.permute(0, 3, 1, 2)
+
+    return TrainSetWithSynthetic(name=f"synth-aug-{generator_name}", root_dir=training_set.root_dir,
+                                 img_ids=training_set.img_ids,
+                                 tensors=(training_set.tensors[0], training_set.tensors[1]),
+                                 primary_label_tensor=training_set.primary_label_tensor,
+                                 synthetic_images=synthetic_imgs_tensor,
+                                 synthetic_labels=synthetic_labels,
+                                 synthetic_ids=synthetic_ids,
+                                 synth_p=synth_p)
+
+
+from sample_augment.utils.plot import show_image_tensor
+
+
+@step
+def look_at_augmented_train_set(augmented: TrainSetWithSynthetic):
+    for i in range(50):
+        _img = augmented[i]
+    label_combo = 6
+    for label_combo in range(19, 24):
+        for i in range(10 * label_combo, 10 * (label_combo + 1)):
+            img_arr = augmented.synthetic_images[i]
+            labels = augmented.synthetic_labels[i]
+            class_names = [class_name for class_name, label in zip(GC10_CLASSES, np.array(labels)) if label == 1.0]
+            show_image_tensor(img_arr, title=str(class_names))
