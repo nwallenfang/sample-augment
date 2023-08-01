@@ -12,7 +12,7 @@ from sample_augment.core import step
 from sample_augment.data.train_test_split import TrainSet
 from sample_augment.models.generator import GC10_CLASSES, StyleGANGenerator
 from sample_augment.utils import log
-from sample_augment.utils.path_utils import shared_dir, root_dir
+from sample_augment.utils.path_utils import shared_dir
 from sample_augment.utils.plot import show_image_tensor
 
 
@@ -89,6 +89,13 @@ class TrainSetWithSynthetic(TrainSet):
     """probability of replacing a real training image with a synthetic one"""
     synth_p: float
 
+    # TODO give mapping attribute
+    # precompute the label_to_indices mapping
+    # self.label_to_indices = defaultdict(list)
+    # for i, label in enumerate(self.synthetic_labels):
+    #     # Assuming label is a tensor, converting it to a tuple to use it as a key
+    #     self.label_to_indices[tuple(label.tolist())].append(i)
+
     def __len__(self):
         return super().__len__()
 
@@ -100,6 +107,8 @@ class TrainSetWithSynthetic(TrainSet):
             # FIXME something is very imperformant here
             #  maybe we do need an additional data structure matching label to indices
             #  and / or the synthetic data should be on GPU
+            # TODO
+            #     matching_indices = self.label_to_indices.get(tuple(label.tolist()), [])
             matching_rows = (self.synthetic_labels.bool() == label.bool()).all(dim=1)
             matching_indices = torch.where(matching_rows)[0]
 
@@ -112,7 +121,7 @@ class TrainSetWithSynthetic(TrainSet):
                 if self.transform is not None:
                     synthetic_image = self.transform(synthetic_image)
                 else:
-                    log.warning('Using TrainSetWithSynthetic without a transform set.')
+                    log.warning('Using TrainSetWithSynthetic without the transform being set.')
                 return synthetic_image, synthetic_label
 
         return image, label
@@ -196,12 +205,12 @@ def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: f
     synthetic_labels = []
     synthetic_ids = []
 
-    generator = StyleGANGenerator(pkl_path=root_dir / f'TrainedStyleGAN/{generator_name}.pkl')
+    generator = StyleGANGenerator.load_from_name(generator_name)
 
     for label_idx, label_comb in enumerate(unique_label_combinations):
-        # TODO fix this after generator refactoring
-        synthetic_instances = generator.generate(label_vector=label_comb,
-                                                 n=10)
+        # stack label_comb vector n times to generate n images
+        c = np.tile(label_comb, (n, 1))  # shape will be [n, num_classes]
+        synthetic_instances = generator.generate(c=c)
         synthetic_imgs_np[label_idx * n:(label_idx + 1) * n] = synthetic_instances
         synthetic_labels.extend([label_comb for _ in range(n)])
         synthetic_ids.extend([f"{generator_name}_{label_comb}_{i}" for i in range(n)])

@@ -4,6 +4,7 @@ from glob import glob
 
 import matplotlib.pyplot as plt
 import torch
+from matplotlib.lines import Line2D
 
 from sample_augment.models.generator import GC10_CLASSES, StyleGANGenerator
 from sample_augment.utils import log
@@ -60,6 +61,82 @@ def oversample_latents(projected_dir):
     np.savez(file_name, X_res=X_res, y_res=y_res, indices_res=indices_res)
 
 
+def generate_classwise_w_latents(n_per_class=20):
+    generator = StyleGANGenerator.load_from_name('wdataaug-025_006200')
+    num_classes = 10
+    w_tensor = torch.empty((n_per_class * num_classes, generator.G.num_ws, generator.G.w_dim))
+    class_names = []
+    for cls in range(num_classes):
+        log.info(f"Generating for cls {cls}..")
+        cls_label = torch.zeros((1, num_classes))
+        cls_label[0][cls] = 1.0
+        for i in range(n_per_class):
+            w = generator.c_to_w(cls_label)
+            w_tensor[cls * num_classes + i] = w
+            class_names.append(GC10_CLASSES[cls])
+
+    return w_tensor, class_names
+
+
+# def plot_tsne_of_latents(directory, random_state=42):
+#     from sklearn.manifold import TSNE
+#     from sklearn.preprocessing import LabelEncoder
+#
+#     # Get a list of all npz files in the directory
+#     npz_files = glob(os.path.join(directory, "*.npz"))
+#
+#     # Initialize an empty list to store the latent vectors and labels
+#     projected_latents = []
+#     labels = []
+#
+#     # Loop over the npz files and load each one
+#     for file in npz_files:
+#         latent = np.load(file)['w']
+#         projected_latents.append(latent)
+#
+#         # Extract the class label from the filename
+#         filename = os.path.basename(file)
+#         label = next((class_name for class_name in GC10_CLASSES if class_name in filename), None)
+#         labels.append(label)
+#
+#     projected_latents = np.concatenate(projected_latents)
+#     random_latents, random_labels = generate_classwise_w_latents()
+#     # Flatten the latent vectors
+#     latent_vectors_flattened = projected_latents.reshape(len(projected_latents), -1)
+#     random_latents_flattened = random_latents.reshape(len(random_latents), -1)
+#
+#     # Combine labels and encode them as integers for the scatter plot
+#     all_labels = np.concatenate([labels, random_labels])
+#     le = LabelEncoder()
+#     all_labels_encoded = le.fit_transform(all_labels)
+#
+#     # Split the encoded labels back up
+#     labels_encoded = all_labels_encoded[:len(labels)]
+#     random_labels_encoded = all_labels_encoded[len(labels):]
+#
+#     tsne = TSNE(n_components=2, random_state=random_state)
+#     all_latents_flattened = np.concatenate([latent_vectors_flattened, random_latents_flattened])
+#
+#     # Apply t-SNE on the combined data
+#     all_latents_2d = tsne.fit_transform(all_latents_flattened)
+#
+#     # Create separate 2D arrays for the projected and random latents
+#     latent_vectors_2d = all_latents_2d[:len(latent_vectors_flattened)]
+#     random_latents_2d = all_latents_2d[len(latent_vectors_flattened):]
+#
+#     plt.figure(figsize=(10, 8))
+#     scatter = plt.scatter(latent_vectors_2d[:, 0], latent_vectors_2d[:, 1], c=labels_encoded, cmap='tab10')
+#     scatter2 = plt.scatter(random_latents_2d[:, 0], random_latents_2d[:, 1], c=random_labels_encoded, cmap='tab10',
+#                            marker='x')
+#
+#     legend1 = plt.legend(*scatter.legend_elements(), title="Classes")
+#     plt.title("t-SNE projection of projected latent vectors and random class-wise ones")
+#     plt.show()
+
+def class_name_to_index(class_names):
+    return
+
+
 def plot_tsne_of_latents(directory, random_state=42):
     from sklearn.manifold import TSNE
     from sklearn.preprocessing import LabelEncoder
@@ -68,40 +145,58 @@ def plot_tsne_of_latents(directory, random_state=42):
     npz_files = glob(os.path.join(directory, "*.npz"))
 
     # Initialize an empty list to store the latent vectors and labels
-    latent_vectors = []
+    projected_latents = []
     labels = []
 
     # Loop over the npz files and load each one
     for file in npz_files:
         latent = np.load(file)['w']
-        latent_vectors.append(latent)
+        projected_latents.append(latent)
 
         # Extract the class label from the filename
         filename = os.path.basename(file)
         label = next((class_name for class_name in GC10_CLASSES if class_name in filename), None)
         labels.append(label)
 
-    latent_vectors = np.concatenate(latent_vectors)
-
+    projected_latents = np.concatenate(projected_latents)
+    random_latents, random_labels = generate_classwise_w_latents()
     # Flatten the latent vectors
-    latent_vectors_flattened = latent_vectors.reshape(len(latent_vectors), -1)
+    latent_vectors_flattened = projected_latents.reshape(len(projected_latents), -1)
+    random_latents_flattened = random_latents.reshape(len(random_latents), -1)
 
-    # Encode the labels as integers for the scatter plot
-    le = LabelEncoder()
-    labels_encoded = le.fit_transform(labels)
+    # Combine labels and encode them as integers for the scatter plot
+    all_labels = np.concatenate([labels, random_labels])
+    all_labels_encoded = [GC10_CLASSES.index(name) for name in all_labels]
+    # le = LabelEncoder()
+    # all_labels_encoded = le.fit_transform(all_labels)
+
+    # Split the encoded labels back up
+    labels_encoded = all_labels_encoded[:len(labels)]
+    random_labels_encoded = all_labels_encoded[len(labels):]
 
     tsne = TSNE(n_components=2, random_state=random_state)
-    latent_vectors_2d = tsne.fit_transform(latent_vectors_flattened)
+    all_latents_flattened = np.concatenate([latent_vectors_flattened, random_latents_flattened])
+
+    # Apply t-SNE on the combined data
+    all_latents_2d = tsne.fit_transform(all_latents_flattened)
+
+    # Create separate 2D arrays for the projected and random latents
+    latent_vectors_2d = all_latents_2d[:len(latent_vectors_flattened)]
+    random_latents_2d = all_latents_2d[len(latent_vectors_flattened):]
 
     plt.figure(figsize=(10, 8))
     scatter = plt.scatter(latent_vectors_2d[:, 0], latent_vectors_2d[:, 1], c=labels_encoded, cmap='tab10')
+    scatter2 = plt.scatter(random_latents_2d[:, 0], random_latents_2d[:, 1], c=random_labels_encoded, cmap='tab10',
+                           marker='x')
 
-    legend1 = plt.legend(*scatter.legend_elements(), title="Classes")
+    # TODO need to fix projection of small classes and verify that the classes match for random and projected
+    cmap = plt.get_cmap('tab10')
+    # Create a custom legend
+    class_legend_elements = [Line2D([0], [0], marker='o', color='w', markerfacecolor=cmap(i), markersize=10)
+                             for i in range(len(GC10_CLASSES))]
 
-    for t, l in zip(legend1.texts, le.classes_):
-        t.set_text(l)
-
-    plt.title("t-SNE projection of the latent vectors")
+    plt.legend(handles=class_legend_elements, labels=GC10_CLASSES, title="Classes")
+    plt.title("t-SNE projection of projected latent vectors and random class-wise ones")
     plt.show()
 
 

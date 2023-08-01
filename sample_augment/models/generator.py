@@ -88,15 +88,13 @@ class StyleGANGenerator:
         assert ws.shape[1:] == (self.G.num_ws, self.G.w_dim)
         return ws
 
-    # def w_to_img(self, latent_w: str):
-    #     print(f'Generating images from projected W "{latent_w}"')
-    #
-    #     for idx, w in enumerate(ws):
-    #         # TODO check out the synthesis method
-    #         img = self.G.synthesis(w.unsqueeze(0), noise_mode=latent_w)
-    #         img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-    #         Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{self.out_dir}/proj{idx:02d}.png')
-    #     return
+    def c_to_w(self, c: Tensor, truncation_psi: float = 1.0, seed: int = None) -> Tensor:
+        c = c.to(self.device)
+        if seed:
+            z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.G.z_dim)).to(self.device)
+        else:
+            z = torch.from_numpy(np.random.RandomState(self.seed).randn(1, self.G.z_dim)).to(self.device)
+        return self.G.mapping(z, c, truncation_psi=truncation_psi)
 
     def z_to_w(self, c: Tensor, z: Tensor) -> Tensor:
         """
@@ -121,12 +119,20 @@ class StyleGANGenerator:
         # TODO
         raise NotImplementedError()
 
-    def w_to_img(self, w: torch.Tensor):
-        assert w.shape[1:] == (self.G.num_ws, self.G.w_dim)
-        for idx, w in enumerate(w):
-            img = self.G.synthesis(w.unsqueeze(0), noise_mode='const')
-            img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-            Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{self.out_dir}/proj{idx:02d}.png')
+    def w_to_img(self, w: Union[torch.Tensor, np.ndarray]):
+        if isinstance(w, np.ndarray):
+            w = torch.from_numpy(w).to(self.device)
+        if w.ndim == 2:
+            w = w.unsqueeze(0)
+        # assert w.ndim == 3, "expecting shape (n, G.num_ws, G.w_dim)"
+        assert w.shape[1:] == (self.G.num_ws, self.G.w_dim), "expecting shape (n, G.num_ws, G.w_dim)"
+        imgs = self.G.synthesis(w)
+        imgs = (imgs.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+        return imgs
+        # for idx, w in enumerate(w):
+        #     img = self.G.synthesis(w.unsqueeze(0), noise_mode='const')
+        #     img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+        #     Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{self.out_dir}/proj{idx:02d}.png')
 
     # def generate_images(self,
     #                     truncation_psi: float = 1.0,

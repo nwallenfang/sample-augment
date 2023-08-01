@@ -1,4 +1,3 @@
-import comet_ml
 import json
 import os
 import re
@@ -35,7 +34,6 @@ def train_stylegan():
     import sample_augment.models.stylegan2.dnnlib as dnnlib
     from sample_augment.models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn
     out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
-    # TODO in theory we could add a method that uploads our tensorboard events file to gdrive or somewhere so we can check it remotely.
     config_kwargs = {
         'data': r"E:\Master_Thesis_Nils\data\stylegan_train_data.pt",
         # 'custom_name' 'gc10_pre_FFHQ'
