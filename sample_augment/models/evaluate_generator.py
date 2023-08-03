@@ -70,8 +70,9 @@ def make_image_grid(real_dir: Path, fake_dir: Path, class_name: str, class_index
     return real_grid, fake_grid
 
 
-def plot_grids(real_grid, fake_grid, class_name, grid_dir: Path, grid_size):
-    prepare_latex_plot()
+def plot_grids(real_grid, fake_grid, class_name, grid_dir: Path, grid_size, latex_available=True):
+    if latex_available:
+        prepare_latex_plot()
 
     image_size = 256  # pixels
 
@@ -87,11 +88,17 @@ def plot_grids(real_grid, fake_grid, class_name, grid_dir: Path, grid_size):
     # Create the figure
     fig, axs = plt.subplots(1, 2, figsize=(2 * total_grid_size_inches[0], total_grid_size_inches[1]), dpi=dpi)
     axs[0].imshow(np.transpose(real_grid.numpy(), (1, 2, 0)))
-    axs[0].set_title(r'Real $\texttt{' + f'{class_name}' + r'}$ Images')
+    if latex_available:
+        axs[0].set_title(r'Real $\texttt{' + f'{class_name}' + r'}$ Images')
+    else:
+        axs[0].set_title(f'Real {class_name} Images')
     axs[0].axis('off')
 
     axs[1].imshow(np.transpose(fake_grid.numpy(), (1, 2, 0)))
-    axs[1].set_title(r'Fake $\texttt{' + f'{class_name}' + r'}$ Images')
+    if latex_available:
+        axs[1].set_title(r'Synthetic $\texttt{' + f'{class_name}' + r'}$ Images')
+    else:
+        axs[0].set_title(f'Synthetic {class_name} Images')
     axs[1].axis('off')
 
     plt.savefig(grid_dir / f"grid_{class_name}.pdf", bbox_inches="tight")
@@ -118,7 +125,7 @@ def run_classifier_on_generated_images(generated_classname: str, modelname: str,
         )
     else:
         raise ValueError("unknown modelname")
-    generated_imgs_dir = shared_dir / "generated"
+    generated_imgs_dir = shared_dir / "generated/wdataaug-028_012200"
 
     model = trained_classifier.model
     model.eval()  # Set the model to evaluation mode
@@ -134,10 +141,10 @@ def run_classifier_on_generated_images(generated_classname: str, modelname: str,
     for root, _dirs, files in os.walk(generated_imgs_dir):
         for file in files:
             # TODO FIXME class_name
-            class_name = file.split("_seed")[0]
+            class_name = '_'.join(file.split("_")[:-1])
             if class_name == generated_classname:
                 img_path = os.path.join(root, file)
-                # image transformer expects 224x224
+                # vision transformer expects 224x224
                 img = load_image_for_vit_classification(img_path).to(device)
                 img_batch.append(img)
 
@@ -271,8 +278,10 @@ def plot_swarm(plot=False, from_csv=None):
         # Create a swarmplot
         prepare_latex_plot()
         plt.figure(figsize=(10, 5))
-        sns.violinplot(x='Class', y='Probability', hue='Type', data=df, split=True, cut=0, bw=0.2, inner=None,
-                       scale="count", alpha=0.7)
+        # sns.violinplot(x='Class', y='Probability', hue='Type', data=df, split=True, cut=0, bw=0.5, inner=None,
+        #                alpha=0.7)
+        sns.violinplot(x='Class', y='Probability', data=df[df['Type'] == 'Fake'], cut=0, inner=None, alpha=0.7,
+                       scale='count')
         # sns.swarmplot(x='Class', y='Probability', hue='Type', data=df, dodge=True,
         #               size=4)
         plt.xticks(rotation=90)
@@ -286,9 +295,10 @@ def plot_swarm(plot=False, from_csv=None):
 
 
 if __name__ == '__main__':
-    # plot_swarm(plot=True, from_csv=shared_dir / r"generator_plots\classwise_classification_probs_VisionTransformer.csv")
+    plot_swarm(plot=True, from_csv=shared_dir / r"generator_plots/classwise_classification_probs_VisionTransformer.csv")
+    # plot_swarm(plot=False)
     # run_classifier_on_real_images("welding_line")
     # run_classifier_on_generated_images("welding_line")
-    fake_vs_real_grid_classwise(fake_dir=shared_dir / 'generated' / 'apa-020')
+    # fake_vs_real_grid_classwise(fake_dir=shared_dir / 'generated' / 'wdataaug-028_012200')
 
 # TODO UMAP projection in classifier activation space :)

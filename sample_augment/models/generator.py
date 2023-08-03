@@ -11,7 +11,7 @@ from torch import Tensor
 import sample_augment.models.stylegan2.legacy as legacy
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import root_dir, shared_dir
-from sample_augment.models.stylegan2.training.networks import Generator
+from sample_augment.models.stylegan2.training.networks import Generator, Discriminator
 
 """
     this file probably needs python <=3.8 and torch <=1.9, same as train_generator.
@@ -32,16 +32,16 @@ GC10_CLASSES = [
     "waist_folding"
 ]
 GC10_CLASSES_TEXT = [
-    "punching hole",
-    "welding line",
-    "crescent gap",
-    "water spot",
-    "oil spot",
-    "silk spot",
-    "inclusion",
-    "rolled pit",
-    "crease",
-    "waist folding"
+    "Punching hole",
+    "Welding line",
+    "Crescent gap",
+    "Water spot",
+    "Oil spot",
+    "Silk spot",
+    "Inclusion",
+    "Rolled pit",
+    "Crease",
+    "Waist folding"
 ]
 
 
@@ -58,6 +58,7 @@ class StyleGANGenerator:
     device: torch.device
     seed: int
     G: Generator
+    D: Discriminator
 
     def __init__(self, pkl_path: Union[str, Path], seed: int = 100):
         if isinstance(pkl_path, str):
@@ -73,10 +74,14 @@ class StyleGANGenerator:
         os.makedirs(self.out_dir, exist_ok=True)
 
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        log.info(f'Generator device: {self.device}')
+        log.debug(f'Generator device: {self.device}')
+        
         with open(self.pkl_path, 'rb') as f:
-            self.G = legacy.load_network_pkl(f)['G_ema'].to(self.device)
-
+            log.debug(f'pkl: {pkl_path}')
+            data = legacy.load_network_pkl(f)
+            self.G = data['G_ema'].to(self.device)
+            # does there exist ema as well for D? not sure
+            self.D = data['D'].to(self.device)
             if self.device.type == 'cpu':
                 # see https://github.com/NVlabs/stylegan2-ada-pytorch/issues/105
                 import functools
@@ -133,6 +138,21 @@ class StyleGANGenerator:
         #     img = self.G.synthesis(w.unsqueeze(0), noise_mode='const')
         #     img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         #     Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{self.out_dir}/proj{idx:02d}.png')
+        
+    def img_into_discriminator(self, img, c):
+        if isinstance(img, np.ndarray):
+            img = torch.from_numpy(img)
+        img = img.to(self.device)
+        
+        if isinstance(c, np.ndarray):
+            c = torch.from_numpy(c)
+        c = c.to(self.device)
+
+        if img.ndim == 3:
+            img = img.unsqueeze(0)
+        if c.ndim == 1:
+            c = c.unsqueeze(0)
+        return self.D(img, c=c)
 
     # def generate_images(self,
     #                     truncation_psi: float = 1.0,
@@ -184,34 +204,35 @@ class StyleGANGenerator:
         imgs = (imgs.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         return imgs
 
-    def generate_image_pool(self):
-        pass
+
 
     @staticmethod
     def load_from_name(name: str) -> "StyleGANGenerator":
         return StyleGANGenerator(pkl_path=root_dir / "TrainedStyleGAN" / f"{name}.pkl")
 
 
-def generate_image_pool(num_imgs_per_class=200, generator_name: str = "wdataaug-025_006200"):
+def generate_image_pool(num_imgs_per_class=200, generator_name: str = "wdataaug-028_012200"):
     # now that we calc more imgs per class, we could do a class-wise diversity metric
     generator = StyleGANGenerator.load_from_name(generator_name)
-    num_classes = StyleGANGenerator.G.c_dim
+    num_classes = generator.G.c_dim
     generated_root = shared_dir / "generated" / generator_name
+    generated_root.mkdir(exist_ok=True)
     for class_index in range(num_classes):
-        print(f'--- {GC10_CLASSES[class_index]} ---')
+        log.info(f'--- {GC10_CLASSES[class_index]} ---')
         # generate single label instances
         label = torch.zeros((num_imgs_per_class, num_classes))
-        label[class_index] = 1.0
+        label[:, class_index] = 1.0
 
         class_imgs = generator.generate(c=label)
         (generated_root / GC10_CLASSES[class_index]).mkdir(exist_ok=True)
         for idx, img in enumerate(class_imgs):
             # Convert the tensor to a PIL Image
-            img_pil = Image.fromarray(img.numpy(), 'RGB')
+            img_pil = Image.fromarray(img.cpu().numpy(), 'RGB')
             # Construct the file path
             file_path = generated_root / GC10_CLASSES[class_index] / f"{GC10_CLASSES[class_index]}_{idx}.png"
             # Save the image
             img_pil.save(file_path)
+
 
 
 def main():

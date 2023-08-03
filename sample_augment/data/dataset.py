@@ -56,7 +56,7 @@ class AugmentDataset(TensorDataset, Artifact):
     def subset(self, indices: Union[List[int], np.ndarray], name: str = None) -> 'AugmentDataset':
         # copies the tensors, so this is a copy rather than a view
         # so potential for optimization, which we will ignore for now.
-        subset_tensors: Tuple[Tensor, Tensor] = self.tensors[0][indices], self.tensors[1][indices]
+        subset_tensors = self.tensors[0][indices], self.tensors[1][indices]  # : Tuple[Tensor, Tensor]
         primary_subset = self.primary_label_tensor[indices]
         subset_img_ids = [self.img_ids[i] for i in indices]
 

@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Dict, List
 
 import matplotlib
-import pandas as pd
 import seaborn as sns
 import xmltodict
 from matplotlib import pyplot as plt, gridspec
@@ -265,22 +264,6 @@ def class_wise_label_count_ratio(labels):
     # print(f"ratio of instances with just a single label: {ratio_single_label:.2f}")
 
 
-# def ratio_of_secondary_classes(labels: Dict, primary_class_idx: int, class_names: List[str]):
-#     # all_labels = {img_id: labels[img_id]['secondary'] + [labels[img_id]['y']] for img_id in labels}
-#     class_labels = {img_id: label['secondary'] for img_id, label in labels.items()
-#                     if primary_class_idx == label['y']}
-#     secondary_counter = collections.defaultdict(int)
-#
-#     for img_id, secondary in class_labels.items():
-#         for sec in secondary:
-#             secondary_counter[class_names[sec]] += 1
-#
-#     log.info(f"Secondaries for class {class_names[primary_class_idx]} ({len(class_labels)} instances)")
-#     pprint(dict(secondary_counter), sort_dicts=False)
-#
-#     total_instances = sum(secondary_counter.values())
-#     secondary_counter = {key: (value / total_instances) for key, value in secondary_counter.items()}
-#     return secondary_counter
 def ratio_of_secondary_classes(labels: Dict, primary_class_idx: int, class_names: List[str]):
     class_labels = {img_id: label['secondary'] for img_id, label in labels.items() if primary_class_idx == label['y']}
     secondary_counter = collections.defaultdict(int)
@@ -332,16 +315,7 @@ def sanitize_labels(gc10_labels: GC10Labels) -> SanitizedGC10Labels:
     # when instance is labelled welding_line and punching_hole, put it into welding line!
     move_combination_into(['punching_hole', 'welding_line'], into_class='welding_line')
 
-    # TODO move all primary punching holes into their secondary classes
-
-    # log.info("--- labels ---")
-    # class_wise_label_count_ratio(labels)
-
-    log.info("--- sanitized ---")
-    # ids_test = get_ids_with_labels(labels, primary_class=class_name_to_idx[''])
-    class_wise_label_count_ratio(sanitized_labels)
-
-    ratio_of_secondary_classes(sanitized_labels, class_name_to_idx['punching_hole'], gc10_labels.class_names)
+    _ratio = ratio_of_secondary_classes(sanitized_labels, class_name_to_idx['punching_hole'], gc10_labels.class_names)
 
     primary_labels = [labels[img_id]['y'] for img_id in labels]
     class_counts = collections.Counter(primary_labels)
@@ -375,10 +349,12 @@ def get_ids_with_labels(labels: Dict, primary_class: int, secondary_class: int):
 
 
 def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts):
+    import pandas as pd
+
     df = pd.DataFrame(distributions, index=primary_classes, columns=secondary_classes)
 
     prepare_latex_plot()
-    fig = plt.figure(figsize=(8, 5))
+    _fig = plt.figure(figsize=(.81 * 8, .81 * 5))
     # Define the grid space
     gs = gridspec.GridSpec(1, 2, width_ratios=[4, 1])
 
@@ -387,12 +363,11 @@ def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts
     ax1 = plt.subplot(gs[1])
 
     # Create a heatmap on the first subplot
-    # cbar_ax = fig.add_axes([0.1, .3, .03, .4]) # Adjust the size and position as needed
-    hmap = sns.heatmap(df, annot=True, cmap='YlGnBu', ax=ax0, cbar=False)
-    ax0.set_xlabel('Secondary Label')
+    _hmap = sns.heatmap(df, annot=True, cmap='YlGnBu', ax=ax0, cbar=False)
+    ax0.set_xlabel('Secondary Class')
     ax0.set_xticklabels(ax0.get_xticklabels(), rotation=45, ha="right")
-    ax0.set_ylabel('Primary Label')
-    ax0.set_title("Relative Distribution of Secondary Labels")
+    ax0.set_ylabel('Primary Class')
+    # ax0.set_title("Relative Distribution of Secondary Labels")
 
     # Display total counts on the second subplot
     # seaborn heatmap and bar chart have inverted y axis
@@ -402,16 +377,4 @@ def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts
     ax1.set_ylim(-0.5, len(total_counts) - 0.5)  # Adjust y limits to match the heatmap
 
     plt.tight_layout()
-    # plt.show()
     plt.savefig(shared_dir / "figures/label-exploration" / "secondary_labels.pdf", bbox_inches="tight")
-
-# def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts):
-#     df = pd.DataFrame(distributions, index=primary_classes, columns=secondary_classes)
-#     df['Total'] = total_counts
-#     prepare_latex_plot()
-#     plt.figure(figsize=(8, 6))
-#     sns.heatmap(df, annot=True, cmap='YlGnBu')
-#     # plt.title('Secondary Class Distribution for Each Primary Class')
-#     plt.xlabel('Secondary Classes')
-#     plt.ylabel('Primary Classes')
-#     plt.savefig(shared_dir / "figures/label-exploration" / "secondary_labels.pdf", bbox_inches="tight")

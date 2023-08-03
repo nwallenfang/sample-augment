@@ -61,4 +61,4 @@ def prepare_latex_plot(width=text_width, height=text_height):
     # plt.tight_layout()
 
 
-CREATE_PLOTS = False
+CREATE_PLOTS = True

@@ -23,7 +23,7 @@ def main(arg_config: Path = None):
     # experiment.run("train_augmented_classifier")
     # experiment.run("evaluate_classifier")
     # experiment.run('look_at_augmented_train_set')
-    experiment.run("train_augmented_classifier")
+    experiment.run("gc10_data_exploration")
 
 
 if __name__ == '__main__':
