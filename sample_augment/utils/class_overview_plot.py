@@ -51,7 +51,7 @@ def make_class_overview():
         ax.axis('off')
         title = GC10_CLASSES_TEXT[i]
         if title == "Silk spot":
-            title += " (Close-Up)"
+            ax.set_title(r"\texttt{Silk spot} (close-up)")
         else:
             ax.set_title(r"\texttt{" + title + r"}")
     # make remaining subplots invisible
