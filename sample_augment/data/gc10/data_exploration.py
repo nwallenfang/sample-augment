@@ -71,5 +71,5 @@ def gc10_data_exploration(labels_artifact: GC10Labels, shared_directory: Path):
     ax.set_title("Occurrences of secondary class labels per primary class")
     fig.tight_layout()
 
-    plt.savefig(shared_directory / 'secondary_labels.pdf')
+    plt.savefig(shared_directory / 'secondary_labels.pdf', bbox_inches='tight')
     plt.show()

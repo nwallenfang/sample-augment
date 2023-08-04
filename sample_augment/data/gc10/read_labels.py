@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import matplotlib
+import numpy as np
 import seaborn as sns
 import xmltodict
 from matplotlib import pyplot as plt, gridspec
@@ -313,7 +314,7 @@ def sanitize_labels(gc10_labels: GC10Labels) -> SanitizedGC10Labels:
                 sanitized_labels[img_id] = assign_instance_to(class_name_to_idx[into_class], img_id, all_labels)
 
     # when instance is labelled welding_line and punching_hole, put it into welding line!
-    move_combination_into(['punching_hole', 'welding_line'], into_class='welding_line')
+    # move_combination_into(['punching_hole', 'welding_line'], into_class='welding_line')
 
     _ratio = ratio_of_secondary_classes(sanitized_labels, class_name_to_idx['punching_hole'], gc10_labels.class_names)
 
@@ -342,12 +343,6 @@ def sanitize_labels(gc10_labels: GC10Labels) -> SanitizedGC10Labels:
     return SanitizedGC10Labels(labels=labels, number_of_classes=gc10_labels.number_of_classes)
 
 
-def get_ids_with_labels(labels: Dict, primary_class: int, secondary_class: int):
-    # TODO if I continue with the sanitation process, look at rolled_pit instances I could
-    #  get from other classes
-    pass
-
-
 def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts):
     import pandas as pd
 
@@ -372,9 +367,18 @@ def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts
     # Display total counts on the second subplot
     # seaborn heatmap and bar chart have inverted y axis
     ax1.barh(list(range(len(total_counts))), total_counts[::-1], color='lightgray')
-    ax1.set_xlabel('Number of Instances')
+    ax1.set_xlabel('No. of Instances')
+    xticks = [100, 300, 650]
+
+    # Sort the x-ticks
+    xticks = np.sort(xticks)
+
+    print(np.max(total_counts))
+    # Set the x-ticks
+    ax1.set_xticks(xticks)
     ax1.get_yaxis().set_visible(False)  # Hide the y-axis labels
     ax1.set_ylim(-0.5, len(total_counts) - 0.5)  # Adjust y limits to match the heatmap
-
-    plt.tight_layout()
-    plt.savefig(shared_dir / "figures/label-exploration" / "secondary_labels.pdf", bbox_inches="tight")
+    ax1.set_xlim(0, np.max(total_counts))
+    plt.subplots_adjust(wspace=0.10)
+    # plt.tight_layout()
+    plt.savefig(shared_dir / "figures/label-exploration" / "secondary_labels.pdf", bbox_inches='tight')
