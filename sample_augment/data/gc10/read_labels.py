@@ -17,6 +17,7 @@ from matplotlib import pyplot as plt, gridspec
 
 from sample_augment.core import step, Artifact
 from sample_augment.data.gc10.download_gc10 import GC10Folder
+from sample_augment.models.generator import GC10_CLASSES
 from sample_augment.utils import log
 # from sample_augment.data.gc10.download import load_gc10_if_missing
 from sample_augment.utils.path_utils import project_path, shared_dir
@@ -294,6 +295,36 @@ def assign_instance_to(new_class_idx: int, img_id: str, all_labels: Dict):
     }
 
 
+def calc_relative_distributions(all_labels):
+    distributions = []
+    absolute_counts = []
+    for class_idx, _row_name in enumerate(GC10_CLASSES):
+        instances_with_class = [(instance_id, labels) for instance_id, labels in all_labels.items()
+                                if class_idx in labels]
+        n_instances = len(instances_with_class)
+        # how frequently (relatively) other classes co-occur with this one
+        class_co_occurrences = []
+        abs_co_occurences = []
+
+        for co_class_idx, _col_name in enumerate(GC10_CLASSES):
+            if class_idx == co_class_idx:
+                # special case: ratio of instances having only that label
+                count = sum([1 for (instance_id, labels) in instances_with_class if len(labels) == 1])
+            else:
+                # determine the ratio of col_class occurance in all instances that have row_class
+                count = sum([1 for (instance_id, labels) in instances_with_class if co_class_idx in labels])
+
+            ratio = count / n_instances
+
+            class_co_occurrences.append(ratio)
+            abs_co_occurences.append(count)
+
+        distributions.append(class_co_occurrences)
+        absolute_counts.append(abs_co_occurences)
+
+    return distributions, absolute_counts
+
+
 @step
 def sanitize_labels(gc10_labels: GC10Labels) -> SanitizedGC10Labels:
     class_name_to_idx = {name: idx for idx, name in enumerate(gc10_labels.class_names)}
@@ -306,50 +337,52 @@ def sanitize_labels(gc10_labels: GC10Labels) -> SanitizedGC10Labels:
     # basically ignore the distinction of y and secondary, it's all the same to us
     all_labels = {img_id: labels[img_id]['secondary'] + [labels[img_id]['y']] for img_id in labels}
 
-    sanitized_labels = copy(labels)
+    # sanitized_labels = copy(labels)
 
-    def move_combination_into(combined: List[str], into_class: str):
-        for img_id, label in sanitized_labels.items():
-            if all([(class_name_to_idx[class_name] in all_labels[img_id]) for class_name in combined]):
-                sanitized_labels[img_id] = assign_instance_to(class_name_to_idx[into_class], img_id, all_labels)
+    # def move_combination_into(combined: List[str], into_class: str):
+    #     for img_id, label in sanitized_labels.items():
+    #         if all([(class_name_to_idx[class_name] in all_labels[img_id]) for class_name in combined]):
+    #             sanitized_labels[img_id] = assign_instance_to(class_name_to_idx[into_class], img_id, all_labels)
 
     # when instance is labelled welding_line and punching_hole, put it into welding line!
     # move_combination_into(['punching_hole', 'welding_line'], into_class='welding_line')
 
-    _ratio = ratio_of_secondary_classes(sanitized_labels, class_name_to_idx['punching_hole'], gc10_labels.class_names)
+    # _ratio = ratio_of_secondary_classes(sanitized_labels, class_name_to_idx['punching_hole'], gc10_labels.class_names)
 
-    primary_labels = [labels[img_id]['y'] for img_id in labels]
-    class_counts = collections.Counter(primary_labels)
+    from itertools import chain
+    class_counts = collections.Counter(chain.from_iterable(all_labels.values()))
     log.info(class_counts)
 
     if CREATE_PLOTS:
         # Heatmap data generation
         class_names = [" ".join(class_name.split("_")) for class_name in gc10_labels.class_names]
         total_counts = []
-        heatmap_data = []
+        heatmap_data, absolute_counts = calc_relative_distributions(all_labels)
         for primary_class_idx in range(len(class_names)):
-            secondary_distribution = ratio_of_secondary_classes(sanitized_labels, primary_class_idx, class_names)
-            # Append the distribution to heatmap data, while making sure each secondary class has an entry
-            heatmap_data.append([round(secondary_distribution.get(class_name, 0), 2) for class_name in class_names])
+            #     # Append the distribution to heatmap data, while making sure each secondary class has an entry
+            #     heatmap_data.append([round(secondary_distribution.get(class_name, 0), 2) for class_name in class_names])
             # Calculate the total counts for each primary class
+            secondary_distribution = ratio_of_secondary_classes(labels, primary_class_idx, class_names)
             total_counts.append(sum([val for val in secondary_distribution.values()]))
 
         class_counts = dict(class_counts)
         total_counts = [class_counts[i] for i in range(10)]
 
+        print(total_counts)
         # Then, you can call the heatmap plotting function
-        plot_heatmap(heatmap_data, class_names, class_names, total_counts)
+        plot_heatmap(heatmap_data, absolute_counts, class_names, class_names, total_counts)
 
     return SanitizedGC10Labels(labels=labels, number_of_classes=gc10_labels.number_of_classes)
 
 
-def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts):
+def plot_heatmap(distributions, absolute_counts, primary_classes, secondary_classes, total_counts):
     import pandas as pd
 
     df = pd.DataFrame(distributions, index=primary_classes, columns=secondary_classes)
+    # df_abs = pd.DataFrame(absolute_counts, index=primary_classes, columns=secondary_classes)
 
     prepare_latex_plot()
-    _fig = plt.figure(figsize=(.81 * 8, .81 * 5))
+    _fig = plt.figure(figsize=(.75 * 8, .75 * 5))
     # Define the grid space
     gs = gridspec.GridSpec(1, 2, width_ratios=[4, 1])
 
@@ -357,18 +390,33 @@ def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts
     ax0 = plt.subplot(gs[0])
     ax1 = plt.subplot(gs[1])
 
+    def custom_annotation(val):
+        if val == 0:
+            return '0'
+        if 0 < val < 0.01:
+            return r'\tiny{$<\!0.01$}'
+        else:
+            return f'{val:.2f}'
+
     # Create a heatmap on the first subplot
     _hmap = sns.heatmap(df, annot=True, cmap='YlGnBu', ax=ax0, cbar=False)
-    ax0.set_xlabel('Secondary Class')
+
+    # for text, value in zip(_hmap.texts, df.values.flatten()):
+    #     text.set_text(value)
+
+    for text in _hmap.texts:
+        text.set_text(custom_annotation(float(text.get_text())))
+    ax0.set_xlabel('Co-Occurring Class')
     ax0.set_xticklabels(ax0.get_xticklabels(), rotation=45, ha="right")
-    ax0.set_ylabel('Primary Class')
+    ax0.set_ylabel('Class')
     # ax0.set_title("Relative Distribution of Secondary Labels")
 
     # Display total counts on the second subplot
     # seaborn heatmap and bar chart have inverted y axis
     ax1.barh(list(range(len(total_counts))), total_counts[::-1], color='lightgray')
+    ax1.grid(linestyle='dotted')
     ax1.set_xlabel('No. of Instances')
-    xticks = [100, 300, 650]
+    xticks = [100, 300, 500, 700]
 
     # Sort the x-ticks
     xticks = np.sort(xticks)
@@ -381,4 +429,5 @@ def plot_heatmap(distributions, primary_classes, secondary_classes, total_counts
     ax1.set_xlim(0, np.max(total_counts))
     plt.subplots_adjust(wspace=0.10)
     # plt.tight_layout()
-    plt.savefig(shared_dir / "figures/label-exploration" / "secondary_labels.pdf", bbox_inches='tight')
+    plt.savefig(shared_dir / "figures/label-exploration" / "secondary_labels.pdf", bbox_inches='tight',
+                pad_inches=0.03)
