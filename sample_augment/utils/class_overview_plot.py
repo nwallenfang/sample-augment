@@ -38,8 +38,8 @@ def load_images(directory):
 def make_class_overview():
     images = load_images(shared_dir / 'figures/class_representatives/')
     prepare_latex_plot()
-
-    fig = plt.figure(figsize=(6, 8))  # create figure without subplots
+    size = 0.95
+    fig = plt.figure(figsize=[size*8.27, size*11.69])  # create figure without subplots
     gs = GridSpec(4, 3)  # grid layout with 4 rows and 3 columns
     for i, img in enumerate(images):
         row, col = divmod(i, 3)  # calculate row and column index
@@ -52,14 +52,16 @@ def make_class_overview():
         title = GC10_CLASSES_TEXT[i]
         if title == "Silk spot":
             title += " (Close-Up)"
-        ax.set_title(title)
+        else:
+            ax.set_title(r"\texttt{" + title + r"}")
     # make remaining subplots invisible
     for j in range(len(images) + 1, 12):  # remaining subplot indices
         row, col = divmod(j, 3)
         ax = fig.add_subplot(gs[row, col])
         ax.axis('off')
     plt.tight_layout()
-    plt.savefig(shared_dir / f'figures/class_representatives.pdf', bbox_inches="tight", dpi=250)
+    plt.savefig(shared_dir / f'figures/class_representatives.pdf',
+                bbox_inches="tight", pad_inches=0.02, dpi=250)
 
 
 if __name__ == '__main__':
