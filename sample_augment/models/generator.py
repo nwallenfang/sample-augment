@@ -1,5 +1,6 @@
 import os
 import sys
+import warnings
 from pathlib import Path
 from typing import Union
 
@@ -12,6 +13,7 @@ import sample_augment.models.stylegan2.legacy as legacy
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import root_dir, shared_dir
 from sample_augment.models.stylegan2.training.networks import Generator, Discriminator
+from sample_augment.utils.log import SuppressSpecificPrint
 
 """
     this file probably needs python <=3.8 and torch <=1.9, same as train_generator.
@@ -76,6 +78,10 @@ class StyleGANGenerator:
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         log.debug(f'Generator device: {self.device}')
 
+        warnings.filterwarnings("ignore", category=UserWarning,
+                                module=".*upfirdn2d.*",
+                                message=".*Failed to build CUDA kernels for upfirdn2d.*")
+
         with open(self.pkl_path, 'rb') as f:
             log.debug(f'pkl: {pkl_path}')
             data = legacy.load_network_pkl(f)
@@ -131,13 +137,10 @@ class StyleGANGenerator:
             w = w.unsqueeze(0)
         # assert w.ndim == 3, "expecting shape (n, G.num_ws, G.w_dim)"
         assert w.shape[1:] == (self.G.num_ws, self.G.w_dim), "expecting shape (n, G.num_ws, G.w_dim)"
-        imgs = self.G.synthesis(w)
+        with SuppressSpecificPrint("Setting up PyTorch plugin \"upfirdn2d_plugin\"... Failed!"):
+            imgs = self.G.synthesis(w)
         imgs = (imgs.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         return imgs
-        # for idx, w in enumerate(w):
-        #     img = self.G.synthesis(w.unsqueeze(0), noise_mode='const')
-        #     img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-        #     Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{self.out_dir}/proj{idx:02d}.png')
 
     def img_into_discriminator(self, img, c):
         if isinstance(img, np.ndarray):
@@ -154,32 +157,6 @@ class StyleGANGenerator:
             c = c.unsqueeze(0)
         return self.D(img, c=c)
 
-    # def generate_images(self,
-    #                     truncation_psi: float = 1.0,
-    #                     noise_mode='const',
-    #                     save_to_outdir=False,
-    #                     seeds=None,
-    #                     class_idx=None):
-    #
-    #     # Synthesize the result of a W projection.
-    #     assert self.G.c_dim != 0, "expected conditional network"
-    #     # one-hot encoded class
-    #     label = torch.zeros([1, self.G.c_dim], device=self.device)
-    #     label[:, class_idx] = 1
-    #
-    #     imgs = np.empty((len(seeds), 256, 256, 3), dtype=np.uint8)
-    #     # Generate images.
-    #     for seed_idx, seed in enumerate(seeds):
-    #         # print('Generating image for seed %d (%d/%d) ...' % (seed, seed_idx, len(seeds)))
-    #         z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.G.z_dim)).to(self.device)
-    #         img = self.G(z, label, truncation_psi=truncation_psi, noise_mode=noise_mode)
-    #         img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-    #         imgs[seed_idx] = img[0].cpu().numpy()
-    #         if save_to_outdir:
-    #             Image.fromarray(img[0].cpu().numpy(), 'RGB').save(
-    #                 f'{self.out_dir}/{GC10_CLASSES[class_idx]}_{seed:04d}.png')
-    #     return imgs
-
     def generate(self, c: Union[Tensor, np.ndarray],
                  truncation_psi: float = 1.0,
                  noise_mode='const') -> Tensor:
@@ -191,16 +168,19 @@ class StyleGANGenerator:
         @return: img stack tensor
         """
         if isinstance(c, np.ndarray):
-            c = torch.from_numpy(c).unsqueeze(0).to(self.device)
+            c = torch.from_numpy(c).to(self.device)
         else:
             c = c.to(self.device)
+        if c.ndim == 1:
+            c = c.unsqueeze(0)
+        assert c.ndim == 2, f"conditional vector c: expected shape (n, c_dim)"
         n: int = c.shape[0]
-        # imgs = torch.empty((n, 256, 256, 3), dtype=torch.uint8)
+
         # build input z vector (gaussian distribution)
         z = torch.from_numpy(np.random.RandomState(self.seed).randn(n, self.G.z_dim)).to(self.device)
 
-        # for i, seed in enumerate(list(range(n))):
-        imgs = self.G(z, c, truncation_psi=truncation_psi, noise_mode=noise_mode)
+        with SuppressSpecificPrint("Setting up PyTorch plugin \"upfirdn2d_plugin\"... Failed!"):
+            imgs = self.G(z, c, truncation_psi=truncation_psi, noise_mode=noise_mode)
         imgs = (imgs.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         return imgs
 

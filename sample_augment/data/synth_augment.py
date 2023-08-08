@@ -1,6 +1,7 @@
 import glob
+from collections import defaultdict
 from pathlib import Path
-from typing import List
+from typing import List, Dict, Optional
 
 import numpy as np
 import torch
@@ -82,48 +83,45 @@ def synth_augment_unified(training_set: TrainSet, generator_name: str = "apa-020
 
 class TrainSetWithSynthetic(TrainSet):
     serialize_this = True
-    # along with the normal TrainSet tensors:
     synthetic_images: Tensor
     synthetic_labels: Tensor
     synthetic_ids: List[str]
-    """probability of replacing a real training image with a synthetic one"""
     synth_p: float
+    _label_to_indices: Optional[Dict] = None
 
-    # TODO give mapping attribute
-    # precompute the label_to_indices mapping
-    # self.label_to_indices = defaultdict(list)
-    # for i, label in enumerate(self.synthetic_labels):
-    #     # Assuming label is a tensor, converting it to a tuple to use it as a key
-    #     self.label_to_indices[tuple(label.tolist())].append(i)
+    class Config:  # Add this internal Config class
+        extra = "allow"
+
+    def __init__(self, *args, **kwargs):
+        log.info("extra allow")
+        super().__init__(*args, **kwargs)
+        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        self._label_to_indices = defaultdict(list)
+        for i, label in enumerate(self.synthetic_labels):
+            label_on_cpu = label.cpu() if device == "cuda" else label
+            self._label_to_indices[tuple(label_on_cpu.tolist())].append(i)
+
+        if device == "cuda":
+            self.synthetic_images = self.synthetic_images.cuda()
+            self.synthetic_labels = self.synthetic_labels.cuda()
 
     def __len__(self):
         return super().__len__()
 
     def __getitem__(self, idx):
-        # the super __getitem__ already has self.transform applied
         image, label = super().__getitem__(idx)
-
         if np.random.rand() < self.synth_p:
-            # FIXME something is very imperformant here
-            #  maybe we do need an additional data structure matching label to indices
-            #  and / or the synthetic data should be on GPU
-            # TODO
-            #     matching_indices = self.label_to_indices.get(tuple(label.tolist()), [])
-            matching_rows = (self.synthetic_labels.bool() == label.bool()).all(dim=1)
-            matching_indices = torch.where(matching_rows)[0]
-
-            if len(matching_indices) > 0:  # If there are synthetic instances with the same label
-                # Replace the real instance with a synthetic one
-
-                chosen_idx = np.random.choice(matching_indices.cpu().numpy())
+            matching_indices = self._label_to_indices.get(tuple(label.cpu().tolist()), [])
+            if matching_indices:
+                chosen_idx = np.random.choice(matching_indices)
                 synthetic_image, synthetic_label = (self.synthetic_images[chosen_idx],
-                                                    self.synthetic_labels[chosen_idx])
+                                                    self.synthetic_labels[
+                                                        chosen_idx].cpu())
                 if self.transform is not None:
                     synthetic_image = self.transform(synthetic_image)
                 else:
                     log.warning('Using TrainSetWithSynthetic without the transform being set.')
                 return synthetic_image, synthetic_label
-
         return image, label
 
 
@@ -192,45 +190,43 @@ def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: f
     """
     A synthetic augmentation type based on label distribution.
     """
+    # since we're using the generator we're using device == 'cuda' here
+    device = torch.device('cuda')
 
-    label_matrix = training_set.label_tensor.numpy()
-    unique_label_combinations = np.unique(label_matrix, axis=0)
+    label_matrix = training_set.label_tensor.to(device)
+    unique_label_combinations, _ = torch.unique(label_matrix, dim=0, return_inverse=True)
 
-    # around 50
     log.info(f"Number of unique label combinations: {len(unique_label_combinations)}")
     n = 10  # generate 10 synthetic instances per label combination
     n_combinations = len(unique_label_combinations)
 
-    synthetic_imgs_np = np.empty(shape=(n * n_combinations, 256, 256, 3), dtype=np.uint8)
-    synthetic_labels = []
-    synthetic_ids = []
+    # Initialize tensors to hold synthetic images and labels
+    synthetic_imgs_tensor = torch.empty((n * n_combinations, 3, 256, 256), dtype=torch.uint8,
+                                        device=device)
+    synthetic_labels_tensor = torch.empty((n * n_combinations, label_matrix.size(1)), device=device)
 
     generator = StyleGANGenerator.load_from_name(generator_name)
 
     for label_idx, label_comb in enumerate(unique_label_combinations):
-        # stack label_comb vector n times to generate n images
-        c = np.tile(label_comb, (n, 1))  # shape will be [n, num_classes]
+        c = label_comb.repeat(n, 1)
         synthetic_instances = generator.generate(c=c)
-        synthetic_imgs_np[label_idx * n:(label_idx + 1) * n] = synthetic_instances
-        synthetic_labels.extend([label_comb for _ in range(n)])
-        synthetic_ids.extend([f"{generator_name}_{label_comb}_{i}" for i in range(n)])
+        synthetic_imgs_tensor[label_idx * n:(label_idx + 1) * n] = synthetic_instances.permute(0, 3, 1, 2)
+        synthetic_labels_tensor[label_idx * n:(label_idx + 1) * n] = c
 
-    synthetic_imgs_tensor = torch.from_numpy(synthetic_imgs_np)
-    synthetic_labels = torch.from_numpy(np.array(synthetic_labels))
-    log.info(f"Label size: {synthetic_labels.size()}")
+    synthetic_ids = [f"{generator_name}_{label_comb.tolist()}_{i}" for label_comb in unique_label_combinations for i in
+                     range(n)]
+    log.info(f"Label size: {synthetic_labels_tensor.size()}")
 
-    # Convert tensors to uint8
-    # synthetic_imgs_tensor = (synthetic_imgs_tensor * 255).byte()
-
-    # permute synthetic tensor to be (N, C, H, W), same as training data
-    synthetic_imgs_tensor = synthetic_imgs_tensor.permute(0, 3, 1, 2)
+    # Move everything to CPU before returning
+    synthetic_imgs_tensor = synthetic_imgs_tensor.cpu()
+    synthetic_labels_tensor = synthetic_labels_tensor.cpu()
 
     return TrainSetWithSynthetic(name=f"synth-aug-{generator_name}", root_dir=training_set.root_dir,
                                  img_ids=training_set.img_ids,
                                  tensors=(training_set.tensors[0], training_set.tensors[1]),
                                  primary_label_tensor=training_set.primary_label_tensor,
                                  synthetic_images=synthetic_imgs_tensor,
-                                 synthetic_labels=synthetic_labels,
+                                 synthetic_labels=synthetic_labels_tensor,
                                  synthetic_ids=synthetic_ids,
                                  synth_p=synth_p)
 

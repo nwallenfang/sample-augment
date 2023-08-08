@@ -1,7 +1,6 @@
 import hashlib
 import inspect
 import json
-import pprint
 import sys
 import typing
 from importlib import import_module
@@ -10,11 +9,12 @@ from typing import *
 
 import numpy as np
 import torch
+from pydantic import BaseModel, parse_obj_as, ValidationError, Field
 # noinspection PyProtectedMember
 from pydantic.main import ModelMetaclass
-from pydantic import BaseModel, parse_obj_as, ValidationError, Field
 
 from sample_augment.utils import log, path_utils
+from sample_augment.utils.log import short_pformat
 
 
 def is_tuple_of_tensors(field_type):
@@ -36,7 +36,7 @@ class ArtifactMeta(ModelMetaclass):
         #  fixed this in a quick and dirty manner.
         cls.__full_name__ = f"{cls.__module__}.{name}"
         if 'sample_augment' in cls.__full_name__:
-            cls.__full_name__ = cls.__full_name__[len('sample_augment')+1:]
+            cls.__full_name__ = cls.__full_name__[len('sample_augment') + 1:]
 
 
 class Artifact(BaseModel, metaclass=ArtifactMeta):
@@ -256,8 +256,8 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
                 json.dump(data, f, indent=4)
             except TypeError as err:
                 log.error(str(err))
-                log.error("Couldn't serialize Artifact, data dict:")
-                log.error(pprint.pformat(data))
+                log.error(f"Couldn't serialize Artifact {self.__full_name__}")
+                # log.error(short_pformat(data))
                 sys.exit(-1)
 
     # @classmethod

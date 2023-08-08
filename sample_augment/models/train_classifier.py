@@ -124,7 +124,6 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             predictions = torch.sigmoid(logits)
 
             train_loss = criterion(logits, label)  # Calculate the loss
-            # train_accuracies += (predictions.argmax(dim=-1) == label).float().mean().item()
             train_accuracies += ((predictions > threshold) == label).float().mean().item()
 
             # backward
@@ -134,7 +133,6 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             # gradient descent or adam step
             optimizer.step()  # Update the weights
 
-            # store loss
             train_losses += train_loss.item()
 
         avg_train_loss = train_losses / len(train_loader)
@@ -156,8 +154,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             # calculate validation metrics
             val_losses += val_loss.item()
             val_accuracies += ((predictions > threshold) == label).float().mean().item()
-            # if the model doesn't predict any class (zero_division), give it a score
-            # of 0
+            # if the model doesn't predict any class (zero_division), give it a score of 0
             val_f1s += f1_score(label.cpu().numpy(),
                                 (predictions > threshold).cpu().numpy(), average='macro',
                                 zero_division=0)
