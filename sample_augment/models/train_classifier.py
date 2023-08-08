@@ -2,11 +2,10 @@ import inspect
 import random
 import sys
 from copy import deepcopy
-from typing import Dict, List
+from typing import List
 
 import numpy as np
 import torch
-import torchvision.models
 from sklearn.metrics import f1_score
 from torch import nn  # All neural network modules
 from torch import optim  # For optimizers like SGD, Adam, etc.
@@ -19,6 +18,7 @@ from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.synth_augment import TrainSetWithSynthetic
 from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
+from sample_augment.models.classifier import CustomViT
 from sample_augment.utils import log
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
@@ -26,120 +26,6 @@ _std = torch.tensor([0.229, 0.224, 0.225])
 normalize = Normalize(mean=_mean, std=_std)
 # reverse operation for use in visualization
 inverse_normalize = Normalize((-_mean / _std).tolist(), (1.0 / _std).tolist())
-
-
-class CustomDenseNet(torchvision.models.DenseNet):
-    num_classes: int
-
-    def __init__(self, num_classes, load_pretrained=False):
-        # Initialize with densenet201 configuration
-        super().__init__(num_init_features=64, growth_rate=32, block_config=(6, 12, 48, 32),
-                         num_classes=1000)  # initially set num_classes to 1000 to match the pre-trained model
-        if load_pretrained:
-            # use the model pretrained on imagenet
-            pretrained = torch.hub.load('pytorch/vision:v0.10.0', 'densenet201', weights='IMAGENET1K_V1')
-            self.load_state_dict(pretrained.state_dict(), strict=False)
-        # Freeze early layers
-        for param in self.parameters():
-            param.requires_grad = False
-
-        # Modify the classifier part of the model
-        self.classifier = nn.Sequential(
-            nn.Linear(1920, 960),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(960, 240),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(240, 30),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(30, num_classes))
-
-        self.num_classes = num_classes
-
-    def get_kwargs(self) -> Dict:
-        return {'num_classes': self.num_classes}
-
-
-class CustomResNet50(torchvision.models.ResNet):
-    def __init__(self, num_classes, load_pretrained=False):
-        # initially set num_classes to 1000 to match the pre-trained model
-        super(CustomResNet50, self).__init__(block=torchvision.models.resnet.Bottleneck,
-                                             layers=[3, 4, 6, 3], num_classes=1000)
-
-        # Freeze early layers
-        if load_pretrained:
-            # use the model pretrained on imagenet
-            pretrained = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', weights='IMAGENET1K_V2')
-            self.load_state_dict(pretrained.state_dict(), strict=False)
-        for param in self.parameters():
-            param.requires_grad = False
-
-        # Modify the classifier part of the model
-        self.fc = nn.Sequential(
-            nn.Linear(2048, 960),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(960, 240),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(240, 30),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(30, num_classes))
-
-        self.num_classes = num_classes
-
-    def get_kwargs(self):
-        return {'num_classes': self.num_classes}
-
-
-class CustomViT(torchvision.models.VisionTransformer):
-    def __init__(self, num_classes, load_pretrained=False):
-        # use same settings as vit_b_16 to get the same architecture
-        super().__init__(
-            image_size=224,
-            patch_size=16,
-            num_layers=12,
-            num_heads=12,
-            hidden_dim=768,
-            mlp_dim=3072,
-            num_classes=1000,
-            representation_size=None)
-
-        # Load the pretrained weights if requested
-        if load_pretrained:
-            # use the model pretrained on imagenet
-            weights = torchvision.models.vision_transformer.ViT_B_16_Weights.IMAGENET1K_V1
-            # pretrained = torch.hub.load('pytorch/vision:v0.10.0', 'vit_b_16', weights='IMAGENET1K_V1')
-            self.load_state_dict(weights.get_state_dict(progress=True), strict=False)
-
-        # Freeze the early layers
-        for param in self.parameters():
-            param.requires_grad = False
-
-        # Create a custom classifier head
-        self.heads = nn.Sequential(
-            nn.Linear(768, 960),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(960, 240),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(240, 30),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(30, num_classes)
-        )
-        self.num_classes = num_classes
-
-        # Unfreeze the custom classifier head
-        for param in self.heads.parameters():
-            param.requires_grad = True
-
-    def get_kwargs(self) -> Dict:
-        return {'num_classes': self.num_classes}
 
 
 class ClassifierMetrics(Artifact):
@@ -152,7 +38,6 @@ class ClassifierMetrics(Artifact):
     validation_accuracy: np.ndarray
     validation_f1: np.ndarray
     """the epoch from which the final model state was selected"""
-    # TODO add this
     epoch: int
 
 
@@ -187,14 +72,6 @@ def _set_random_seed(random_seed: int):
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
 
-
-# Quick sanity check
-# for i in range(10):
-#     img = inverse_normalize(image[i].cpu()).numpy()  # Take the first image of the batch
-#     plt.imshow(img.transpose(1, 2, 0))  # Assuming the image has shape (channels, height, width)
-#     plt.title(f'Label: {label[i]}')
-#     plt.axis('off')
-#     plt.show()
 
 def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
                 learning_rate: float, random_seed: int,
@@ -321,19 +198,8 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
 
 
 class TrainedClassifier(Artifact):
-    # name: str
     model: torch.nn.Module
-    # these following metrics are taken for each epoch
-    # extra cred task: a decorator like @extractable would be nice. This decorator would mean that a
-    #  "virtual" step would be created that takes a TrainedClassifier and returns the subartifact
-    #  ClassifierMetrics. Then in evaluate we can take just ClassiferMetrics as arg.
     metrics: ClassifierMetrics
-
-
-plain_transforms = [
-    transforms.ConvertImageDtype(dtype=torch.float32),
-    normalize
-]
 
 
 class WithProbability:
@@ -362,31 +228,10 @@ class CircularTranslate:
         return img
 
 
-# class AugmentedDataset(AugmentDataset):
-#     def __init__(self, original_with_synthetic: TrainSetWithSynthetic, synth_p: float, name: str,
-#                  tensors: Tuple[Tensor, Tensor], img_ids: List[str], root_dir: Path, **kwargs):
-#         super().__init__(name, tensors, img_ids, root_dir, **kwargs)
-#         self.original_with_synthetic = original_with_synthetic
-#         self.synth_p = synth_p
-#
-#     def __len__(self):
-#         return len(self.original_with_synthetic)
-#
-#     def __getitem__(self, idx):
-#         image, label = self.original_with_synthetic.__getitem__(idx)
-#         if np.random.rand() < self.synth_p:
-#             same_class_indices = (self.original_with_synthetic.synthetic_labels == label).nonzero(as_tuple=True)[0]
-#             if len(same_class_indices) > 0:  # If there are synthetic instances from the same class
-#                 # Replace the real instance with a synthetic one
-#                 chosen_idx = np.random.choice(same_class_indices)
-#                 image, label = (self.original_with_synthetic.synthetic_images[chosen_idx],
-#                                 self.original_with_synthetic.synthetic_labels[chosen_idx])
-#                 # Apply the same transformation to the synthetic image
-#                 if self.original_with_synthetic.transform is not None:
-#                     image = self.original_with_synthetic.transform(image)
-#                 else:
-#                     log.warning("synthetic dataset transform is None!")
-#         return image, label
+plain_transforms = [
+    transforms.ConvertImageDtype(dtype=torch.float32),
+    normalize
+]
 
 
 @step
@@ -429,8 +274,6 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
         # if antialias_param_needed:  # needed in newer torchvision versions
         # noinspection PyArgumentList
         random_crop = transforms.RandomResizedCrop(256, scale=(0.85, 1.0), **optional_aa_arg)
-        # else:
-        #     random_crop = transforms.RandomResizedCrop(256, scale=(0.85, 1.0))
 
         geometric_transforms = [
             # antialias argument needed for newer versions of torchvision

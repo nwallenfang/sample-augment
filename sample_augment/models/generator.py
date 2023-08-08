@@ -75,7 +75,7 @@ class StyleGANGenerator:
 
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         log.debug(f'Generator device: {self.device}')
-        
+
         with open(self.pkl_path, 'rb') as f:
             log.debug(f'pkl: {pkl_path}')
             data = legacy.load_network_pkl(f)
@@ -138,12 +138,12 @@ class StyleGANGenerator:
         #     img = self.G.synthesis(w.unsqueeze(0), noise_mode='const')
         #     img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         #     Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{self.out_dir}/proj{idx:02d}.png')
-        
+
     def img_into_discriminator(self, img, c):
         if isinstance(img, np.ndarray):
             img = torch.from_numpy(img)
         img = img.to(self.device)
-        
+
         if isinstance(c, np.ndarray):
             c = torch.from_numpy(c)
         c = c.to(self.device)
@@ -204,8 +204,6 @@ class StyleGANGenerator:
         imgs = (imgs.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         return imgs
 
-
-
     @staticmethod
     def load_from_name(name: str) -> "StyleGANGenerator":
         return StyleGANGenerator(pkl_path=root_dir / "TrainedStyleGAN" / f"{name}.pkl")
@@ -232,7 +230,6 @@ def generate_image_pool(num_imgs_per_class=200, generator_name: str = "wdataaug-
             file_path = generated_root / GC10_CLASSES[class_index] / f"{GC10_CLASSES[class_index]}_{idx}.png"
             # Save the image
             img_pil.save(file_path)
-
 
 
 def main():
