@@ -153,7 +153,7 @@ class ClassifierMetrics(Artifact):
     validation_f1: np.ndarray
     """the epoch from which the final model state was selected"""
     # TODO add this
-    # epoch: int
+    epoch: int
 
 
 def create_weighted_random_sampler(dataset: Dataset):
@@ -315,7 +315,8 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         validation_loss=np.array(val_loss_per_epoch),
         train_accuracy=np.array(train_acc_per_epoch),
         validation_accuracy=np.array(val_acc_per_epoch),
-        validation_f1=np.array(val_f1_per_epoch)
+        validation_f1=np.array(val_f1_per_epoch),
+        epoch=best_epoch
     )
 
 
@@ -500,6 +501,7 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
     splits = stratified_k_fold_split(train_val, n_folds, random_seed, min_instances)
     for i, (train, val) in enumerate(splits.datasets):
         # different random seed when splitting for each fold
+        # noinspection PyTypeChecker
         log.info(f"Training classifier on fold {i + 1}")
         fold_random_seed += 1
 
@@ -518,7 +520,6 @@ class SynthTrainedClassifier(TrainedClassifier):
     def __init__(self, trained_classifier: TrainedClassifier, **kwargs):
         # Copy all attributes from the superclass instance to the subclass instance
         super().__init__(model=trained_classifier.model, metrics=trained_classifier.metrics, **kwargs)
-
 
 
 @step
