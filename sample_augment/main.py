@@ -15,7 +15,7 @@ def main(arg_config: Path = None):
         CLI for running experiments concerning
     """
     config = read_config(arg_config)
-    find_steps(include=['test', 'data', 'models'], exclude=['models.stylegan2'])
+    find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
     # create Experiment instance
     experiment = Experiment(config)
 
@@ -23,7 +23,7 @@ def main(arg_config: Path = None):
     # experiment.run("train_augmented_classifier")
     # experiment.run("evaluate_classifier")
     # experiment.run('look_at_augmented_train_set')
-    experiment.run("sanitize_labels")
+    experiment.run("evaluate_classifier")
 
 
 if __name__ == '__main__':

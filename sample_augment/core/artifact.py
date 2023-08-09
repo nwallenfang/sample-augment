@@ -14,7 +14,6 @@ from pydantic import BaseModel, parse_obj_as, ValidationError, Field
 from pydantic.main import ModelMetaclass
 
 from sample_augment.utils import log, path_utils
-from sample_augment.utils.log import short_pformat
 
 
 def is_tuple_of_tensors(field_type):
@@ -41,14 +40,19 @@ class ArtifactMeta(ModelMetaclass):
 
 class Artifact(BaseModel, metaclass=ArtifactMeta):
     """
-        Represents a piece of data that gets produced/consumed in some Step.
-        Supports automatic (de-)serialization.
+        This is the base class for holding data in the `core` package.
+        It supports automatic (de-)serialization of its attributes, including lists, dicts,
+        np.arrays, and torch tensors/modules.
+        Use Artifact instances to pass inputs and results between `@step`s.
     """
+    """set this to False in your subclass to disable automatic serialization"""
     serialize_this = True
+    """dict for tracking the configs this Artifact depends on (by inspecting @step input args)"""
     configs: Dict[str, Any] = Field(default_factory=dict)
 
     @property
     def fully_qualified_name(self):
+        log.warning("fully qualified name is a little broken, use __full_name__ attr instead.")
         return f'{self.__module__}.{self.__class__.__name__}'
 
     def _serialize_field(self, field, field_name: str, field_type, external_directory: Path,
@@ -132,7 +136,6 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
 
     @staticmethod
     def _deserialize_field(field_name: str, value: Any, type_annotation: Optional[Type[Any]]) -> Any:
-
         if isinstance(value, dict) and 'path' in value:
             field_path = path_utils.root_dir / value['path']
             if value['type'] == 'torch.Tensor':
@@ -210,6 +213,7 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
     def collect_annotations(cls):
         """
         Collects and returns all the field annotations from the given class and its parent classes recursively.
+        Used to iterate over all Artifact fields.
 
         Returns:
             dict: A dictionary mapping field names to their types, including fields from the input class and all its
@@ -259,14 +263,6 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
                 log.error(f"Couldn't serialize Artifact {self.__full_name__}")
                 # log.error(short_pformat(data))
                 sys.exit(-1)
-
-    # @classmethod
-    # def load_from_disk(cls, config_entries: Dict[str, Any]) -> "Artifact":
-    #     config_hash = cls._calculate_config_hash(config_entries)
-    #     artifact_path = path_utils.root_directory / cls.__name__ / f"{config_hash}.json"
-    #     with open(artifact_path) as artifact_json:
-    #         artifact = cls.from_dict(json.load(artifact_json))
-    #         return artifact
 
     @classmethod
     def from_dict(cls, data: Dict) -> "Artifact":

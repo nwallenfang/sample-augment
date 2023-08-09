@@ -81,21 +81,23 @@ def synth_augment_unified(training_set: TrainSet, generator_name: str = "apa-020
                            tensors=(augmented_tensors, augmented_labels))
 
 
-class TrainSetWithSynthetic(TrainSet):
-    serialize_this = True
+class SynthAugTrainSet(TrainSet):
+    """
+        Synthetically Augmented Training Set
+    """
+    serialize_this = False
     synthetic_images: Tensor
     synthetic_labels: Tensor
-    synthetic_ids: List[str]
+    # synthetic_ids: List[str]
     synth_p: float
     _label_to_indices: Optional[Dict] = None
-
-    class Config:  # Add this internal Config class
-        extra = "allow"
+    """if the synthetic strategy only supports single-label creation, set this to False"""
+    _multi_label: Optional[bool] = True
 
     def __init__(self, *args, **kwargs):
-        log.info("extra allow")
         super().__init__(*args, **kwargs)
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        # precompute label_to_indices dict to make __getitem__ easier
         self._label_to_indices = defaultdict(list)
         for i, label in enumerate(self.synthetic_labels):
             label_on_cpu = label.cpu() if device == "cuda" else label
@@ -111,6 +113,7 @@ class TrainSetWithSynthetic(TrainSet):
     def __getitem__(self, idx):
         image, label = super().__getitem__(idx)
         if np.random.rand() < self.synth_p:
+            # TODO read _multi_label attr and act according to it
             matching_indices = self._label_to_indices.get(tuple(label.cpu().tolist()), [])
             if matching_indices:
                 chosen_idx = np.random.choice(matching_indices)
@@ -120,13 +123,16 @@ class TrainSetWithSynthetic(TrainSet):
                 if self.transform is not None:
                     synthetic_image = self.transform(synthetic_image)
                 else:
-                    log.warning('Using TrainSetWithSynthetic without the transform being set.')
+                    log.warning('Using SynthAugTrainSet without the transform attribute being set.')
                 return synthetic_image, synthetic_label
         return image, label
 
+    class Config:  # needed for _label_to_indices to be allowed
+        extra = "allow"
+
 
 @step
-def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -> TrainSetWithSynthetic:
+def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -> SynthAugTrainSet:
     """
     First most basic synthetic augmentation type.
     Gets a directory of generated images and adds those to the smaller classes, until each class
@@ -175,22 +181,23 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
     # Convert tensors to uint8
     synthetic_tensors = (synthetic_tensors * 255).byte()
 
-    return TrainSetWithSynthetic(name=f"synth-aug-{generator_name}", root_dir=generated_dir,
-                                 img_ids=training_set.img_ids,
-                                 tensors=(training_set.tensors[0], training_set.tensors[1]),
-                                 primary_label_tensor=training_set.primary_label_tensor,
-                                 synthetic_images=synthetic_tensors,
-                                 synthetic_labels=synthetic_labels,
-                                 synthetic_ids=synthetic_ids,
-                                 synth_p=synth_p)
+    return SynthAugTrainSet(name=f"synth-aug-{generator_name}", root_dir=generated_dir,
+                            img_ids=training_set.img_ids,
+                            tensors=(training_set.tensors[0], training_set.tensors[1]),
+                            primary_label_tensor=training_set.primary_label_tensor,
+                            synthetic_images=synthetic_tensors,
+                            synthetic_labels=synthetic_labels,
+                            synthetic_ids=synthetic_ids,
+                            synth_p=synth_p)
 
 
 @step
-def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: float) -> TrainSetWithSynthetic:
+def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: float) -> SynthAugTrainSet:
     """
     A synthetic augmentation type based on label distribution.
     """
     # since we're using the generator we're using device == 'cuda' here
+    log.warning("don't use this, see strategies.py")
     device = torch.device('cuda')
 
     label_matrix = training_set.label_tensor.to(device)
@@ -215,24 +222,23 @@ def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: f
 
     synthetic_ids = [f"{generator_name}_{label_comb.tolist()}_{i}" for label_comb in unique_label_combinations for i in
                      range(n)]
-    log.info(f"Label size: {synthetic_labels_tensor.size()}")
 
     # Move everything to CPU before returning
     synthetic_imgs_tensor = synthetic_imgs_tensor.cpu()
     synthetic_labels_tensor = synthetic_labels_tensor.cpu()
 
-    return TrainSetWithSynthetic(name=f"synth-aug-{generator_name}", root_dir=training_set.root_dir,
-                                 img_ids=training_set.img_ids,
-                                 tensors=(training_set.tensors[0], training_set.tensors[1]),
-                                 primary_label_tensor=training_set.primary_label_tensor,
-                                 synthetic_images=synthetic_imgs_tensor,
-                                 synthetic_labels=synthetic_labels_tensor,
-                                 synthetic_ids=synthetic_ids,
-                                 synth_p=synth_p)
+    return SynthAugTrainSet(name=f"synth-aug-{generator_name}", root_dir=training_set.root_dir,
+                            img_ids=training_set.img_ids,
+                            tensors=(training_set.tensors[0], training_set.tensors[1]),
+                            primary_label_tensor=training_set.primary_label_tensor,
+                            synthetic_images=synthetic_imgs_tensor,
+                            synthetic_labels=synthetic_labels_tensor,
+                            synthetic_ids=synthetic_ids,
+                            synth_p=synth_p)
 
 
 @step
-def look_at_augmented_train_set(augmented: TrainSetWithSynthetic):
+def look_at_augmented_train_set(augmented: SynthAugTrainSet):
     for i in range(50):
         _img = augmented[i]
 
