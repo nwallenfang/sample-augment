@@ -1,12 +1,12 @@
 {
-  "name": "synth-aug-refactor",
+  "name": "synth-comparison",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 10,
 
   "learning_rate": 0.0001,
-  "num_epochs": 30,
+  "num_epochs": 25,
   "batch_size": 32,
   "balance_classes": true,
   "n_folds": 10,
@@ -18,5 +18,9 @@
 
   "generator_name": "wdataaug-028_012200",
   "threshold": 0.8,
-  "synth_p": 0.25
+  "synth_p": 0.25,
+
+  "strategies": [
+    "random"
+  ]
 }

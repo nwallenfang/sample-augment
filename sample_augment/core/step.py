@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from sample_augment.core.artifact import Artifact
 from sample_augment.core.config import EXCLUDED_CONFIG_KEYS
+from sample_augment.utils import log
 
 
 class Step(Callable, BaseModel):
@@ -25,14 +26,18 @@ class Step(Callable, BaseModel):
 
     """dict (arg_name -> arg_type) of config entries this Step takes as arguments.
        Note that every argument is either an Artifact or a config entry."""
-    config_args: Dict[str, Type[Any]]
+    config_args: Dict[str, Any]
     """dict (arg_name -> artifact_type) of Artifact types this Step expects as input arguments (consumes)"""
     consumes: Dict[str, Type[Artifact]]
     """Artefact type this step produces (optional)"""
     produces: Optional[Type[Artifact]]
 
     def __call__(self, *args, **kwargs):
-        return self.func(*args, **kwargs)
+        try:
+            return self.func(*args, **kwargs)
+        except TypeError as e:
+            log.error(str(e))
+            sys.exit(-1)
 
     def __repr__(self):
         return self.name
@@ -136,11 +141,14 @@ class StepRegistry:
         config_kwargs = {}
         consumed_artifacts = {}
         for param_name, param in sig.parameters.items():
-            if issubclass(param.annotation, Artifact):
-                consumed_artifacts[param_name] = param.annotation
-            else:
-                # assert somehow that this is a config
-                config_kwargs[param_name] = param.annotation
+            try:
+                if isinstance(param.annotation, type) and issubclass(param.annotation, Artifact):
+                    consumed_artifacts[param_name] = param.annotation
+                else:
+                    # assert somehow that this is a config
+                    config_kwargs[param_name] = param.annotation
+            except TypeError as _e:
+                log.error(f"weird annotation '{param}': '{param.annotation}'")
 
         produced_artifact = None
         # if this function returns something it should be an Artifact, and it will get added to producers

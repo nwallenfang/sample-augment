@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import torch.cuda
 import torchvision
-from sklearn.metrics import ConfusionMatrixDisplay, classification_report, roc_curve
+from sklearn.metrics import ConfusionMatrixDisplay, classification_report, roc_curve, f1_score
 from sklearn.preprocessing import label_binarize
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
@@ -130,7 +130,7 @@ def predict_validation_set(classifier: TrainedClassifier, validation_set: ValSet
                                    desc="Validation predictions", file=sys.stdout)):
         batch = batch[0].to(device)
         with torch.no_grad():
-            predictions[i * batch_size:(i + 1) * batch_size] = classifier.model(batch)
+            predictions[i * batch_size:(i + 1) * batch_size] = torch.sigmoid(classifier.model(batch))
 
     # torch.save(predictions, project_path('data/interim/predictions_densenet.pt'))
     # start, n = 20, 1
@@ -177,28 +177,55 @@ def show_prediction(image, prediction, class_names, true_labels, name: str, img_
     plt.savefig(shared_dir / "figures" / "predictions" / f"{name}_{img_id}.pdf", bbox_inches="tight")
 
 
+def determine_threshold_vector(predictions: ValidationPredictions, val: ValSet) -> Tensor:
+    """
+    Finds the optimal threshold for each class with respect to the F1 score on the validation set.
+    Predictions should be in the range 0..1, so have sigmoid already applied.
+    Returns:
+      np.ndarray containing the optimal threshold for each class.
+    """
+    all_predictions = predictions.predictions.cpu().numpy()
+    all_labels = val.label_tensor.cpu().numpy()
+
+    num_classes = all_labels.shape[1]
+    thresholds = []
+
+    # For each class, find the threshold that maximizes the F1 score
+    for class_idx in range(num_classes):
+        best_threshold = 0.5  # Default threshold
+        best_f1 = 0
+        for threshold in np.linspace(0, 1, 100):  # Test 100 thresholds in the range [0, 1]
+            f1 = f1_score(all_labels[:, class_idx], all_predictions[:, class_idx] > threshold)
+            if f1 > best_f1:
+                best_f1 = f1
+                best_threshold = threshold
+        thresholds.append(best_threshold)
+
+    return torch.FloatTensor(thresholds)
+
+
 @step
 def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSet,
-                        gc10_labels: GC10Labels, threshold: float) -> ClassificationReport:
+                        gc10_labels: GC10Labels) -> ClassificationReport:
     # quickfix since the artifacts are not properly guarded from being mutated yet (TODO)
     # I removed the preprocessing of val_set since it's only used for the label info here, the data doesn't get accessed
     predictions = val_pred_artifact.predictions
     assert len(predictions) == len(val_set)
     imgs, labels = val_set.tensors[0], val_set.tensors[1]
-    # secondary_labels = gc10_labels.labels
 
-    for i in range(10):
-        true_class_names = [gc10_labels.class_names[j] for j in labels[i].nonzero().flatten().tolist()]
-        show_prediction(imgs[i], torch.sigmoid(predictions[i]), gc10_labels.class_names, true_labels=true_class_names,
-                        name=val_pred_artifact.configs['name'], img_id=val_set.img_ids[i], threshold=threshold)
+    threshold_vector = determine_threshold_vector(val_pred_artifact, val_set)
+    log.info(f'Threshold vector: {threshold_vector}')
 
-    torch.save(val_set.tensors[1], shared_dir / 'validation_labels.pt')
-    sys.exit(-1)
+    # for i in range(10):
+    #     true_class_names = [gc10_labels.class_names[j] for j in labels[i].nonzero().flatten().tolist()]
+    #     show_prediction(imgs[i], torch.sigmoid(predictions[i]), gc10_labels.class_names, true_labels=true_class_names,
+    #                     name=val_pred_artifact.configs['name'], img_id=val_set.img_ids[i], threshold=threshold)
+
     # apply_secondary_labels(labels, predictions, secondary_labels, val_set)
     # ConfusionMatrixMetric(labels=classes).calculate(predictions, labels).show()
     # show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data)
     # debug_class_distribution(classes, labels, sec_labels)
-    predicted_labels = (predictions > threshold).float()
+    predicted_labels = (predictions > threshold_vector.unsqueeze(0)).float()
     report = classification_report(labels.numpy(), predicted_labels.numpy(),
                                    target_names=gc10_labels.class_names[:gc10_labels.number_of_classes],
                                    zero_division=0, output_dict=True)

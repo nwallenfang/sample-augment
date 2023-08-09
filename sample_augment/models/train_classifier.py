@@ -6,6 +6,7 @@ from typing import List
 
 import numpy as np
 import torch
+from sample_augment.sampling.synth_augment import SynthAugTrainSet
 from sklearn.metrics import f1_score
 from torch import nn  # All neural network modules
 from torch import optim  # For optimizers like SGD, Adam, etc.
@@ -16,9 +17,8 @@ from tqdm import tqdm  # For nice progress bar!
 
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
-from sample_augment.data.synth_augment import TrainSetWithSynthetic
 from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
-from sample_augment.models.classifier import CustomViT
+from sample_augment.models.classifier import CustomViT  # or CustomDensenet, etc.
 from sample_augment.utils import log
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
@@ -76,10 +76,6 @@ def _set_random_seed(random_seed: int):
 def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
                 learning_rate: float, random_seed: int,
                 balance_classes: bool, threshold: float) -> ClassifierMetrics:
-    """
-        this code is taken in large part from Michel's notebook,
-        see docs/Michel_99_base_line_DenseNet_201_PyTorch.ipynb
-    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # make the experiment as reproducible as possible by setting a random seed
     _set_random_seed(random_seed)
@@ -363,7 +359,7 @@ class SynthTrainedClassifier(TrainedClassifier):
 
 
 @step
-def train_augmented_classifier(train_data: TrainSetWithSynthetic, val_data: ValSet,
+def train_augmented_classifier(train_data: SynthAugTrainSet, val_data: ValSet,
                                num_epochs: int, batch_size: int, learning_rate: float,
                                balance_classes: bool,
                                random_seed: int,

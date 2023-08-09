@@ -179,8 +179,9 @@ class StyleGANGenerator:
         # build input z vector (gaussian distribution)
         z = torch.from_numpy(np.random.RandomState(self.seed).randn(n, self.G.z_dim)).to(self.device)
 
-        with SuppressSpecificPrint("Setting up PyTorch plugin \"upfirdn2d_plugin\"... Failed!"):
-            imgs = self.G(z, c, truncation_psi=truncation_psi, noise_mode=noise_mode)
+        # with SuppressSpecificPrint("Setting up PyTorch plugin \"upfirdn2d_plugin\"... Failed!"):
+        imgs = self.G(z, c, truncation_psi=truncation_psi, noise_mode=noise_mode)
+
         imgs = (imgs.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         return imgs
 
