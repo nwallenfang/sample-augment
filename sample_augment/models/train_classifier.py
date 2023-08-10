@@ -7,7 +7,6 @@ from typing import List
 
 import numpy as np
 import torch
-from sample_augment.sampling.synth_augment import SynthAugTrainSet
 from sklearn.metrics import f1_score
 from torch import nn  # All neural network modules
 from torch import optim  # For optimizers like SGD, Adam, etc.
@@ -20,6 +19,7 @@ from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
 from sample_augment.models.classifier import CustomViT, CustomResNet50, CustomDenseNet  # or CustomDensenet, etc.
+from sample_augment.sampling.synth_augment import SynthAugTrainSet
 from sample_augment.utils import log
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
@@ -76,7 +76,7 @@ def _set_random_seed(random_seed: int):
 
 def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
                 learning_rate: float, random_seed: int,
-                balance_classes: bool, threshold: float) -> ClassifierMetrics:
+                balance_classes: bool) -> ClassifierMetrics:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # make the experiment as reproducible as possible by setting a random seed
     _set_random_seed(random_seed)
@@ -102,6 +102,9 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
 
     best_epoch = -1
 
+    # fixed threshold just during training, later we'll calculate the optimal one
+    threshold = 0.5
+
     for epoch in range(num_epochs):
         model.train()
         train_losses = 0
@@ -121,6 +124,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             predictions = torch.sigmoid(logits)
 
             train_loss = criterion(logits, label)  # Calculate the loss
+            # fixed threshold just during training, later we'll calculate the optimal one
             train_accuracies += ((predictions > threshold) == label).float().mean().item()
 
             # backward
@@ -244,7 +248,6 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
                      color_jitter: float,
                      h_flip_p: float,
                      v_flip_p: float,
-                     threshold: float,
                      synth_p: float) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
@@ -316,7 +319,7 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
 
     metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
                           batch_size=batch_size, learning_rate=learning_rate,
-                          balance_classes=balance_classes, random_seed=random_seed, threshold=threshold)
+                          balance_classes=balance_classes, random_seed=random_seed)
 
     del train_data
     del val_data
@@ -333,6 +336,7 @@ class KFoldTrainedClassifiers(Artifact):
 @step
 def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                             test_ratio: float,
+                            model_type: ModelType,
                             min_instances: int,
                             random_seed: int,
                             num_epochs: int,
@@ -343,7 +347,8 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                             geometric_augment: bool,
                             color_jitter: float,
                             h_flip_p: float,
-                            v_flip_p: float
+                            v_flip_p: float,
+                            synth_p: float
                             ) -> KFoldTrainedClassifiers:
     fold_random_seed = random_seed
     train_val, test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
@@ -357,9 +362,11 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
 
         classifier: TrainedClassifier = train_classifier(TrainSet.from_existing(train, name="train_fold_{i}"),
                                                          ValSet.from_existing(val, name="val_fold_{i}"),
+                                                         model_type,
                                                          num_epochs, batch_size, learning_rate,
                                                          balance_classes, fold_random_seed, data_augment,
-                                                         geometric_augment, color_jitter, h_flip_p, v_flip_p)
+                                                         geometric_augment, color_jitter, h_flip_p, v_flip_p,
+                                                         synth_p)
         classifiers.append(classifier)
 
     return KFoldTrainedClassifiers(classifiers=classifiers)
@@ -376,14 +383,14 @@ class SynthTrainedClassifier(TrainedClassifier):
 def train_augmented_classifier(train_data: SynthAugTrainSet, val_data: ValSet,
                                num_epochs: int, batch_size: int, learning_rate: float,
                                balance_classes: bool,
+                               model_type: ModelType,
                                random_seed: int,
                                data_augment: bool,
                                geometric_augment: bool,
                                color_jitter: float,
                                h_flip_p: float,
                                v_flip_p: float,
-                               threshold: float,
                                synth_p: float) -> SynthTrainedClassifier:
     return SynthTrainedClassifier(
-        train_classifier(train_data, val_data, num_epochs, batch_size, learning_rate, balance_classes, random_seed,
-                         data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, threshold, synth_p))
+        train_classifier(train_data, val_data, model_type, num_epochs, batch_size, learning_rate, balance_classes,
+                         random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, synth_p))

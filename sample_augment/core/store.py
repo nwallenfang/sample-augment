@@ -64,8 +64,9 @@ class Store:
     #     self.artifacts[artifact_type.__name__] = deserialized_artifact
     #     return deserialized_artifact
 
-    def save(self, config_name: str, config_hash: str):
-        store_filename = f"{config_name}_{config_hash}.json"
+    def save(self, config_name: str, config_hash: str, store_save_path: Optional[Path] = None):
+        if store_save_path is None:
+            store_save_path = path_utils.root_dir / f"{config_name}_{config_hash}.json"
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
@@ -88,8 +89,8 @@ class Store:
                 "configs": artifact.configs
             }
 
-        log.info(f"Saving store to {store_filename}")
-        with open(path_utils.root_dir / store_filename, 'w') as f:
+        log.info(f"Saving store to {store_save_path}")
+        with open(path_utils.root_dir / store_save_path, 'w') as f:
             try:
                 json.dump(data, f, indent=4)
             except TypeError as err:

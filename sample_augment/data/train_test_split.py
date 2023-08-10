@@ -78,7 +78,7 @@ class FoldDatasets(Artifact):
 def stratified_k_fold_split(dataset: AugmentDataset, n_folds: int = 5, random_seed: int = 42,
                             min_instances_per_class: int = 10) -> FoldDatasets:
     np.random.seed(random_seed)
-    labels = dataset.label_tensor
+    labels = dataset.primary_label_tensor
     n = len(dataset)
     indices = list(range(n))
 

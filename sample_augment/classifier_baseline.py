@@ -10,6 +10,7 @@ from sample_augment.core.config import read_config
 from sample_augment.core.step import find_steps
 from sample_augment.models.train_classifier import ClassifierMetrics
 from sample_augment.utils import log
+from sample_augment.utils.path_utils import root_dir
 from sample_augment.utils.plot import prepare_latex_plot
 
 
@@ -88,22 +89,31 @@ def compare_f1_scores(shared_directory: Path):
     plt.savefig(figure_path, bbox_inches='tight', format='pdf')
 
 
-def run_classifier_baseline_experiment():
-    # could delete the contents of class-base-data before running
+def running_on_colab():
+    try:
+        import google.colab
+        return True
+    except ImportError:
+        return False
 
+
+def run_classifier_baseline_experiment():
+    # could delete the contents of class-base-runs before running
+    experiments_dir = root_dir.parent / 'experiments'
     # would be cool to have this in a separate root_dir but don't know if that's feasible hmm might be actually
     # ask chatgpt if it's writable
-    find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
-    experiment_dir = "experiments/class-base-configs"
+    if not running_on_colab():
+        find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
+    classifier_baseline_configs = experiments_dir / 'class-base-configs'
 
-    for config_filename in os.listdir(experiment_dir):
-        config = read_config(Path(config_filename))
-    log.info("hey")
-    # create Experiment instance
-    experiment = Experiment(config)
-    experiment.run("evaluate_classifier")
-
-    # TODO save the run files in the experiment dir as well
+    for config_filename in os.listdir(classifier_baseline_configs):
+        print("root: ", root_dir)
+        log.info(f"- running experiment {config_filename} -")
+        config_path = classifier_baseline_configs / config_filename
+        config = read_config(config_path)
+        # create Experiment instance
+        experiment = Experiment(config)
+        experiment.run("evaluate_k_classifiers", store_save_path=experiments_dir / 'class-base-runs')
 
 
 if __name__ == '__main__':

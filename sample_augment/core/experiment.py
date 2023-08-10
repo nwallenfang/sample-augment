@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import *
 
 from sample_augment.core import Step, Config, get_step, Store, Artifact
@@ -88,8 +89,7 @@ class Experiment:
 
         self.store.completed_steps.append(step.name)
 
-    def run(self, target_name: str, fixed: Optional[List[str] | str] = None, initial_artifacts: List[Artifact] = None):
-        # TODO allow for a step to fixed, that affects the pipeline (when there are multiple steps producing an artifact)
+    def run(self, target_name: str, initial_artifacts: List[Artifact] = None, store_save_path: Optional[Path] = None):
         target = get_step(target_name)
         pipeline = self._calc_pipeline(initial_artifacts, target)
 
@@ -99,7 +99,7 @@ class Experiment:
 
         if self.save_store:
             # Pipeline run is complete, save the produced artifacts and the config that was used
-            self.save()
+            self.save(store_save_path)
 
     def _calc_pipeline(self, initial_artifacts, target):
         full_pipeline = step_registry.resolve_dependencies(target)
@@ -121,18 +121,16 @@ class Experiment:
             pipeline.append(target)
         return pipeline
 
-    def save(self):
+    def save(self, store_save_path: Optional[Path] = None):
         # Pipeline run is complete, save the produced artifacts and the config that was used
-        # TODO clean this up, it's a true mess
         if hasattr(self.store, "previous_run_identifier"):
             identifier = self.store.previous_run_identifier
             log.debug(f"Using previous store's id {identifier}.")
         else:
             identifier = self.config.run_identifier
 
-        self.store.save(self.config.name, identifier)
+        self.store.save(self.config.name, identifier, store_save_path)
 
-        # for now: don't save config file, all the config entries are part of the store file
         config_directory = root_dir / "shared" / "configs"
         with open(config_directory / f"config_{self.config.name}_{identifier}.json", 'w') as config_f:
             config_f.write(self.config.json(indent=4))

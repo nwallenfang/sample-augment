@@ -1,11 +1,11 @@
 {
-  "name": "DenseNet-naive",
+  "name": "ResNet-naive",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 10,
 
-  "model_type": "DenseNet",
+  "model_type": "ResNet",
   "learning_rate": 0.0001,
   "num_epochs": 30,
   "batch_size": 32,
