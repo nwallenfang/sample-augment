@@ -58,7 +58,7 @@ def get_logger(name: str, level):
     return module_logger
 
 
-log_level = logging.INFO
+log_level = logging.DEBUG
 log = get_logger('sampling-aug', log_level)
 
 

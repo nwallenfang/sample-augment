@@ -2,6 +2,7 @@ import inspect
 import random
 import sys
 from copy import deepcopy
+from enum import Enum
 from typing import List
 
 import numpy as np
@@ -18,7 +19,7 @@ from tqdm import tqdm  # For nice progress bar!
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
-from sample_augment.models.classifier import CustomViT  # or CustomDensenet, etc.
+from sample_augment.models.classifier import CustomViT, CustomResNet50, CustomDenseNet  # or CustomDensenet, etc.
 from sample_augment.utils import log
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
@@ -227,8 +228,14 @@ plain_transforms = [
 ]
 
 
+class ModelType(str, Enum):
+    DenseNet = "DenseNet"
+    ResNet = "ResNet"
+    VisionTransformer = "VisionTransformer"
+
+
 @step
-def train_classifier(train_data: TrainSet, val_data: ValSet,
+def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelType,
                      num_epochs: int, batch_size: int, learning_rate: float,
                      balance_classes: bool,
                      random_seed: int,
@@ -247,9 +254,16 @@ def train_classifier(train_data: TrainSet, val_data: ValSet,
     old default train params: num_epochs = 20, batch_size = 64, learning_rate = 0.001
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # model = CustomDenseNet(num_classes=train_data.num_classes, load_pretrained=True)
-    # model = CustomResNet50(num_classes=train_data.num_classes, load_pretrained=True)
-    model = CustomViT(num_classes=train_data.num_classes, load_pretrained=True)
+    if model_type == ModelType.ResNet:
+        model = CustomResNet50(num_classes=train_data.num_classes, load_pretrained=True)
+    elif model_type == ModelType.DenseNet:
+        model = CustomDenseNet(num_classes=train_data.num_classes, load_pretrained=True)
+    elif model_type == ModelType.VisionTransformer:
+        model = CustomViT(num_classes=train_data.num_classes, load_pretrained=True)
+    else:
+        # noinspection PyUnresolvedReferences
+        raise ValueError(f'Invalid model_type `{model_type}`. Available models: {", ".join(e.name for e in ModelType)}')
+    log.debug(f"Training {model_type}")
     model.to(device)
     train_data = deepcopy(train_data)
     val_data = deepcopy(val_data)

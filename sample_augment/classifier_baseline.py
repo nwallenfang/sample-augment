@@ -1,10 +1,13 @@
 import json
+import os
 from pathlib import Path
 from typing import Dict
 
 import numpy as np
 
-from sample_augment.core import step
+from sample_augment.core import step, Experiment
+from sample_augment.core.config import read_config
+from sample_augment.core.step import find_steps
 from sample_augment.models.train_classifier import ClassifierMetrics
 from sample_augment.utils import log
 from sample_augment.utils.plot import prepare_latex_plot
@@ -19,7 +22,6 @@ def read_f1_losses(kfold_json: Dict) -> np.ndarray:
     return np.stack(f1_scores)
 
 
-# TODO turn into a proper step
 @step
 def compare_f1_scores(shared_directory: Path):
     import matplotlib.pyplot as plt
@@ -86,8 +88,27 @@ def compare_f1_scores(shared_directory: Path):
     plt.savefig(figure_path, bbox_inches='tight', format='pdf')
 
 
+def run_classifier_baseline_experiment():
+    # could delete the contents of class-base-data before running
+
+    # would be cool to have this in a separate root_dir but don't know if that's feasible hmm might be actually
+    # ask chatgpt if it's writable
+    find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
+    experiment_dir = "experiments/class-base-configs"
+
+    for config_filename in os.listdir(experiment_dir):
+        config = read_config(Path(config_filename))
+    log.info("hey")
+    # create Experiment instance
+    experiment = Experiment(config)
+    experiment.run("evaluate_classifier")
+
+    # TODO save the run files in the experiment dir as well
+
+
 if __name__ == '__main__':
-    compare_f1_scores()
+    run_classifier_baseline_experiment()
+    # compare_f1_scores()
     # kfold_trained_path = Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data"
     #                           r"\KFoldTrainedClassifiers\aug-01_ecc814.json")
     # with open(kfold_trained_path) as kfold_trained_file:
