@@ -20,7 +20,7 @@ from sample_augment.data.gc10.download_gc10 import GC10Folder
 from sample_augment.models.generator import GC10_CLASSES
 from sample_augment.utils import log
 # from sample_augment.data.gc10.download import load_gc10_if_missing
-from sample_augment.utils.path_utils import project_path, shared_dir
+from sample_augment.utils.path_utils import shared_dir
 from sample_augment.utils.plot import show_image_tensor, prepare_latex_plot, CREATE_PLOTS
 
 # from sample_augment.data/gc10/Defect Descriptions.xlsx, which also contains some example images
@@ -142,14 +142,14 @@ def compare_dir_and_xml_labels(xml_labels: Dict, dir_labels: Dict):
         dir_label, xml_label = dir_labels[name], xml_labels[name]['y']
         if xml_label == 'all':
             continue  # skip these for now
-        path = project_path(f"data/gc10/{dir_label}/img_{name}.jpg")
+        path = shared_dir / f"gc10/{dir_label}/img_{name}.jpg"
         img = matplotlib.image.imread(path)
 
         secondary_labels = [LABEL_TO_NAME[label] for label in xml_labels[name]['secondary']]
         img_text = f"dir: {LABEL_TO_NAME[dir_labels[name]]}, xml: {LABEL_TO_NAME[xml_labels[name]['y']]}\n \
          secondary: {secondary_labels}"
         show_image_tensor(img, title=name, text=img_text,
-                          save_path=project_path(f'reports/figures/label-exploration/mismatch_{name}.png'))
+                          save_path=shared_dir / f'figures/label-exploration/mismatch_{name}.png')
         mismatch_index += 1
 
 

@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from sample_augment.utils.path_utils import project_path
-
 
 def show_image_numpy(img: np.ndarray, title: str, text: str = None, save_path: str = None):
     _fig = plt.figure()
@@ -15,14 +13,14 @@ def show_image_numpy(img: np.ndarray, title: str, text: str = None, save_path: s
         plt.figtext(0.5, 0.05, text, ha='center', fontsize=9)
 
     if save_path:
-        plt.savefig(project_path(save_path))
+        plt.savefig(save_path)
     else:
         plt.show()
         
     
-def show_image_tensor(img_tensor: torch.Tensor, title: str):
+def show_image_tensor(img_tensor: torch.Tensor, title: str, text: str = None, save_path: str = None):
     img_numpy = img_tensor.permute(1, 2, 0).numpy()
-    show_image_numpy(img_numpy, title)
+    show_image_numpy(img_numpy, title, text, save_path)
 
 
 text_width, text_height = 5.8476, 8.88242
