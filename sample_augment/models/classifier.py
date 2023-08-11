@@ -7,6 +7,8 @@ from torch import Tensor
 from torchvision.models.efficientnet import efficientnet_v2_s, EfficientNet_V2_S_Weights, \
     efficientnet_v2_l, EfficientNet_V2_L_Weights
 
+from sample_augment.utils import log
+
 
 class DenseNet201(torchvision.models.DenseNet):
     num_classes: int
@@ -148,27 +150,45 @@ class EfficientNetV2(nn.Module):
         self.size = size
 
         # Freeze early layers
-        for param in self.parameters():
+        for param in self.efficient_net.parameters():
             param.requires_grad = False
+
+        # Unfreeze last block
+        for param in self.efficient_net.features[-1].parameters():
+            param.requires_grad = True
 
         # Modify the classifier, get size of the last channel before classifier
         last_channel_size = self.efficient_net.classifier[1].in_features
         if size == 'S':
             self.efficient_net.classifier = nn.Sequential(
-                nn.Linear(last_channel_size, last_channel_size // 2),
+                nn.Linear(last_channel_size, 960),
                 nn.ReLU(),
                 nn.Dropout(0.2),
-                nn.Linear(last_channel_size // 2, last_channel_size // 4),
+                nn.Linear(960, 240),
                 nn.ReLU(),
                 nn.Dropout(0.2),
-                nn.Linear(last_channel_size // 4, 30),
+                nn.Linear(240, 30),
                 nn.ReLU(),
                 nn.Dropout(0.2),
                 nn.Linear(30, num_classes)
             )
         else:
-            # TODO create a more complex classifier
-            raise NotImplementedError()
+            log.info(f'{last_channel_size}')
+            self.efficient_net.classifier = nn.Sequential(
+                nn.Linear(last_channel_size, last_channel_size),
+                nn.ReLU(),
+                nn.Dropout(0.3),
+                nn.Linear(last_channel_size, last_channel_size // 2),
+                nn.ReLU(),
+                nn.Dropout(0.3),
+                nn.Linear(last_channel_size // 2, last_channel_size // 4),
+                nn.ReLU(),
+                nn.Dropout(0.3),
+                nn.Linear(last_channel_size // 4, 50),  # add intermediary layer
+                nn.ReLU(),
+                nn.Dropout(0.3),
+                nn.Linear(50, num_classes)
+            )
 
         self.num_classes = num_classes
 

@@ -1,0 +1,44 @@
+{
+    "sample_augment.models.train_classifier.KFoldTrainedClassifiers": {
+        "path": "KFoldTrainedClassifiers/ViT-naive_758666.json",
+        "configs": {
+            "n_folds": 10,
+            "test_ratio": 0.2,
+            "model_type": "VisionTransformer",
+            "min_instances": 10,
+            "random_seed": 100,
+            "num_epochs": 30,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "balance_classes": true,
+            "data_augment": false,
+            "geometric_augment": false,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "synth_p": 0.0,
+            "name": "ViT-naive"
+        }
+    },
+    "sample_augment.models.evaluate_classifier.KFoldClassificationReport": {
+        "path": "KFoldClassificationReport/ViT-naive_758666.json",
+        "configs": {
+            "test_ratio": 0.2,
+            "min_instances": 10,
+            "random_seed": 100,
+            "n_folds": 10,
+            "name": "ViT-naive",
+            "model_type": "VisionTransformer",
+            "num_epochs": 30,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "balance_classes": true,
+            "data_augment": false,
+            "geometric_augment": false,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "synth_p": 0.0
+        }
+    }
+}
