@@ -182,7 +182,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             f'Val Acc: {avg_accuracy:.2f}, '
             f'Val F1: {avg_f1:.3f}')
 
-    log.info(f"Classifier training: Best model from epoch {best_epoch} with val_loss = {best_val_loss:.3f} "
+    log.info(f"Classifier training: Best model from epoch {best_epoch+1} with val_loss = {best_val_loss:.3f} "
              f"and f1_score = {best_f1_score:.3f}")
 
     # load model state from best performing epoch
@@ -193,7 +193,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         train_accuracy=np.array(train_acc_per_epoch),
         validation_accuracy=np.array(val_acc_per_epoch),
         validation_f1=np.array(val_f1_per_epoch),
-        epoch=best_epoch
+        epoch=best_epoch+1
     )
 
 
