@@ -1,11 +1,14 @@
-from typing import Dict
+from typing import Dict, Literal, Union
 
 import torch
+import torch.nn as nn
 import torchvision.models
-from torch import nn
+from torch import Tensor
+from torchvision.models.efficientnet import efficientnet_v2_s, EfficientNet_V2_S_Weights, \
+    efficientnet_v2_l, EfficientNet_V2_L_Weights
 
 
-class CustomDenseNet(torchvision.models.DenseNet):
+class DenseNet201(torchvision.models.DenseNet):
     num_classes: int
 
     def __init__(self, num_classes, load_pretrained=False):
@@ -39,11 +42,11 @@ class CustomDenseNet(torchvision.models.DenseNet):
         return {'num_classes': self.num_classes}
 
 
-class CustomResNet50(torchvision.models.ResNet):
+class ResNet50(torchvision.models.ResNet):
     def __init__(self, num_classes, load_pretrained=False):
         # initially set num_classes to 1000 to match the pre-trained model
-        super(CustomResNet50, self).__init__(block=torchvision.models.resnet.Bottleneck,
-                                             layers=[3, 4, 6, 3], num_classes=1000)
+        super(ResNet50, self).__init__(block=torchvision.models.resnet.Bottleneck,
+                                       layers=[3, 4, 6, 3], num_classes=1000)
 
         # Freeze early layers
         if load_pretrained:
@@ -72,7 +75,7 @@ class CustomResNet50(torchvision.models.ResNet):
         return {'num_classes': self.num_classes}
 
 
-class CustomViT(torchvision.models.VisionTransformer):
+class VisionTransformer(torchvision.models.VisionTransformer):
     def __init__(self, num_classes, load_pretrained=False):
         # use same settings as vit_b_16 to get the same architecture
         super().__init__(
@@ -117,3 +120,63 @@ class CustomViT(torchvision.models.VisionTransformer):
 
     def get_kwargs(self) -> Dict:
         return {'num_classes': self.num_classes}
+
+
+class EfficientNetV2(nn.Module):
+    num_classes: int
+    size: Union[Literal['S'], Literal['L']]
+    efficient_net: torchvision.models.EfficientNet
+
+    def __init__(self, num_classes, size: Union[Literal['S'], Literal['L']], load_pretrained=False):
+        super().__init__()
+        self.efficient_net = efficientnet_v2_l()
+        if size == 'S':
+            # super().__init__(**efficientnet_v2_s().get_kwargs())
+            if load_pretrained:
+                self.efficient_net = efficientnet_v2_s(weights=EfficientNet_V2_S_Weights.IMAGENET1K_V1)
+            else:
+                self.efficient_net = efficientnet_v2_s()
+        elif size == 'L':
+            # super().__init__(**efficientnet_v2_l().get_kwargs())
+            if load_pretrained:
+                self.efficient_net = efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.IMAGENET1K_V1)
+            else:
+                self.efficient_net = efficientnet_v2_l()
+        else:
+            raise ValueError('invalid size param provided')
+
+        self.size = size
+
+        # Freeze early layers
+        for param in self.parameters():
+            param.requires_grad = False
+
+        # Modify the classifier, get size of the last channel before classifier
+        last_channel_size = self.efficient_net.classifier[1].in_features
+        if size == 'S':
+            self.efficient_net.classifier = nn.Sequential(
+                nn.Linear(last_channel_size, last_channel_size // 2),
+                nn.ReLU(),
+                nn.Dropout(0.2),
+                nn.Linear(last_channel_size // 2, last_channel_size // 4),
+                nn.ReLU(),
+                nn.Dropout(0.2),
+                nn.Linear(last_channel_size // 4, 30),
+                nn.ReLU(),
+                nn.Dropout(0.2),
+                nn.Linear(30, num_classes)
+            )
+        else:
+            # TODO create a more complex classifier
+            raise NotImplementedError()
+
+        self.num_classes = num_classes
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.efficient_net.forward(x)
+
+    def get_kwargs(self) -> Dict:
+        return {
+            'num_classes': self.num_classes,
+            'size': self.size
+        }

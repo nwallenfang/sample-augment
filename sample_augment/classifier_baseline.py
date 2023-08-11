@@ -111,9 +111,12 @@ def run_classifier_baseline_experiment():
         log.info(f"- running experiment {config_filename} -")
         config_path = classifier_baseline_configs / config_filename
         config = read_config(config_path)
+        store_save_path = experiments_dir / 'class-base-runs' / f"{config.filename}.json"
+
         # create Experiment instance
         experiment = Experiment(config)
-        experiment.run("evaluate_k_classifiers", store_save_path=experiments_dir / 'class-base-runs')
+        experiment.run("evaluate_k_classifiers", store_save_path=store_save_path)
+        del experiment
 
 
 if __name__ == '__main__':

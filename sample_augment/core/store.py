@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import json
 import os
 import sys
@@ -67,6 +68,8 @@ class Store:
     def save(self, config_name: str, config_hash: str, store_save_path: Optional[Path] = None):
         if store_save_path is None:
             store_save_path = path_utils.root_dir / f"{config_name}_{config_hash}.json"
+        elif store_save_path.is_dir():
+            store_save_path = store_save_path / f"{config_name}_{config_hash}.json"
         data = {}
 
         for artifact_name, artifact in self.artifacts.items():
@@ -201,7 +204,8 @@ class Store:
                         ArtifactSubclass = getattr(import_module(module_name), class_name)
                     except ModuleNotFoundError as e:
                         log.error(e.msg)
-                        log.error(f'Could not load artifact {artifact_name}, run-file {run_file_name} might be outdated.')
+                        log.error(
+                            f'Could not load artifact {artifact_name}, run-file {run_file_name} might be outdated.')
                         continue
                     artifact_dict = json.load(open(path_utils.root_dir / artifact_info['path'], 'r'))
                     artifacts[class_name] = ArtifactSubclass.from_dict(artifact_dict)

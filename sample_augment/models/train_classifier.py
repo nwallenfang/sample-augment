@@ -1,6 +1,7 @@
 import inspect
 import random
 import sys
+import time
 from copy import deepcopy
 from enum import Enum
 from typing import List
@@ -18,7 +19,8 @@ from tqdm import tqdm  # For nice progress bar!
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
-from sample_augment.models.classifier import CustomViT, CustomResNet50, CustomDenseNet  # or CustomDensenet, etc.
+from sample_augment.models.classifier import VisionTransformer, ResNet50, DenseNet201, \
+    EfficientNetV2  # or CustomDensenet, etc.
 from sample_augment.sampling.synth_augment import SynthAugTrainSet
 from sample_augment.utils import log
 
@@ -236,6 +238,8 @@ class ModelType(str, Enum):
     DenseNet = "DenseNet"
     ResNet = "ResNet"
     VisionTransformer = "VisionTransformer"
+    EfficientNetV2_S = "EfficientNetV2_S"
+    EfficientNetV2_L = "EfficientNetV2_L"
 
 
 @step
@@ -258,11 +262,15 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if model_type == ModelType.ResNet:
-        model = CustomResNet50(num_classes=train_data.num_classes, load_pretrained=True)
+        model = ResNet50(num_classes=train_data.num_classes, load_pretrained=True)
     elif model_type == ModelType.DenseNet:
-        model = CustomDenseNet(num_classes=train_data.num_classes, load_pretrained=True)
+        model = DenseNet201(num_classes=train_data.num_classes, load_pretrained=True)
     elif model_type == ModelType.VisionTransformer:
-        model = CustomViT(num_classes=train_data.num_classes, load_pretrained=True)
+        model = VisionTransformer(num_classes=train_data.num_classes, load_pretrained=True)
+    elif model_type == ModelType.EfficientNetV2_S:
+        model = EfficientNetV2(num_classes=train_data.num_classes, size='S', load_pretrained=True)
+    elif model_type == ModelType.EfficientNetV2_L:
+        model = EfficientNetV2(num_classes=train_data.num_classes, size='L', load_pretrained=True)
     else:
         # noinspection PyUnresolvedReferences
         raise ValueError(f'Invalid model_type `{model_type}`. Available models: {", ".join(e.name for e in ModelType)}')
@@ -306,7 +314,7 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
         train_data.transform = transforms.Compose(plain_transforms)
         val_data.transform = transforms.Compose(plain_transforms)
 
-    if isinstance(model, CustomViT):
+    if isinstance(model, VisionTransformer):
         log.info("Using a VisionTransformer, resizing inputs to 224x224.")
         train_data.transform = transforms.Compose([
             transforms.Resize((224, 224), **optional_aa_arg),
@@ -360,6 +368,7 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
         log.info(f"Training classifier on fold {i + 1}")
         fold_random_seed += 1
 
+        start_time = time.time()  # Start the timer
         classifier: TrainedClassifier = train_classifier(TrainSet.from_existing(train, name="train_fold_{i}"),
                                                          ValSet.from_existing(val, name="val_fold_{i}"),
                                                          model_type,
@@ -368,7 +377,10 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                                                          geometric_augment, color_jitter, h_flip_p, v_flip_p,
                                                          synth_p)
         classifiers.append(classifier)
-
+        elapsed_time = time.time() - start_time  # Calculate elapsed time
+        minutes, seconds = divmod(elapsed_time, 60)  # Split elapsed time into minutes and seconds
+        # noinspection PyTypeChecker
+        log.info(f"Fold {i + 1} completed in {int(minutes)}m{int(seconds)}s")
     return KFoldTrainedClassifiers(classifiers=classifiers)
 
 

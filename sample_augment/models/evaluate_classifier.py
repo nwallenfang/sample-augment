@@ -27,7 +27,7 @@ from sample_augment.data.gc10.read_labels import GC10Labels
 from sample_augment.data.train_test_split import stratified_split, stratified_k_fold_split, ValSet, \
     FoldDatasets
 from sample_augment.models.train_classifier import TrainedClassifier, KFoldTrainedClassifiers, plain_transforms
-from sample_augment.models.classifier import CustomViT
+from sample_augment.models.classifier import VisionTransformer
 from sample_augment.utils import log, plot
 from sample_augment.utils.path_utils import shared_dir
 from sample_augment.utils.plot import prepare_latex_plot
@@ -98,7 +98,7 @@ def get_preprocess(model):
     optional_aa_arg = {"antialias": True} if antialias_param_needed else {}
 
     _preprocess: List = copy(plain_transforms)
-    if isinstance(model, CustomViT):
+    if isinstance(model, VisionTransformer):
         _preprocess.insert(0, torchvision.transforms.Resize((224, 224), **optional_aa_arg))
 
     return transforms.Compose(_preprocess)
