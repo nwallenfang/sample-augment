@@ -130,5 +130,5 @@ def train_stylegan():
 if __name__ == "__main__":
     # IF STUCK ON 'Setting up Pytorch plugin..'
     # need to remove the torch_extensions cache!!!! (C:\Users\user\AppData\Local\torch_extensions)
-    # create_train_val_pt()
-    train_stylegan()
+    create_train_val_pt()
+    # train_stylegan()

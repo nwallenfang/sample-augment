@@ -154,8 +154,8 @@ class EfficientNetV2(nn.Module):
             param.requires_grad = False
 
         # Unfreeze last block
-        for param in self.efficient_net.features[-1].parameters():
-            param.requires_grad = True
+        # for param in self.efficient_net.features[-1].parameters():
+        #     param.requires_grad = True
 
         # Modify the classifier, get size of the last channel before classifier
         last_channel_size = self.efficient_net.classifier[1].in_features
@@ -175,19 +175,16 @@ class EfficientNetV2(nn.Module):
         else:
             log.info(f'{last_channel_size}')
             self.efficient_net.classifier = nn.Sequential(
-                nn.Linear(last_channel_size, last_channel_size),
+                nn.Linear(last_channel_size, 960),
                 nn.ReLU(),
-                nn.Dropout(0.3),
-                nn.Linear(last_channel_size, last_channel_size // 2),
+                nn.Dropout(0.2),
+                nn.Linear(960, 240),
                 nn.ReLU(),
-                nn.Dropout(0.3),
-                nn.Linear(last_channel_size // 2, last_channel_size // 4),
+                nn.Dropout(0.2),
+                nn.Linear(240, 30),
                 nn.ReLU(),
-                nn.Dropout(0.3),
-                nn.Linear(last_channel_size // 4, 50),  # add intermediary layer
-                nn.ReLU(),
-                nn.Dropout(0.3),
-                nn.Linear(50, num_classes)
+                nn.Dropout(0.2),
+                nn.Linear(30, num_classes)
             )
 
         self.num_classes = num_classes
