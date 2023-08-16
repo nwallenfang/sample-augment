@@ -1,9 +1,10 @@
 {
-  "name": "synth-comparison",
+  "name": "hand-picked-vs-random",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 10,
+  "model_type": "VisionTransformer",
 
   "learning_rate": 0.001,
   "num_epochs": 10,
@@ -17,6 +18,9 @@
   "v_flip_p": 0.5,
 
   "generator_name": "wdataaug-028_012200",
-  "threshold": 0.8,
-  "synth_p": 0.4
+  "synth_p": 0.4,
+  "strategies": [
+    "random",
+    "hand-picked"
+  ]
 }

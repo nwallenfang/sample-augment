@@ -33,11 +33,11 @@ class Step(Callable, BaseModel):
     produces: Optional[Type[Artifact]]
 
     def __call__(self, *args, **kwargs):
-        try:
-            return self.func(*args, **kwargs)
-        except TypeError as e:
-            log.error(str(e))
-            sys.exit(-1)
+        # try:
+        return self.func(*args, **kwargs)
+        # except TypeError as e:
+        #     log.error(str(e))
+        #     sys.exit(-1)
 
     def __repr__(self):
         return self.name

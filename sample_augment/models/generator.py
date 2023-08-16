@@ -100,11 +100,13 @@ class StyleGANGenerator:
         return ws
 
     def c_to_w(self, c: Tensor, truncation_psi: float = 1.0, seed: int = None) -> Tensor:
+        if c.ndim == 1:
+            c = c.unsqueeze(0)
         c = c.to(self.device)
         if seed:
-            z = torch.from_numpy(np.random.RandomState(seed).randn(1, self.G.z_dim)).to(self.device)
+            z = torch.from_numpy(np.random.RandomState(seed).randn(c.shape[0], self.G.z_dim)).to(self.device)
         else:
-            z = torch.from_numpy(np.random.RandomState(self.seed).randn(1, self.G.z_dim)).to(self.device)
+            z = torch.from_numpy(np.random.RandomState(self.seed).randn(c.shape[0], self.G.z_dim)).to(self.device)
         return self.G.mapping(z, c, truncation_psi=truncation_psi)
 
     def z_to_w(self, c: Tensor, z: Tensor) -> Tensor:

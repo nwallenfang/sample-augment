@@ -403,6 +403,8 @@ def train_augmented_classifier(train_data: SynthAugTrainSet, val_data: ValSet,
                                h_flip_p: float,
                                v_flip_p: float,
                                synth_p: float) -> SynthTrainedClassifier:
+    # synth_training_set, val_set, num_epochs, batch_size, learning_rate, balance_classes,
+    # random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, synth_p=synth_p
     return SynthTrainedClassifier(
         train_classifier(train_data, val_data, model_type, num_epochs, batch_size, learning_rate, balance_classes,
                          random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, synth_p))

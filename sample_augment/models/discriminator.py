@@ -37,7 +37,6 @@ class StyleGANDiscriminator:
         with open(self.pkl_path, 'rb') as f:
             log.debug(f'pkl: {pkl_path}')
             data = legacy.load_network_pkl(f)
-            # does there exist ema as well for D? not sure
             self.D = data['D'].to(self.device)
             if self.device.type == 'cpu':
                 # see https://github.com/NVlabs/stylegan2-ada-pytorch/issues/105

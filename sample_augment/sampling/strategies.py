@@ -1,12 +1,13 @@
 from typing import List
 
+import sys
 import torch
 from torch import Tensor
 
 from sample_augment.core import Artifact, step
 from sample_augment.data.train_test_split import TrainSet, ValSet
 from sample_augment.models.generator import StyleGANGenerator
-from sample_augment.models.train_classifier import train_augmented_classifier, TrainedClassifier
+from sample_augment.models.train_classifier import train_augmented_classifier, TrainedClassifier, train_classifier
 from sample_augment.sampling.synth_augment import SynthAugTrainSet
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir
@@ -28,7 +29,8 @@ def synth_data_to_training_set(training_set: TrainSet, synth_data: SynthData, ge
                             primary_label_tensor=training_set.primary_label_tensor,
                             synthetic_images=synth_data.synthetic_images,
                             synthetic_labels=synth_data.synthetic_labels,
-                            synth_p=synth_p)
+                            synth_p=synth_p,
+                            multi_label=synth_data.multi_label)
 
 
 def random_synthetic_augmentation(training_set: TrainSet, generator_name: str) -> SynthData:
@@ -67,6 +69,16 @@ def random_synthetic_augmentation(training_set: TrainSet, generator_name: str) -
     
     return SynthData(synthetic_images=synthetic_imgs_tensor, synthetic_labels=synthetic_labels_tensor,
                      multi_label=True)
+    
+def hand_picked_dataset(training_set: TrainSet, generator_name: str):
+    generator_name = 'handpicked-' + generator_name
+    from sample_augment.sampling.synth_augment import synth_augment
+    # a little redundant to do it like that but fine
+    synth_aug = synth_augment(training_set=training_set, generator_name=generator_name, synth_p=0.0)
+    
+    return SynthData(synthetic_images=synth_aug.synthetic_images, synthetic_labels=synth_aug.synthetic_labels,
+                     multi_label=False)
+    
 
 
 class SyntheticBundle(Artifact):
@@ -75,7 +87,7 @@ class SyntheticBundle(Artifact):
 
 ALL_STRATEGIES = {
     "random": random_synthetic_augmentation,
-    "hand-picked": None
+    "hand-picked": hand_picked_dataset
 }
 
 
@@ -85,7 +97,8 @@ def create_synthetic_bundle_from_strategies(strategies: List[str], training_set:
     synthetic_datasets = []
     for strategy in strategies:
         if strategy not in ALL_STRATEGIES:
-            log.error(f'unknown strategy {strategy} provided')
+            log.error(f'unknown strategy {strategy} provided.')
+            sys.exit(-1)
             continue
         strategy_func = ALL_STRATEGIES[strategy]
         synth_set = strategy_func(training_set, generator_name)
@@ -96,27 +109,31 @@ def create_synthetic_bundle_from_strategies(strategies: List[str], training_set:
 
 
 class TrainedClassifiersOnSynthData(Artifact):
+    baseline: TrainedClassifier
     classifiers: List[TrainedClassifier]
 
-
+from sample_augment.models.train_classifier import ModelType
 @step
 def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
+                                     strategies: List[str],
                                      train_set: TrainSet,
                                      val_set: ValSet,
                                      synth_p: float,
                                      num_epochs: int, batch_size: int, learning_rate: float,
                                      balance_classes: bool,
+                                     model_type: ModelType,
                                      random_seed: int,
                                      data_augment: bool,
                                      geometric_augment: bool,
                                      color_jitter: float,
                                      h_flip_p: float,
                                      v_flip_p: float,
-                                     threshold: float,
                                      ) -> TrainedClassifiersOnSynthData:
     trained_classifiers: List[TrainedClassifier] = []
-
-    for synthetic_dataset in bundle.synthetic_datasets:
+    # TODO also train one classifier witout synthetic data
+    assert len(bundle.synthetic_datasets) == len(strategies), f'{len(bundle.synthetic_datasets)} datasets != {len(strategies)} strategies'
+    for i, synthetic_dataset in enumerate(bundle.synthetic_datasets):
+        log.info(f'Training classifier with strategy {strategies[i]}.')
         # this assumes, that all datasets in the bundle used the same generator
         synth_training_set = synth_data_to_training_set(train_set, synthetic_dataset,
                                                         generator_name=bundle.configs['generator_name'],
@@ -124,22 +141,26 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
         trained_classifier = train_augmented_classifier(synth_training_set, val_set,
                                                         num_epochs, batch_size, learning_rate,
                                                         balance_classes,
+                                                        model_type,
                                                         random_seed,
                                                         data_augment,
                                                         geometric_augment,
                                                         color_jitter,
                                                         h_flip_p,
                                                         v_flip_p,
-                                                        threshold,
                                                         synth_p=synth_p
                                                         )
         trained_classifiers.append(trained_classifier)
-
-    return TrainedClassifiersOnSynthData(classifiers=trained_classifiers)
+    log.info(f'Training baseline without synthetic data.')
+    baseline = train_classifier(train_data=train_set, val_data=val_set, model_type=model_type, num_epochs=num_epochs, batch_size=batch_size,
+                                learning_rate=learning_rate, balance_classes=balance_classes, random_seed=random_seed, data_augment=data_augment, geometric_augment=geometric_augment,
+                                color_jitter=color_jitter, h_flip_p=h_flip_p, v_flip_p=v_flip_p, synth_p=synth_p)
+    return TrainedClassifiersOnSynthData(baseline=baseline, classifiers=trained_classifiers)
 
 
 @step
 def evaluate_synth_trained_classifiers(trained_classifiers: TrainedClassifiersOnSynthData):
-    for classifier in trained_classifiers.classifiers:
-        # TODO optimal threshold :) could put it in TrainedClassifier straight up
-        evaluate_classifier()
+    raise NotImplementedError()
+    # for classifier in trained_classifiers.classifiers:
+        # TODO need the optimal threshold :) could put it in TrainedClassifier straight up
+        # evaluate_classifier()

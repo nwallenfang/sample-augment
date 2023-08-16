@@ -2,6 +2,9 @@ import json
 import os
 import re
 import tempfile
+
+from sample_augment.utils.path_utils import shared_dir, root_dir
+
 os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 import torch
 
@@ -33,9 +36,11 @@ def create_train_val_pt():
 def train_stylegan():
     import sample_augment.models.stylegan2.dnnlib as dnnlib
     from sample_augment.models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn
-    out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
+    # out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
+    out_dir = str(shared_dir / 'generated')
     config_kwargs = {
-        'data': r"E:\Master_Thesis_Nils\data\stylegan_train_data.pt",
+        # 'data': r"E:\Master_Thesis_Nils\data\stylegan_train_data.pt",
+        'data': str(root_dir / 'stylegan_train_data.pt'),
         # 'custom_name' 'gc10_pre_FFHQ'
         'gpus': 1,
         'snap': None,  # snapshot interval (default 50)
@@ -59,7 +64,7 @@ def train_stylegan():
         # 'celebahq256', # 'ffhq256',  # checkpoint for transfer learning / resuming interrupted run
         'freezed': None,  # int, 'Freeze-D', 'freeze the highest-resolution layers of the discriminator
         # during transfer'
-        'fp32': None,
+        'fp32': True,
         'nhwc': None,
         'nobench': None,
         'allow_tf32': None,
@@ -130,5 +135,5 @@ def train_stylegan():
 if __name__ == "__main__":
     # IF STUCK ON 'Setting up Pytorch plugin..'
     # need to remove the torch_extensions cache!!!! (C:\Users\user\AppData\Local\torch_extensions)
-    create_train_val_pt()
-    # train_stylegan()
+    # create_train_val_pt()
+    train_stylegan()

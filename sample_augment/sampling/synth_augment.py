@@ -90,9 +90,10 @@ class SynthAugTrainSet(TrainSet):
     synthetic_labels: Tensor
     # synthetic_ids: List[str]
     synth_p: float
-    _label_to_indices: Optional[Dict] = None
     """if the synthetic strategy only supports single-label creation, set this to False"""
-    _multi_label: Optional[bool] = True
+    multi_label: bool
+    _label_to_indices: Optional[Dict] = None
+    
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -113,8 +114,11 @@ class SynthAugTrainSet(TrainSet):
     def __getitem__(self, idx):
         image, label = super().__getitem__(idx)
         if np.random.rand() < self.synth_p:
-            # TODO read _multi_label attr and act according to it
-            matching_indices = self._label_to_indices.get(tuple(label.cpu().tolist()), [])
+            # TODO read multi_label attr and act according to it
+            if self.multi_label:
+                matching_indices = self._label_to_indices.get(tuple(label.cpu().tolist()), [])
+            else:
+                matching_indices = self._label_to_indices.get(tuple(label.cpu().tolist()), [])
             if matching_indices:
                 chosen_idx = np.random.choice(matching_indices)
                 synthetic_image, synthetic_label = (self.synthetic_images[chosen_idx],
@@ -125,6 +129,8 @@ class SynthAugTrainSet(TrainSet):
                 else:
                     log.warning('Using SynthAugTrainSet without the transform attribute being set.')
                 return synthetic_image, synthetic_label
+            else:
+                log.warning(f'No matching indices for label {label.cpu().tolist()}.')
         return image, label
 
     class Config:  # needed for _label_to_indices to be allowed
@@ -143,6 +149,8 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
     target_count = 200  # = median_count
 
     generated_dir = shared_dir / "generated" / generator_name
+    
+    log.info(f'synth-augment generated dir: {generated_dir}')
 
     # Store tensors and labels for synthetic data
     synthetic_tensors = []
@@ -151,23 +159,27 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
 
     for class_idx, class_name in enumerate(GC10_CLASSES):
         n_missing = target_count - class_counts[class_idx]
-        if n_missing <= 0:
-            log.info(f"Augment: skip {class_name}")
-            # TODO this skipping doesn't make anymore sense now with synth_p, no?
-            continue
+        # if n_missing <= 0:
+        #     log.info(f"Augment: skip {class_name}")
+        #     # TODO this skipping doesn't make anymore sense now with synth_p, no?
+        #     continue
 
         # Find the images for the class_name
         generated_image_paths = glob.glob(
-            f"{generated_dir}/{class_name}_*.png")  # This will return a list of all files that match the pattern
-
+            f"{generated_dir}/{class_name}/*.jpg")
+        n_imgs = len(generated_image_paths)
         # Use min to avoid trying to add more images than exist
-        for j in range(min(n_missing, len(generated_image_paths))):
+        # n_adding = min(n_missing, len(generated_image_paths))
+        # Just add every img for our use-case now
+        log.info(f'Augmenting {n_imgs} {class_name} instances.')
+        for j in range(n_imgs):
             img_path = Path(generated_image_paths[j])
             image = Image.open(img_path)
             image_tensor = ToTensor()(image).unsqueeze(0)  # Add batch dimension
 
             # Create a tensor for the label and add a dimension
-            label_tensor = torch.tensor([class_idx], dtype=torch.long)  # Assuming that `i` is your label
+            label_tensor = torch.zeros((10), dtype=torch.float32)
+            label_tensor[class_idx] = 1.0
 
             # Append the image_tensor and label_tensor to synthetic_tensors and synthetic_labels
             # todo check if I need to do any preprocessing
@@ -176,7 +188,8 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
             synthetic_ids.append(f"{generator_name}_{img_path.name.split('.')[0]}")
 
     synthetic_tensors = torch.cat(synthetic_tensors, 0)
-    synthetic_labels = torch.cat(synthetic_labels, 0)
+    # synthetic
+    synthetic_labels = torch.stack(synthetic_labels, 0)
 
     # Convert tensors to uint8
     synthetic_tensors = (synthetic_tensors * 255).byte()
@@ -188,7 +201,8 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
                             synthetic_images=synthetic_tensors,
                             synthetic_labels=synthetic_labels,
                             synthetic_ids=synthetic_ids,
-                            synth_p=synth_p)
+                            synth_p=synth_p,
+                            multi_label=False)  # Could be True depending....
 
 
 @step
