@@ -99,6 +99,7 @@ def get_preprocess(model):
 
     _preprocess: List = copy(plain_transforms)
     if isinstance(model, VisionTransformer):
+        # VisionTransformer needs to do resizing
         _preprocess.insert(0, torchvision.transforms.Resize((224, 224), **optional_aa_arg))
 
     return transforms.Compose(_preprocess)

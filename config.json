@@ -1,13 +1,13 @@
 {
-  "name": "hand-picked-vs-random",
+  "name": "hand-picked-vs-random-vs-baseline",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
   "min_instances": 10,
   "model_type": "VisionTransformer",
 
-  "learning_rate": 0.001,
-  "num_epochs": 10,
+  "learning_rate": 0.0001,
+  "num_epochs": 50,
   "batch_size": 32,
   "balance_classes": true,
   "n_folds": 10,
@@ -18,7 +18,7 @@
   "v_flip_p": 0.5,
 
   "generator_name": "wdataaug-028_012200",
-  "synth_p": 0.4,
+  "synth_p": 0.33,
   "strategies": [
     "random",
     "hand-picked"

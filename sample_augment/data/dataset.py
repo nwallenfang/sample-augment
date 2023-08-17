@@ -29,6 +29,7 @@ class ImageDataset(torchvision.datasets.ImageFolder):
 
 
 class AugmentDataset(TensorDataset, Artifact):
+    # TODO rename to CompleteDataset
     """
         PyTorch TensorDataset with the extension that we're also saving the paths to the
         original images.

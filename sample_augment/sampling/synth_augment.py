@@ -1,7 +1,7 @@
 import glob
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, Optional
 
 import numpy as np
 import torch
@@ -9,7 +9,7 @@ from PIL import Image
 from torch import Tensor
 from torchvision.transforms import ToTensor
 
-from sample_augment.core import step
+from sample_augment.core import step, Artifact
 from sample_augment.data.train_test_split import TrainSet
 from sample_augment.models.generator import GC10_CLASSES, StyleGANGenerator
 from sample_augment.utils import log
@@ -23,6 +23,14 @@ class UnifiedTrainSet(TrainSet):
     """
     serialize_this = True  # good to have serialized
     pass
+
+
+# TODO restructure the steps here in this file so they receive SynthData
+
+class SynthData(Artifact):
+    synthetic_images: Tensor
+    synthetic_labels: Tensor
+    multi_label: bool
 
 
 @step
@@ -93,7 +101,6 @@ class SynthAugTrainSet(TrainSet):
     """if the synthetic strategy only supports single-label creation, set this to False"""
     multi_label: bool
     _label_to_indices: Optional[Dict] = None
-    
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -102,6 +109,7 @@ class SynthAugTrainSet(TrainSet):
         self._label_to_indices = defaultdict(list)
         for i, label in enumerate(self.synthetic_labels):
             label_on_cpu = label.cpu() if device == "cuda" else label
+            # TODO debug the label to indices
             self._label_to_indices[tuple(label_on_cpu.tolist())].append(i)
 
         if device == "cuda":
@@ -114,11 +122,15 @@ class SynthAugTrainSet(TrainSet):
     def __getitem__(self, idx):
         image, label = super().__getitem__(idx)
         if np.random.rand() < self.synth_p:
-            # TODO read multi_label attr and act according to it
             if self.multi_label:
-                matching_indices = self._label_to_indices.get(tuple(label.cpu().tolist()), [])
+                label_key = tuple(label.cpu().tolist())
             else:
-                matching_indices = self._label_to_indices.get(tuple(label.cpu().tolist()), [])
+                # if we only have single-label synth data, use the primary label
+                label_key = [0.0] * 10
+                label_key[self.primary_label_tensor[idx].cpu().item()] = 1.0
+                label_key = tuple(label_key)
+
+            matching_indices = self._label_to_indices.get(label_key, [])
             if matching_indices:
                 chosen_idx = np.random.choice(matching_indices)
                 synthetic_image, synthetic_label = (self.synthetic_images[chosen_idx],
@@ -146,10 +158,10 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
     """
     class_counts = np.bincount(training_set.primary_label_tensor.numpy())
     _median_count = int(np.median(class_counts) + 0.5)
-    target_count = 200  # = median_count
+    _target_count = 200  # = median_count
 
     generated_dir = shared_dir / "generated" / generator_name
-    
+
     log.info(f'synth-augment generated dir: {generated_dir}')
 
     # Store tensors and labels for synthetic data
@@ -158,7 +170,7 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
     synthetic_ids = []
 
     for class_idx, class_name in enumerate(GC10_CLASSES):
-        n_missing = target_count - class_counts[class_idx]
+        _n_missing = _target_count - class_counts[class_idx]
         # if n_missing <= 0:
         #     log.info(f"Augment: skip {class_name}")
         #     # TODO this skipping doesn't make anymore sense now with synth_p, no?
@@ -178,7 +190,7 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
             image_tensor = ToTensor()(image).unsqueeze(0)  # Add batch dimension
 
             # Create a tensor for the label and add a dimension
-            label_tensor = torch.zeros((10), dtype=torch.float32)
+            label_tensor = torch.zeros(10, dtype=torch.float32)
             label_tensor[class_idx] = 1.0
 
             # Append the image_tensor and label_tensor to synthetic_tensors and synthetic_labels
@@ -211,7 +223,7 @@ def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: f
     A synthetic augmentation type based on label distribution.
     """
     # since we're using the generator we're using device == 'cuda' here
-    log.warning("don't use this, see strategies.py")
+    log.warning("don't use this, see compare_strategies.py")
     device = torch.device('cuda')
 
     label_matrix = training_set.label_tensor.to(device)

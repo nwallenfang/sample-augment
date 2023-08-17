@@ -92,7 +92,7 @@ class Store:
                 "configs": artifact.configs
             }
 
-        log.info(f"Saving store to {store_save_path}")
+        log.info(f"Store saved: {store_save_path}")
         with open(path_utils.root_dir / store_save_path, 'w') as f:
             try:
                 json.dump(data, f, indent=4)
@@ -113,7 +113,12 @@ class Store:
         for artifact_name, artifact_info in data.items():
             module_name, class_name = artifact_name.rsplit('.', 1)
             artifact_path = path_utils.root_dir / artifact_info['path']
-            ArtifactSubclass = getattr(import_module(module_name), class_name)
+            try:
+                ArtifactSubclass = getattr(import_module(module_name), class_name)
+            except ModuleNotFoundError as _e:
+                log.error(f"Loading from {store_path.name}: Module `{module_name}` does not exist.")
+                sys.exit(-1)
+
             with open(artifact_path, 'r') as artifact_json:
                 artifacts[class_name] = ArtifactSubclass.from_dict(json.load(artifact_json))
                 if artifacts[class_name] is None:
