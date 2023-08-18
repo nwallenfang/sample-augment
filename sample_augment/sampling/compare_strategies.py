@@ -17,6 +17,7 @@ from sample_augment.sampling.random_synth import random_synthetic_augmentation
 from sample_augment.sampling.synth_augment import SynthAugTrainSet, SynthData
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir
+from sample_augment.utils.plot import prepare_latex_plot
 
 
 @step
@@ -153,8 +154,11 @@ def evaluate_synth_trained_classifiers(trained_classifiers: StrategyComparisonCl
 
 
 @step
-def create_strategy_f1_plot(synth_report: SynthComparisonReport):
-    reports = [  # boilerplatey fun :) synth reports, what's there not to get/
+def create_strategy_f1_plot(synth_report: SynthComparisonReport, strategies: List[str]):
+    def idx_to_name(_idx):
+        return strategies[_idx - 1] if _idx > 0 else "Baseline"
+
+    reports = [
         synth_report.baseline_report.report,
         *[synth.report for synth in synth_report.synth_reports]
     ]
@@ -163,7 +167,7 @@ def create_strategy_f1_plot(synth_report: SynthComparisonReport):
     for idx, report in enumerate(reports):
         for class_name in GC10_CLASSES:
             all_data.append({
-                "Training Regime": f"Regime {idx + 1}",
+                "Training Regime": idx_to_name(idx),
                 "Class": class_name,
                 "F1 Score": report[class_name]["f1-score"]
             })
@@ -171,21 +175,25 @@ def create_strategy_f1_plot(synth_report: SynthComparisonReport):
     df = pd.DataFrame(all_data)
 
     plt.figure(figsize=(10, 6))
-    sns.set_style("whitegrid")  # Set a grid style for better readability
-    palette = ["grey"] + list(sns.color_palette("deep", n_colors=len(reports) - 1))  # Set grey for baseline
+    sns.set_style("whitegrid")
+    prepare_latex_plot()
+    palette = ["grey"] + list(sns.color_palette("deep", n_colors=len(reports) - 1))
 
-    # Plot the baseline as vertical lines
-    baseline_scores = df[df["Training Regime"] == "Regime 1"]["F1 Score"].values
-    for class_idx, class_name in enumerate(GC10_CLASSES):
-        plt.axvline(x=baseline_scores[class_idx], color=palette[0], linestyle='--',
-                    ymax=(class_idx + 0.5) / len(GC10_CLASSES), ymin=(class_idx) / len(GC10_CLASSES))
+    # Use stripplot for the baseline with '|' marker
+    baseline_data = df[df["Training Regime"] == "Baseline"]
+    sns.stripplot(x="F1 Score", y="Class", data=baseline_data, marker='|', jitter=False, size=15,
+                  color=palette[0], linewidth=2)
 
-    # Plot the other regimes using stripplot
-    for idx, regime in enumerate(df["Training Regime"].unique()[1:]):  # Excluding the baseline
+    # Plot the other regimes using stripplot with 'o' marker
+    for idx, regime in enumerate(df["Training Regime"].unique()[1:]):
         regime_data = df[df["Training Regime"] == regime]
-        sns.stripplot(x="F1 Score", y="Class", data=regime_data, marker='o', jitter=False, label=regime,
-                      color=palette[idx + 1], size=8, linewidth=1, edgecolor="gray")
+        sns.stripplot(x="F1 Score", y="Class", data=regime_data, marker='o', jitter=False,
+                      color=palette[idx + 1], size=8, linewidth=1.0, edgecolor="gray")
 
-    plt.legend(title="Training Regime", loc='lower right')  # Positioned legend to lower right; adjust as needed
-    plt.title("Comparison of Class-wise F1 scores for Different Training Regimes")
-    plt.show()
+    handles = [plt.Line2D([0], [0], color=palette[i], marker=('|' if i == 0 else 'o'),
+                          markersize=(15 if i == 0 else 8), linestyle='', label=idx_to_name(i),
+                          linewidth=(2 if i == 0 else 1))
+               for i in range(len(reports))]
+    plt.legend(handles=handles, title="Strategy", loc='best')
+    # plt.title("Comparison of Class-wise F1 scores for Different Training Regimes")
+    plt.savefig(shared_dir / "figures" / 'strategies_f1_comparison.pdf', bbox_inches="tight")
