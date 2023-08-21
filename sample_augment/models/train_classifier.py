@@ -182,7 +182,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
             f'Val Acc: {avg_accuracy:.2f}, '
             f'Val F1: {avg_f1:.3f}')
 
-    log.info(f"Classifier training: Best model from epoch {best_epoch+1} with val_loss = {best_val_loss:.3f} "
+    log.info(f"Classifier training: Best model from epoch {best_epoch + 1} with val_loss = {best_val_loss:.3f} "
              f"and f1_score = {best_f1_score:.3f}")
 
     # load model state from best performing epoch
@@ -193,7 +193,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         train_accuracy=np.array(train_acc_per_epoch),
         validation_accuracy=np.array(val_acc_per_epoch),
         validation_f1=np.array(val_f1_per_epoch),
-        epoch=best_epoch+1
+        epoch=best_epoch + 1
     )
 
 
@@ -251,8 +251,7 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
                      geometric_augment: bool,
                      color_jitter: float,
                      h_flip_p: float,
-                     v_flip_p: float,
-                     synth_p: float) -> TrainedClassifier:
+                     v_flip_p: float) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
@@ -291,7 +290,8 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
 
         # if antialias_param_needed:  # needed in newer torchvision versions
         # noinspection PyArgumentList
-        random_crop = transforms.RandomResizedCrop(256, scale=(0.85, 1.0), **optional_aa_arg)
+        random_crop = transforms.RandomResizedCrop(256 if not isinstance(model, VisionTransformer) else 224,
+                                                   scale=(0.85, 1.0), **optional_aa_arg)
 
         geometric_transforms = [
             # antialias argument needed for newer versions of torchvision
@@ -302,11 +302,6 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
         if geometric_augment:
             # add geometric transforms to base_transforms (before ColorJitter)
             base_transforms[2:2] = geometric_transforms
-
-        # add synthetic augmentation if synthetic data is present
-        # can't use isinstance due to the pesky importing / class use issue....
-        if train_data.__full_name__ == 'data.synth_augment.TrainSetWithSynthetic':
-            log.info(f"Doing synthetic Data Augmentation with probability {synth_p}.")
 
         train_data.transform = transforms.Compose(base_transforms)
         val_data.transform = transforms.Compose(plain_transforms)
@@ -370,12 +365,10 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
 
         start_time = time.time()  # Start the timer
         classifier: TrainedClassifier = train_classifier(TrainSet.from_existing(train, name="train_fold_{i}"),
-                                                         ValSet.from_existing(val, name="val_fold_{i}"),
-                                                         model_type,
-                                                         num_epochs, batch_size, learning_rate,
-                                                         balance_classes, fold_random_seed, data_augment,
-                                                         geometric_augment, color_jitter, h_flip_p, v_flip_p,
-                                                         synth_p)
+                                                         ValSet.from_existing(val, name="val_fold_{i}"), model_type,
+                                                         num_epochs, batch_size, learning_rate, balance_classes,
+                                                         fold_random_seed, data_augment, geometric_augment,
+                                                         color_jitter, h_flip_p, v_flip_p)
         classifiers.append(classifier)
         elapsed_time = time.time() - start_time  # Calculate elapsed time
         minutes, seconds = divmod(elapsed_time, 60)  # Split elapsed time into minutes and seconds
@@ -407,4 +400,4 @@ def train_augmented_classifier(train_data: SynthAugTrainSet, val_data: ValSet,
     # random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, synth_p=synth_p
     return SynthTrainedClassifier(
         train_classifier(train_data, val_data, model_type, num_epochs, batch_size, learning_rate, balance_classes,
-                         random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, synth_p))
+                         random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p))

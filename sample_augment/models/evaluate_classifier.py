@@ -178,7 +178,8 @@ def show_prediction(image, prediction, class_names, true_labels, name: str, img_
     plt.savefig(shared_dir / "figures" / "predictions" / f"{name}_{img_id}.pdf", bbox_inches="tight")
 
 
-def determine_threshold_vector(predictions: ValidationPredictions, val: ValSet) -> Tensor:
+def determine_threshold_vector(predictions: ValidationPredictions, val: ValSet, threshold_regularize: bool,
+                               threshold_lambda: float) -> Tensor:
     """
     Finds the optimal threshold for each class with respect to the F1 score on the validation set.
     Predictions should be in the range 0..1, so have sigmoid already applied.
@@ -194,11 +195,13 @@ def determine_threshold_vector(predictions: ValidationPredictions, val: ValSet) 
     # For each class, find the threshold that maximizes the F1 score
     for class_idx in range(num_classes):
         best_threshold = 0.5  # Default threshold
-        best_f1 = 0
-        for threshold in np.linspace(0, 1, 100):  # Test 100 thresholds in the range [0, 1]
+        best_score = 0
+        for threshold in np.linspace(0, 1, 250):  # Test 100 thresholds in the range [0, 1]
             f1 = f1_score(all_labels[:, class_idx], all_predictions[:, class_idx] > threshold)
-            if f1 > best_f1:
-                best_f1 = f1
+            reg_penalty = threshold_lambda * abs(threshold - 0.5) if threshold_regularize else 0.0
+            score = f1 - reg_penalty
+            if score > best_score:
+                best_score = score
                 best_threshold = threshold
         thresholds.append(best_threshold)
 
@@ -207,14 +210,15 @@ def determine_threshold_vector(predictions: ValidationPredictions, val: ValSet) 
 
 @step
 def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSet,
-                        gc10_labels: GC10Labels) -> ClassificationReport:
+                        gc10_labels: GC10Labels, threshold_regularize: bool,
+                        threshold_lambda: float) -> ClassificationReport:
     # quickfix since the artifacts are not properly guarded from being mutated yet (TODO)
     # I removed the preprocessing of val_set since it's only used for the label info here, the data doesn't get accessed
     predictions = val_pred_artifact.predictions
     assert len(predictions) == len(val_set)
     imgs, labels = val_set.tensors[0], val_set.tensors[1]
 
-    threshold_vector = determine_threshold_vector(val_pred_artifact, val_set)
+    threshold_vector = determine_threshold_vector(val_pred_artifact, val_set, threshold_regularize, threshold_lambda)
     log.info(f'Threshold vector: {threshold_vector}')
 
     # for i in range(10):

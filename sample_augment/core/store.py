@@ -87,7 +87,7 @@ class Store:
 
             # artifact_dict = artifact.serialize()
             # log.debug(f"Saving artifact {artifact_name}")
-            data[artifact.fully_qualified_name] = {
+            data[artifact.__full_name__] = {
                 "path": artifact.complete_path.relative_to(path_utils.root_dir).as_posix(),
                 "configs": artifact.configs
             }

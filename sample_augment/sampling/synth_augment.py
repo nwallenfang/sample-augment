@@ -143,9 +143,8 @@ class SynthAugTrainSet(TrainSet):
                 return synthetic_image, synthetic_label
             else:
                 log.warning(f'No matching indices for label {label.cpu().tolist()}.')
-        if self.transform:
-            image = self.transform(image)
 
+        # self.transform got applied already in __super__ call
         return image, label
 
     class Config:  # needed for _label_to_indices to be allowed

@@ -11,6 +11,7 @@ from sample_augment.data.train_test_split import TrainSet, ValSet
 from sample_augment.models.evaluate_classifier import evaluate_classifier, ClassificationReport, predict_validation_set, \
     ValidationPredictions
 from sample_augment.models.generator import GC10_CLASSES
+from sample_augment.models.project_images import from_projected_images
 from sample_augment.models.train_classifier import ModelType
 from sample_augment.models.train_classifier import train_augmented_classifier, TrainedClassifier, train_classifier
 from sample_augment.sampling.random_synth import random_synthetic_augmentation
@@ -50,13 +51,14 @@ class SyntheticBundle(Artifact):
 
 ALL_STRATEGIES = {
     "random": random_synthetic_augmentation,
-    "hand-picked": hand_picked_dataset
+    "hand-picked": hand_picked_dataset,
+    "projection": from_projected_images,
 }
 
 
 @step
-def create_synthetic_bundle_from_strategies(strategies: List[str], training_set: TrainSet,
-                                            generator_name: str) -> SyntheticBundle:
+def create_synthetic_bundle(strategies: List[str], training_set: TrainSet,
+                            generator_name: str) -> SyntheticBundle:
     synthetic_datasets = []
     for strategy in strategies:
         if strategy not in ALL_STRATEGIES:
@@ -65,6 +67,7 @@ def create_synthetic_bundle_from_strategies(strategies: List[str], training_set:
 
         strategy_func = ALL_STRATEGIES[strategy]
         synth_set = strategy_func(training_set, generator_name)
+        synth_set.configs['strategy'] = strategy
         log.info(f'Created set for {strategy}')
         synthetic_datasets.append(synth_set)
 
@@ -118,10 +121,9 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
 
     log.info(f'Training baseline without synthetic data.')
     baseline = train_classifier(train_data=train_set, val_data=val_set, model_type=model_type, num_epochs=num_epochs,
-                                batch_size=batch_size,
-                                learning_rate=learning_rate, balance_classes=balance_classes, random_seed=random_seed,
-                                data_augment=data_augment, geometric_augment=geometric_augment,
-                                color_jitter=color_jitter, h_flip_p=h_flip_p, v_flip_p=v_flip_p, synth_p=synth_p)
+                                batch_size=batch_size, learning_rate=learning_rate, balance_classes=balance_classes,
+                                random_seed=random_seed, data_augment=data_augment, geometric_augment=geometric_augment,
+                                color_jitter=color_jitter, h_flip_p=h_flip_p, v_flip_p=v_flip_p)
     return StrategyComparisonClassifiers(baseline=baseline, classifiers=trained_classifiers)
 
 
@@ -134,13 +136,17 @@ class SynthComparisonReport(Artifact):
 @step
 def evaluate_synth_trained_classifiers(trained_classifiers: StrategyComparisonClassifiers, val_set: ValSet,
                                        labels: GC10Labels,
-                                       strategies: List[str]) -> SynthComparisonReport:
+                                       strategies: List[str],
+                                       threshold_regularize: bool,
+                                       threshold_lambda: float
+                                       ) -> SynthComparisonReport:
     synth_reports = []
     for strategy, classifier in zip(strategies, trained_classifiers.classifiers):
         predictions: ValidationPredictions = predict_validation_set(classifier, val_set,
                                                                     batch_size=32)
         log.info(f"-- Strategy {strategy} --")
-        report: ClassificationReport = evaluate_classifier(predictions, val_set, labels)
+        report: ClassificationReport = evaluate_classifier(predictions, val_set, labels, threshold_regularize,
+                                                           threshold_lambda)
 
         # log.info(report.report)
         synth_reports.append(report)
@@ -148,7 +154,8 @@ def evaluate_synth_trained_classifiers(trained_classifiers: StrategyComparisonCl
     log.info(" -- Baseline --")
     predictions_baseline: ValidationPredictions = predict_validation_set(trained_classifiers.baseline, val_set,
                                                                          batch_size=32)
-    baseline_report: ClassificationReport = evaluate_classifier(predictions_baseline, val_set, labels)
+    baseline_report: ClassificationReport = evaluate_classifier(predictions_baseline, val_set, labels,
+                                                                threshold_regularize, threshold_lambda)
 
     return SynthComparisonReport(baseline_report=baseline_report, synth_reports=synth_reports)
 
@@ -196,4 +203,4 @@ def create_strategy_f1_plot(synth_report: SynthComparisonReport, strategies: Lis
                for i in range(len(reports))]
     plt.legend(handles=handles, title="Strategy", loc='best')
     # plt.title("Comparison of Class-wise F1 scores for Different Training Regimes")
-    plt.savefig(shared_dir / "figures" / 'strategies_f1_comparison.pdf', bbox_inches="tight")
+    plt.savefig(shared_dir / "figures" / f'strategies_f1_{synth_report.configs["name"]}.pdf', bbox_inches="tight")

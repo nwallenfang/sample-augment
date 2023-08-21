@@ -1,0 +1,44 @@
+{
+    "sample_augment.models.train_classifier.KFoldTrainedClassifiers": {
+        "path": "KFoldTrainedClassifiers/EfficientNetL-naive_21b34d.json",
+        "configs": {
+            "n_folds": 10,
+            "test_ratio": 0.2,
+            "model_type": "EfficientNetV2_L",
+            "min_instances": 10,
+            "random_seed": 100,
+            "num_epochs": 30,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "balance_classes": true,
+            "data_augment": false,
+            "geometric_augment": false,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "synth_p": 0.0,
+            "name": "EfficientNetL-naive"
+        }
+    },
+    "sample_augment.models.evaluate_classifier.KFoldClassificationReport": {
+        "path": "KFoldClassificationReport/EfficientNetL-naive_21b34d.json",
+        "configs": {
+            "test_ratio": 0.2,
+            "min_instances": 10,
+            "random_seed": 100,
+            "n_folds": 10,
+            "name": "EfficientNetL-naive",
+            "model_type": "EfficientNetV2_L",
+            "num_epochs": 30,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "balance_classes": true,
+            "data_augment": false,
+            "geometric_augment": false,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "synth_p": 0.0
+        }
+    }
+}
