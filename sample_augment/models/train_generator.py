@@ -3,9 +3,10 @@ import os
 import re
 import tempfile
 
+from sample_augment.data.train_test_split import ValSet
 from sample_augment.utils.path_utils import shared_dir, root_dir
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+# os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 import torch
 
 
@@ -13,7 +14,7 @@ import torch
 # sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\')
 # sys.path.insert(0, 'H:\\thesis\\repos\\thesis_nils\\sample_augment\\models\\stylegan2\\')
 
-def create_train_val_pt():
+def create_train_val_pt(combine_train_val: bool):
     # this only runs on python 3.10
     from sample_augment.data.dataset import AugmentDataset
     from sample_augment.utils import path_utils
@@ -25,10 +26,17 @@ def create_train_val_pt():
     # lacking data (or towards the end before testing), we can train it on combined train and val set
     bundle = create_train_test_val(complete_dataset, random_seed, test_ratio=0.2, val_ratio=0.1, min_instances=10)
     train = bundle.train
+    tensors_to_save = train.tensors
+    primary_label_tensor = train.primary_label_tensor
+    if combine_train_val:
+        val: ValSet = bundle.val
+        primary_label_tensor = torch.cat(
+            (train.primary_label_tensor, val.primary_label_tensor))
+        tensors_to_save = (torch.cat((train.tensors[0], val.tensors[0])), torch.cat((train.tensors[1], val.tensors[1])))
     # save the two tensors stacked to one pt file
     # let's stack the primary tensor in there as well just in case
-    
-    torch.save(train.tensors +  (train.primary_label_tensor,), path_utils.root_dir / 'stylegan_train_data.pt')
+
+    torch.save(tensors_to_save + (primary_label_tensor,), path_utils.root_dir / 'stylegan_train_data.pt')
 
 
 # TODO calculate improved precision and recall metrics
@@ -36,22 +44,22 @@ def create_train_val_pt():
 def train_stylegan():
     import sample_augment.models.stylegan2.dnnlib as dnnlib
     from sample_augment.models.stylegan2.train import UserError, setup_training_loop_kwargs, subprocess_fn
-    # out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
-    out_dir = str(shared_dir / 'generated')
+    out_dir = r'E:\Master_Thesis_Nils\stylegan-training'
+    # out_dir = str(shared_dir / 'generated')
     config_kwargs = {
         # 'data': r"E:\Master_Thesis_Nils\data\stylegan_train_data.pt",
         'data': str(root_dir / 'stylegan_train_data.pt'),
         # 'custom_name' 'gc10_pre_FFHQ'
-        'gpus': 1,
+        'gpus': 2,
         'snap': None,  # snapshot interval (default 50)
         'metrics': None,
-        'seed': 16,  # remember to change this when running the experiment a second time ;)
+        'seed': 17,  # remember to change this when running the experiment a second time ;)
         'cond': True,
         'subset': None,
         'mirror': True,  # checked each class and x-flip can be done semantically for GC10
         'cfg': 'config-gc10',
         'gamma': None,  # tune this parameter with values such as 0.1, 0.5, 1, 5, 10
-        'kimg': 12500,
+        'kimg': 20000,
         'batch': None,
         'aug': None,
         'p': None,
@@ -68,8 +76,8 @@ def train_stylegan():
         'nhwc': None,
         'nobench': None,
         'allow_tf32': None,
-        'workers': 1, # could try setting number of workers to 1, since the data is fully in RAM
-        'with_dataaug': True 
+        'workers': 1,  # could try setting number of workers to 1, since the data is fully in RAM
+        'with_dataaug': True
     }
     dry_run = False
 
@@ -135,5 +143,5 @@ def train_stylegan():
 if __name__ == "__main__":
     # IF STUCK ON 'Setting up Pytorch plugin..'
     # need to remove the torch_extensions cache!!!! (C:\Users\user\AppData\Local\torch_extensions)
-    # create_train_val_pt()
+    # create_train_val_pt(combine_train_val=True)
     train_stylegan()
