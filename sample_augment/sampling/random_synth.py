@@ -2,7 +2,7 @@ import torch
 
 from sample_augment.data.train_test_split import TrainSet
 from sample_augment.models.generator import StyleGANGenerator
-from sample_augment.sampling.synth_augment import SynthData
+from sample_augment.data.synth_data import SynthData
 from sample_augment.utils import log
 
 

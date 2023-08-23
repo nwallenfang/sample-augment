@@ -11,11 +11,11 @@ from sample_augment.data.train_test_split import TrainSet, ValSet
 from sample_augment.models.evaluate_classifier import evaluate_classifier, ClassificationReport, predict_validation_set, \
     ValidationPredictions
 from sample_augment.models.generator import GC10_CLASSES
-from sample_augment.models.project_images import from_projected_images
+from sample_augment.sampling.project_images import from_projected_images
 from sample_augment.models.train_classifier import ModelType
 from sample_augment.models.train_classifier import train_augmented_classifier, TrainedClassifier, train_classifier
 from sample_augment.sampling.random_synth import random_synthetic_augmentation
-from sample_augment.sampling.synth_augment import SynthAugTrainSet, SynthData
+from sample_augment.data.synth_data import SynthData, SynthAugTrainSet
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir
 from sample_augment.utils.plot import prepare_latex_plot

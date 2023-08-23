@@ -21,7 +21,7 @@ from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
 from sample_augment.models.classifier import VisionTransformer, ResNet50, DenseNet201, \
     EfficientNetV2  # or CustomDensenet, etc.
-from sample_augment.sampling.synth_augment import SynthAugTrainSet
+from sample_augment.data.synth_data import SynthAugTrainSet
 from sample_augment.utils import log
 
 _mean = torch.tensor([0.485, 0.456, 0.406])

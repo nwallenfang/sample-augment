@@ -23,7 +23,7 @@ def main(arg_config: Path = None):
     # experiment.run("train_augmented_classifier")
     # experiment.run("evaluate_classifier")
     # experiment.run('look_at_augmented_train_set')
-    experiment.run("create_strategy_f1_plot")
+    experiment.run("create_synthetic_bundle")
 
 
 if __name__ == '__main__':

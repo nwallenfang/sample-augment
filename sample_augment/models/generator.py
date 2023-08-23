@@ -109,34 +109,12 @@ class StyleGANGenerator:
             z = torch.from_numpy(np.random.RandomState(self.seed).randn(c.shape[0], self.G.z_dim)).to(self.device)
         return self.G.mapping(z, c, truncation_psi=truncation_psi)
 
-    def z_to_w(self, c: Tensor, z: Tensor) -> Tensor:
-        """
-        @param z:
-        @param c: class label of the instance to be generated with the w
-                    Shape: either (G.c_dim) or (n, G.c_dim).
-                    If it's a stacked n-tensor with multiple labels, multiple images get generated
-                    G.c_dim is the number_of_classes=10 for GC-10
-        @return: uint8 image tensor with shape (C, H, W) = (3, 256, 256)
-        """
-        # TODO
-        raise NotImplementedError()
-
-    def z_to_img(self, c: Tensor, z: Tensor) -> Tensor:
-        """
-        @param c: class label of the instance to be generated with the w.
-                    Shapes: either (num_classes) or (n, num_classes).
-                    If it's a stacked n-tensor with multiple labels, multiple images get generated
-        @param z: must match (n, G.z_dim) or (G.z_dim), depending on c
-        @return: uint8 image tensor with shape (C, H, W) = (3, 256, 256)
-        """
-        # TODO
-        raise NotImplementedError()
-
     def w_to_img(self, w: Union[torch.Tensor, np.ndarray]):
         if isinstance(w, np.ndarray):
-            w = torch.from_numpy(w).to(self.device)
+            w = torch.from_numpy(w)
         if w.ndim == 2:
             w = w.unsqueeze(0)
+        w = w.to(self.device)
         # assert w.ndim == 3, "expecting shape (n, G.num_ws, G.w_dim)"
         assert w.shape[1:] == (self.G.num_ws, self.G.w_dim), "expecting shape (n, G.num_ws, G.w_dim)"
         with SuppressSpecificPrint("Setting up PyTorch plugin \"upfirdn2d_plugin\"... Failed!"):
