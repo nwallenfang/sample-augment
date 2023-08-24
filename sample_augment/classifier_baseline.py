@@ -32,7 +32,7 @@ def compare_f1_scores(shared_directory: Path):
     kfold_augmented_json = json.load(
         open('/home/nils/thesis/sample-augment/data/KFoldTrainedClassifiers/aug-01_ecc814.json'))
     kfold_no_aug_json = json.load(
-        open('/home/nils/thesis/sample-augment/data/KFoldTrainedClassifiers/baseline-noaug_58f246.json'))
+        open('/home/nils/thesis/sample-augment/data/KFoldTrainedClassifiers/baseline-configs-noaug_58f246.json'))
 
     # Extract F1 scores
     f1_aug = read_f1_losses(kfold_augmented_json)
@@ -98,20 +98,20 @@ def running_on_colab():
 
 
 def run_classifier_baseline_experiment():
-    # could delete the contents of class-base-runs before running
+    # could delete the contents of architecture-runs before running
     experiments_dir = root_dir.parent / 'experiments'
     # would be cool to have this in a separate root_dir but don't know if that's feasible hmm might be actually
     # ask chatgpt if it's writable
     if not running_on_colab():
         find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
-    classifier_baseline_configs = experiments_dir / 'class-base-configs'
+    classifier_baseline_configs = experiments_dir / 'architecture-configs'
 
     for config_filename in os.listdir(classifier_baseline_configs):
         print("root: ", root_dir)
         log.info(f"- running experiment {config_filename} -")
         config_path = classifier_baseline_configs / config_filename
         config = read_config(config_path)
-        store_save_path = experiments_dir / 'class-base-runs' / f"{config.filename}.json"
+        store_save_path = experiments_dir / 'architecture-runs' / f"{config.filename}.json"
 
         # create Experiment instance
         experiment = Experiment(config)

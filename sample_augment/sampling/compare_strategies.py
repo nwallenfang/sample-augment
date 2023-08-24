@@ -7,7 +7,7 @@ import seaborn as sns
 
 from sample_augment.core import Artifact, step
 from sample_augment.data.gc10.read_labels import GC10Labels
-from sample_augment.data.synth_data import SynthData, SynthAugmentedTrain
+from sample_augment.data.synth_data import SynthData, SynthAugmentedTrain, SyntheticBundle
 from sample_augment.data.train_test_split import TrainSet, ValSet
 from sample_augment.models.evaluate_classifier import evaluate_classifier, ClassificationReport, predict_validation_set, \
     ValidationPredictions
@@ -44,10 +44,6 @@ def hand_picked_dataset(training_set: TrainSet, generator_name: str):
 
     return SynthData(synthetic_images=synth_aug.synthetic_images, synthetic_labels=synth_aug.synthetic_labels,
                      multi_label=False)
-
-
-class SyntheticBundle(Artifact):
-    synthetic_datasets: List[SynthData]
 
 
 ALL_STRATEGIES = {
@@ -130,7 +126,7 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
         trained_classifier.configs['strategy'] = strategies[i]
         trained_classifiers.append(trained_classifier)
 
-    log.info(f'Training baseline without synthetic data.')
+    log.info(f'Training baseline-configs without synthetic data.')
     baseline = train_classifier(train_data=train_set, val_data=val_set, model_type=model_type, num_epochs=num_epochs,
                                 batch_size=batch_size, learning_rate=learning_rate, balance_classes=balance_classes,
                                 random_seed=random_seed, data_augment=data_augment, geometric_augment=geometric_augment,
@@ -198,7 +194,7 @@ def create_strategy_f1_plot(synth_report: SynthComparisonReport, strategies: Lis
     prepare_latex_plot()
     palette = ["grey"] + list(sns.color_palette("deep", n_colors=len(reports) - 1))
 
-    # Use stripplot for the baseline with '|' marker
+    # Use stripplot for the baseline-configs with '|' marker
     baseline_data = df[df["Training Regime"] == "Baseline"]
     sns.stripplot(x="F1 Score", y="Class", data=baseline_data, marker='|', jitter=False, size=15,
                   color=palette[0], linewidth=2)

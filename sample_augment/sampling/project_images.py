@@ -155,9 +155,9 @@ def from_projected_images(_training_set: TrainSet, generator_name: str, number_p
             synthetic_imgs.append(synth_img)
             synthetic_labels.append(interpolated_label)
 
-    synthetic_imgs_tensor = torch.stack(synthetic_imgs)
-    synthetic_labels_tensor = torch.stack(synthetic_labels)
-    return SynthData(synthetic_images=synthetic_imgs_tensor, synthetic_labels=synthetic_labels_tensor, multi_label=True)
+    synthetic_imgs_tensor = torch.stack(synthetic_imgs).squeeze()
+    synthetic_labels_tensor = torch.stack(synthetic_labels).squeeze()
+    return SynthData(synthetic_images=synthetic_imgs_tensor, synthetic_labels=synthetic_labels_tensor, multi_label=False)
 
 
 if __name__ == '__main__':

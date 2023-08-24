@@ -1,5 +1,5 @@
 {
-  "name": "synth-comparison-4-strats",
+  "name": "synthetic-bundle",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
