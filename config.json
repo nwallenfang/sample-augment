@@ -1,5 +1,5 @@
 {
-  "name": "synth-comparison-full-da",
+  "name": "synth-comparison-4-strats",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
@@ -7,12 +7,14 @@
   "model_type": "VisionTransformer",
 
   "learning_rate": 0.0001,
+  "lr_schedule": false,
+
   "num_epochs": 30,
   "batch_size": 32,
   "balance_classes": true,
   "n_folds": 10,
   "data_augment": true,
-  "geometric_augment": true,
+  "geometric_augment": false,
   "color_jitter": 0.25,
   "h_flip_p": 0.5,
   "v_flip_p": 0.5,
@@ -20,7 +22,8 @@
   "generator_name": "wdataaug-028_012200",
   "synth_p": 0.33,
   "strategies": [
-    "projection"
+      "projection",
+      "classifier-guided"
   ],
 
   "threshold_regularize": true,

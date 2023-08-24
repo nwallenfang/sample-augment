@@ -21,7 +21,7 @@ from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
 from sample_augment.models.classifier import VisionTransformer, ResNet50, DenseNet201, \
     EfficientNetV2  # or CustomDensenet, etc.
-from sample_augment.data.synth_data import SynthAugTrainSet
+from sample_augment.data.synth_data import SynthAugmentedTrain
 from sample_augment.utils import log
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
@@ -78,7 +78,8 @@ def _set_random_seed(random_seed: int):
 
 def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
                 learning_rate: float, random_seed: int,
-                balance_classes: bool) -> ClassifierMetrics:
+                balance_classes: bool,
+                lr_schedule: bool) -> ClassifierMetrics:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # make the experiment as reproducible as possible by setting a random seed
     _set_random_seed(random_seed)
@@ -251,7 +252,8 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
                      geometric_augment: bool,
                      color_jitter: float,
                      h_flip_p: float,
-                     v_flip_p: float) -> TrainedClassifier:
+                     v_flip_p: float,
+                     lr_schedule: bool) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
@@ -322,7 +324,8 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
 
     metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
                           batch_size=batch_size, learning_rate=learning_rate,
-                          balance_classes=balance_classes, random_seed=random_seed)
+                          balance_classes=balance_classes, random_seed=random_seed,
+                          lr_schedule=lr_schedule)
 
     del train_data
     del val_data
@@ -385,7 +388,7 @@ class SynthTrainedClassifier(TrainedClassifier):
 
 
 @step
-def train_augmented_classifier(train_data: SynthAugTrainSet, val_data: ValSet,
+def train_augmented_classifier(train_data: SynthAugmentedTrain, val_data: ValSet,
                                num_epochs: int, batch_size: int, learning_rate: float,
                                balance_classes: bool,
                                model_type: ModelType,
@@ -395,9 +398,9 @@ def train_augmented_classifier(train_data: SynthAugTrainSet, val_data: ValSet,
                                color_jitter: float,
                                h_flip_p: float,
                                v_flip_p: float,
-                               synth_p: float) -> SynthTrainedClassifier:
+                               lr_schedule: bool) -> SynthTrainedClassifier:
     # synth_training_set, val_set, num_epochs, batch_size, learning_rate, balance_classes,
     # random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, synth_p=synth_p
     return SynthTrainedClassifier(
         train_classifier(train_data, val_data, model_type, num_epochs, batch_size, learning_rate, balance_classes,
-                         random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p))
+                         random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, lr_schedule))

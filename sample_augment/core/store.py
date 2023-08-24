@@ -207,11 +207,15 @@ class Store:
                     module_name, class_name = artifact_name.rsplit('.', 1)
                     try:
                         ArtifactSubclass = getattr(import_module(module_name), class_name)
-                    except ModuleNotFoundError as e:
-                        log.error(e.msg)
-                        log.error(
-                            f'Could not load artifact {artifact_name}, run-file {run_file_name} might be outdated.')
-                        continue
+                    except ModuleNotFoundError as _e:
+                        # HOTFIX: try once more by prefixing sample_augment / package name
+                        try:
+                            ArtifactSubclass = getattr(import_module("sample_augment." + module_name), class_name)
+                        except ModuleNotFoundError as e:
+                            log.error(e.msg)
+                            log.error(
+                                f'Could not load artifact {artifact_name}, run-file {run_file_name} might be outdated.')
+                            continue
                     artifact_dict = json.load(open(path_utils.root_dir / artifact_info['path'], 'r'))
                     artifacts[class_name] = ArtifactSubclass.from_dict(artifact_dict)
                     if artifacts[class_name] is None:

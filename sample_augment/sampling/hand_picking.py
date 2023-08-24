@@ -25,7 +25,6 @@ if __name__ == '__main__':
     # save_button = Button(save_ax, 'Save', color='lightgoldenrodyellow')
     # button.label.set_fontsize(14)
 
-
     title = fig.suptitle(f'Select good {GC10_CLASSES[current_class_idx]} instances', fontsize=14)  # Title above images
     info_text = fig.text(0.95, 0.05, 'Info Label', ha='right', bbox=dict(facecolor='lightgray', alpha=1.0), fontsize=14)
 
@@ -91,8 +90,8 @@ if __name__ == '__main__':
         # go to next class if class count reached
         if class_counts[current_class_idx] >= TARGET_CLASS_COUNTS:
             title.set_text(f'Select good {GC10_CLASSES[current_class_idx]} instances')
-            current_class_idx += 1    
-        
+            current_class_idx += 1
+
         c = torch.zeros((9, 10))
         c[:, current_class_idx] = 1.0
 
@@ -105,7 +104,7 @@ if __name__ == '__main__':
         global images, latents, info_text
         latents = w.cpu().numpy()
         images = gen_images
-        
+
         # reset colors
         colors = ['red'] * 9
         info_text.set_text(f'{class_counts[current_class_idx]} / {TARGET_CLASS_COUNTS}')

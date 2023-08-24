@@ -14,6 +14,7 @@ from pydantic import BaseModel, parse_obj_as, ValidationError, Field
 from pydantic.main import ModelMetaclass
 
 from sample_augment.utils import log, path_utils
+from sample_augment.utils.path_utils import root_dir
 
 
 def is_tuple_of_tensors(field_type):
@@ -313,6 +314,17 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
     @classmethod
     def from_file(cls, path: Union[str, Path]) -> "Artifact":
         with open(path) as json_file:
+            return cls.from_dict(json.load(json_file))
+
+    @classmethod
+    def from_name(cls, name: str) -> "Artifact":
+        # TODO ugly dependency on root dir, hmm
+        if not name.endswith(".json"):
+            name = name + ".json"
+        json_path = root_dir / cls.__name__ / name
+        if not json_path.exists():
+            log.error(f"{cls.__name__} with filename {name} can't be found.")
+        with open(json_path) as json_file:
             return cls.from_dict(json.load(json_file))
 
     class Config:

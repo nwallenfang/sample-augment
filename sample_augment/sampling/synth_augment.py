@@ -7,7 +7,7 @@ from PIL import Image
 from torchvision.transforms import ToTensor
 
 from sample_augment.core import step
-from sample_augment.data.synth_data import SynthAugTrainSet
+from sample_augment.data.synth_data import SynthAugmentedTrain
 from sample_augment.data.train_test_split import TrainSet
 from sample_augment.models.generator import GC10_CLASSES, StyleGANGenerator
 from sample_augment.utils import log
@@ -19,7 +19,7 @@ from sample_augment.utils.plot import show_image_tensor
 
 
 @step
-def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -> SynthAugTrainSet:
+def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -> SynthAugmentedTrain:
     """
     First most basic synthetic augmentation type.
     Gets a directory of generated images and adds those to the smaller classes, until each class
@@ -40,10 +40,7 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
 
     for class_idx, class_name in enumerate(GC10_CLASSES):
         _n_missing = _target_count - class_counts[class_idx]
-        # if n_missing <= 0:
-        #     log.info(f"Augment: skip {class_name}")
-        #     # TODO this skipping doesn't make anymore sense now with synth_p, no?
-        #     continue
+
 
         # Find the images for the class_name
         generated_image_paths = glob.glob(
@@ -75,19 +72,19 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
     # Convert tensors to uint8
     synthetic_tensors = (synthetic_tensors * 255).byte()
 
-    return SynthAugTrainSet(name=f"synth-aug-{generator_name}", root_dir=generated_dir,
-                            img_ids=training_set.img_ids,
-                            tensors=(training_set.tensors[0], training_set.tensors[1]),
-                            primary_label_tensor=training_set.primary_label_tensor,
-                            synthetic_images=synthetic_tensors,
-                            synthetic_labels=synthetic_labels,
-                            synthetic_ids=synthetic_ids,
-                            synth_p=synth_p,
-                            multi_label=False)  # Could be True depending....
+    return SynthAugmentedTrain(name=f"synth-aug-{generator_name}", root_dir=generated_dir,
+                               img_ids=training_set.img_ids,
+                               tensors=(training_set.tensors[0], training_set.tensors[1]),
+                               primary_label_tensor=training_set.primary_label_tensor,
+                               synthetic_images=synthetic_tensors,
+                               synthetic_labels=synthetic_labels,
+                               synthetic_ids=synthetic_ids,
+                               synth_p=synth_p,
+                               multi_label=False)  # Could be True depending....
 
 
 @step
-def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: float) -> SynthAugTrainSet:
+def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: float) -> SynthAugmentedTrain:
     """
     A synthetic augmentation type based on label distribution.
     """
@@ -122,18 +119,18 @@ def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: f
     synthetic_imgs_tensor = synthetic_imgs_tensor.cpu()
     synthetic_labels_tensor = synthetic_labels_tensor.cpu()
 
-    return SynthAugTrainSet(name=f"synth-aug-{generator_name}", root_dir=training_set.root_dir,
-                            img_ids=training_set.img_ids,
-                            tensors=(training_set.tensors[0], training_set.tensors[1]),
-                            primary_label_tensor=training_set.primary_label_tensor,
-                            synthetic_images=synthetic_imgs_tensor,
-                            synthetic_labels=synthetic_labels_tensor,
-                            synthetic_ids=synthetic_ids,
-                            synth_p=synth_p)
+    return SynthAugmentedTrain(name=f"synth-aug-{generator_name}", root_dir=training_set.root_dir,
+                               img_ids=training_set.img_ids,
+                               tensors=(training_set.tensors[0], training_set.tensors[1]),
+                               primary_label_tensor=training_set.primary_label_tensor,
+                               synthetic_images=synthetic_imgs_tensor,
+                               synthetic_labels=synthetic_labels_tensor,
+                               synthetic_ids=synthetic_ids,
+                               synth_p=synth_p)
 
 
 @step
-def look_at_augmented_train_set(augmented: SynthAugTrainSet):
+def look_at_augmented_train_set(augmented: SynthAugmentedTrain):
     for i in range(50):
         _img = augmented[i]
 

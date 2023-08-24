@@ -7,15 +7,16 @@ import seaborn as sns
 
 from sample_augment.core import Artifact, step
 from sample_augment.data.gc10.read_labels import GC10Labels
+from sample_augment.data.synth_data import SynthData, SynthAugmentedTrain
 from sample_augment.data.train_test_split import TrainSet, ValSet
 from sample_augment.models.evaluate_classifier import evaluate_classifier, ClassificationReport, predict_validation_set, \
     ValidationPredictions
 from sample_augment.models.generator import GC10_CLASSES
-from sample_augment.sampling.project_images import from_projected_images
 from sample_augment.models.train_classifier import ModelType
 from sample_augment.models.train_classifier import train_augmented_classifier, TrainedClassifier, train_classifier
+from sample_augment.sampling.classifier_guidance import classifier_guided
+from sample_augment.sampling.project_images import from_projected_images
 from sample_augment.sampling.random_synth import random_synthetic_augmentation
-from sample_augment.data.synth_data import SynthData, SynthAugTrainSet
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir
 from sample_augment.utils.plot import prepare_latex_plot
@@ -25,14 +26,14 @@ from sample_augment.utils.plot import prepare_latex_plot
 def synth_data_to_training_set(training_set: TrainSet, synth_data: SynthData, generator_name: str, synth_p: float):
     generated_dir = shared_dir / "generated" / generator_name
 
-    return SynthAugTrainSet(name=f"synth-aug-{generator_name}", root_dir=generated_dir,
-                            img_ids=training_set.img_ids,
-                            tensors=(training_set.tensors[0], training_set.tensors[1]),
-                            primary_label_tensor=training_set.primary_label_tensor,
-                            synthetic_images=synth_data.synthetic_images,
-                            synthetic_labels=synth_data.synthetic_labels,
-                            synth_p=synth_p,
-                            multi_label=synth_data.multi_label)
+    return SynthAugmentedTrain(name=f"synth-aug-{generator_name}", root_dir=generated_dir,
+                               img_ids=training_set.img_ids,
+                               tensors=(training_set.tensors[0], training_set.tensors[1]),
+                               primary_label_tensor=training_set.primary_label_tensor,
+                               synthetic_images=synth_data.synthetic_images,
+                               synthetic_labels=synth_data.synthetic_labels,
+                               synth_p=synth_p,
+                               multi_label=synth_data.multi_label)
 
 
 def hand_picked_dataset(training_set: TrainSet, generator_name: str):
@@ -53,6 +54,13 @@ ALL_STRATEGIES = {
     "random": random_synthetic_augmentation,
     "hand-picked": hand_picked_dataset,
     "projection": from_projected_images,
+    "classifier-guided": classifier_guided
+}
+
+strategy_specific_args = {
+    "classifier-guided": {  # TODO pick a specific good one, this is just a random trained classifier
+        "classifier": TrainedClassifier.from_name("ViT-100e_ce6b40")
+    }
 }
 
 
@@ -61,14 +69,16 @@ def create_synthetic_bundle(strategies: List[str], training_set: TrainSet,
                             generator_name: str) -> SyntheticBundle:
     synthetic_datasets = []
     for strategy in strategies:
+        log.info(f'Creating SyntheticData with strategy {strategy}')
+
         if strategy not in ALL_STRATEGIES:
             log.error(f'unknown strategy {strategy} provided.')
             sys.exit(-1)
 
         strategy_func = ALL_STRATEGIES[strategy]
-        synth_set = strategy_func(training_set, generator_name)
+        specific_args = strategy_specific_args[strategy] if strategy in strategy_specific_args else {}
+        synth_set = strategy_func(training_set, generator_name, **specific_args)
         synth_set.configs['strategy'] = strategy
-        log.info(f'Created set for {strategy}')
         synthetic_datasets.append(synth_set)
 
     return SyntheticBundle(synthetic_datasets=synthetic_datasets)
@@ -94,6 +104,7 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
                                      color_jitter: float,
                                      h_flip_p: float,
                                      v_flip_p: float,
+                                     lr_schedule: bool
                                      ) -> StrategyComparisonClassifiers:
     trained_classifiers: List[TrainedClassifier] = []
     assert len(bundle.synthetic_datasets) == len(
@@ -114,7 +125,7 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
                                                         color_jitter,
                                                         h_flip_p,
                                                         v_flip_p,
-                                                        synth_p=synth_p
+                                                        lr_schedule=lr_schedule
                                                         )
         trained_classifier.configs['strategy'] = strategies[i]
         trained_classifiers.append(trained_classifier)
@@ -123,7 +134,8 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
     baseline = train_classifier(train_data=train_set, val_data=val_set, model_type=model_type, num_epochs=num_epochs,
                                 batch_size=batch_size, learning_rate=learning_rate, balance_classes=balance_classes,
                                 random_seed=random_seed, data_augment=data_augment, geometric_augment=geometric_augment,
-                                color_jitter=color_jitter, h_flip_p=h_flip_p, v_flip_p=v_flip_p)
+                                color_jitter=color_jitter, h_flip_p=h_flip_p, v_flip_p=v_flip_p,
+                                lr_schedule=lr_schedule)
     return StrategyComparisonClassifiers(baseline=baseline, classifiers=trained_classifiers)
 
 
@@ -165,7 +177,7 @@ def create_strategy_f1_plot(synth_report: SynthComparisonReport, strategies: Lis
     def idx_to_name(_idx):
         return strategies[_idx - 1] if _idx > 0 else "Baseline"
 
-    reports = [
+    reports = [  # just poor-naming-conventions shenanigans happening here
         synth_report.baseline_report.report,
         *[synth.report for synth in synth_report.synth_reports]
     ]
