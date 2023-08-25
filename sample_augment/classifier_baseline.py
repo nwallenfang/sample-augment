@@ -97,30 +97,45 @@ def running_on_colab():
         return False
 
 
-def run_classifier_baseline_experiment():
-    # could delete the contents of architecture-runs before running
+def run_classifier_experiment(experiment_name, limit=None):
     experiments_dir = root_dir.parent / 'experiments'
-    # would be cool to have this in a separate root_dir but don't know if that's feasible hmm might be actually
-    # ask chatgpt if it's writable
     if not running_on_colab():
         find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
-    classifier_baseline_configs = experiments_dir / 'architecture-configs'
 
-    for config_filename in os.listdir(classifier_baseline_configs):
-        print("root: ", root_dir)
-        log.info(f"- running experiment {config_filename} -")
-        config_path = classifier_baseline_configs / config_filename
+    # Determine the paths based on the experiment name
+    config_path_name = f"{experiment_name}-configs"
+    run_path_name = f"{experiment_name}-runs"
+    classifier_configs = experiments_dir / config_path_name
+
+    count = 0
+    for config_filename in os.listdir(classifier_configs):
+        if limit and count >= limit:
+            log.info(f"limit of {limit} runs reached.")
+            break
+
+        config_path = classifier_configs / config_filename
         config = read_config(config_path)
-        store_save_path = experiments_dir / 'architecture-runs' / f"{config.filename}.json"
+        store_save_path = experiments_dir / run_path_name / f"{config.filename}.json"
 
+        if store_save_path.exists():
+            log.info(f"- skipping experiment {config_filename} -")
+            continue
+        else:
+            log.info(f"- running experiment {config_filename} -")
         # create Experiment instance
         experiment = Experiment(config)
         experiment.run("evaluate_k_classifiers", store_save_path=store_save_path)
         del experiment
 
+        count += 1
+
+def main():
+    run_classifier_experiment("baseline", limit=1)
+    # run_classifier_experiment("architecture")
+
 
 if __name__ == '__main__':
-    run_classifier_baseline_experiment()
+    pass
     # compare_f1_scores()
     # kfold_trained_path = Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data"
     #                           r"\KFoldTrainedClassifiers\aug-01_ecc814.json")

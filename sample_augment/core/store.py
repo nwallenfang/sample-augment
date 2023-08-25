@@ -166,6 +166,9 @@ class Store:
                                 #  for some artifacts. (unsolved problem!)
                     # artifact is fine and can be loaded
                     module_name, class_name = artifact_name.rsplit('.', 1)
+                    # HOTFIX FIXME prefix this with sample_augment if it doesn't contain it
+                    if not module_name.startswith('sample_augment.'):
+                        module_name = "sample_augment." + module_name
                     ArtifactSubclass = getattr(import_module(module_name), class_name)
                     artifact_dict = json.load(open(path_utils.root_dir / artifact_info['path'], 'r'))
                     artifacts[class_name] = ArtifactSubclass.from_dict(artifact_dict)

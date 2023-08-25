@@ -7,17 +7,17 @@ from pprint import pprint
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import torch.cuda
 import torchvision
-from sklearn.metrics import ConfusionMatrixDisplay, classification_report, roc_curve, f1_score
+import torchvision.transforms as transforms
+from sklearn.metrics import ConfusionMatrixDisplay, classification_report, roc_curve
 from sklearn.preprocessing import label_binarize
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
-import torchvision.transforms as transforms
 from tqdm import tqdm
 
 from sample_augment import utils
@@ -26,8 +26,8 @@ from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.gc10.read_labels import GC10Labels
 from sample_augment.data.train_test_split import stratified_split, stratified_k_fold_split, ValSet, \
     FoldDatasets
-from sample_augment.models.train_classifier import TrainedClassifier, KFoldTrainedClassifiers, plain_transforms
 from sample_augment.models.classifier import VisionTransformer
+from sample_augment.models.train_classifier import TrainedClassifier, KFoldTrainedClassifiers, plain_transforms
 from sample_augment.utils import log, plot
 from sample_augment.utils.path_utils import shared_dir
 from sample_augment.utils.plot import prepare_latex_plot
@@ -178,47 +178,17 @@ def show_prediction(image, prediction, class_names, true_labels, name: str, img_
     plt.savefig(shared_dir / "figures" / "predictions" / f"{name}_{img_id}.pdf", bbox_inches="tight")
 
 
-def determine_threshold_vector(predictions: ValidationPredictions, val: ValSet, threshold_regularize: bool,
-                               threshold_lambda: float) -> Tensor:
-    """
-    Finds the optimal threshold for each class with respect to the F1 score on the validation set.
-    Predictions should be in the range 0..1, so have sigmoid already applied.
-    Returns:
-      np.ndarray containing the optimal threshold for each class.
-    """
-    all_predictions = predictions.predictions.cpu().numpy()
-    all_labels = val.label_tensor.cpu().numpy()
-
-    num_classes = all_labels.shape[1]
-    thresholds = []
-
-    # For each class, find the threshold that maximizes the F1 score
-    for class_idx in range(num_classes):
-        best_threshold = 0.5  # Default threshold
-        best_score = 0
-        for threshold in np.linspace(0, 1, 250):  # Test 100 thresholds in the range [0, 1]
-            f1 = f1_score(all_labels[:, class_idx], all_predictions[:, class_idx] > threshold)
-            reg_penalty = threshold_lambda * abs(threshold - 0.5) if threshold_regularize else 0.0
-            score = f1 - reg_penalty
-            if score > best_score:
-                best_score = score
-                best_threshold = threshold
-        thresholds.append(best_threshold)
-
-    return torch.FloatTensor(thresholds)
-
-
 @step
 def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSet,
-                        gc10_labels: GC10Labels, threshold_regularize: bool,
-                        threshold_lambda: float) -> ClassificationReport:
+                        gc10_labels: GC10Labels, threshold_lambda: float) -> ClassificationReport:
+    from sample_augment.models.train_classifier import determine_threshold_vector
     # quickfix since the artifacts are not properly guarded from being mutated yet (TODO)
     # I removed the preprocessing of val_set since it's only used for the label info here, the data doesn't get accessed
     predictions = val_pred_artifact.predictions
     assert len(predictions) == len(val_set)
     imgs, labels = val_set.tensors[0], val_set.tensors[1]
 
-    threshold_vector = determine_threshold_vector(val_pred_artifact, val_set, threshold_regularize, threshold_lambda)
+    threshold_vector = determine_threshold_vector(predictions, val_set, threshold_lambda)
     log.info(f'Threshold vector: {threshold_vector}')
 
     # for i in range(10):

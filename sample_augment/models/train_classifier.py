@@ -9,7 +9,7 @@ from typing import List
 import numpy as np
 import torch
 from sklearn.metrics import f1_score
-from torch import nn  # All neural network modules
+from torch import nn, Tensor  # All neural network modules
 from torch import optim  # For optimizers like SGD, Adam, etc.
 from torch.utils.data import DataLoader, WeightedRandomSampler  # Gives easier dataset management
 from torch.utils.data import Dataset
@@ -18,10 +18,11 @@ from tqdm import tqdm  # For nice progress bar!
 
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
+from sample_augment.data.synth_data import SynthAugmentedTrain
 from sample_augment.data.train_test_split import ValSet, TrainSet, stratified_split, stratified_k_fold_split
 from sample_augment.models.classifier import VisionTransformer, ResNet50, DenseNet201, \
     EfficientNetV2  # or CustomDensenet, etc.
-from sample_augment.data.synth_data import SynthAugmentedTrain
+# from sample_augment.models.evaluate_classifier import ValidationPredictions
 from sample_augment.utils import log
 
 _mean = torch.tensor([0.485, 0.456, 0.406])
@@ -78,8 +79,8 @@ def _set_random_seed(random_seed: int):
 
 def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
                 learning_rate: float, random_seed: int,
-                balance_classes: bool,
-                lr_schedule: bool) -> ClassifierMetrics:
+                balance_classes: bool, lr_schedule: bool,
+                threshold_lambda: float) -> ClassifierMetrics:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # make the experiment as reproducible as possible by setting a random seed
     _set_random_seed(random_seed)
@@ -111,10 +112,12 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
     for epoch in range(num_epochs):
         model.train()
         train_losses = 0
-        val_losses = 0
+        # val_losses = 0
+        val_logits = []
+        val_labels = []
         train_accuracies = 0
-        val_accuracies = 0
-        val_f1s = 0
+        # val_accuracies = 0
+        # val_f1s = 0
 
         for batch_idx, (image, label) in enumerate(tqdm(train_loader, file=sys.stdout, desc="Training")):
             # move data to GPU if possible
@@ -143,7 +146,10 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         train_loss_per_epoch.append(avg_train_loss)
         train_acc_per_epoch.append(train_accuracies / len(train_loader))
 
+        # Validation Set evaluation at the end of this epoch:
+
         model.eval()
+
         for batch_idx, (image, label) in enumerate(val_loader):
             # move data to GPU if possible
             image = image.to(device=device)
@@ -151,37 +157,54 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
 
             with torch.no_grad():
                 logits = model(image)
-                predictions = torch.sigmoid(logits)
 
-            val_loss = criterion(logits, label)
-
+            val_logits.append(logits)
+            val_labels.append(label)
             # calculate validation metrics
-            val_losses += val_loss.item()
-            val_accuracies += ((predictions > threshold) == label).float().mean().item()
-            # if the model doesn't predict any class (zero_division), give it a score of 0
-            val_f1s += f1_score(label.cpu().numpy(),
-                                (predictions > threshold).cpu().numpy(), average='macro',
-                                zero_division=0)
+            # val_losses += val_loss.item()
+            # val_accuracies += ((predictions > threshold) == label).float().mean().item()
+            # # if the model doesn't predict any class (zero_division), give it a score of 0
+            # val_f1s += f1_score(label.cpu().numpy(),
+            #                     (predictions > threshold).cpu().numpy(), average='macro',
+            #                     zero_division=0)
+        val_logits = torch.cat(val_logits, dim=0).cpu()
+        val_labels = torch.cat(val_labels, dim=0).cpu()
+        val_predictions = torch.sigmoid(val_logits)
+        val_loss = criterion(val_logits, val_labels)
+        assert isinstance(val_set, ValSet), "val_set should be ValSet for threshold"
+        time_pre = time.time()
+        # print(f"Predictions device: {val_predictions.device}")
+        # print(f"ValSet label_tensor device: {val_set.label_tensor.device}")
+        thresholds = determine_threshold_vector(val_predictions, val_set, threshold_lambda, n_support=100)
+        time_post = time.time()
+        log.debug(f"Threshold time: {time_post - time_pre}")
 
-        avg_val_loss = val_losses / len(val_loader)
-        val_loss_per_epoch.append(avg_val_loss)
-        avg_accuracy = val_accuracies / len(val_loader)
-        val_acc_per_epoch.append(avg_accuracy)
-        avg_f1 = val_f1s / len(val_loader)
-        val_f1_per_epoch.append(avg_f1)
+        binary_predictions = (val_predictions > thresholds).cpu()
+        val_accuracy = (binary_predictions == val_labels.cpu()).float().mean().item()
 
-        if avg_f1 > best_f1_score:
+        # Calculate F1 score, using the same thresholds
+        val_f1 = f1_score(val_labels.cpu().numpy(),
+                          binary_predictions.numpy(),
+                          average='macro',
+                          zero_division=0)
+
+        val_loss_per_epoch.append(val_loss)
+        val_acc_per_epoch.append(val_accuracy)
+        val_f1_per_epoch.append(val_f1)
+
+        # model checkpointing, take the best model so far
+        if val_f1 > best_f1_score:
             best_epoch = epoch
-            best_val_loss = avg_val_loss
-            best_f1_score = avg_f1
+            best_val_loss = val_loss
+            best_f1_score = val_f1
             best_model_state = model.state_dict()  # Store the state dict of the best model so far
 
         log.info(
             f'Epoch [{epoch + 1}/{num_epochs}], '
             f'Train Loss: {avg_train_loss:.2f}, '
-            f'Val Loss: {avg_val_loss:.2f}, '
-            f'Val Acc: {avg_accuracy:.2f}, '
-            f'Val F1: {avg_f1:.3f}')
+            f'Val Loss: {val_loss:.2f}, '
+            f'Val Acc: {val_accuracy:.2f}, '
+            f'Val F1: {val_f1:.3f}')
 
     log.info(f"Classifier training: Best model from epoch {best_epoch + 1} with val_loss = {best_val_loss:.3f} "
              f"and f1_score = {best_f1_score:.3f}")
@@ -253,7 +276,8 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
                      color_jitter: float,
                      h_flip_p: float,
                      v_flip_p: float,
-                     lr_schedule: bool) -> TrainedClassifier:
+                     lr_schedule: bool,
+                     threshold_lambda: float) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
@@ -325,7 +349,7 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
     metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
                           batch_size=batch_size, learning_rate=learning_rate,
                           balance_classes=balance_classes, random_seed=random_seed,
-                          lr_schedule=lr_schedule)
+                          lr_schedule=lr_schedule, threshold_lambda=threshold_lambda)
 
     del train_data
     del val_data
@@ -354,7 +378,6 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                             color_jitter: float,
                             h_flip_p: float,
                             v_flip_p: float,
-                            synth_p: float
                             ) -> KFoldTrainedClassifiers:
     fold_random_seed = random_seed
     train_val, test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
@@ -404,3 +427,37 @@ def train_augmented_classifier(train_data: SynthAugmentedTrain, val_data: ValSet
     return SynthTrainedClassifier(
         train_classifier(train_data, val_data, model_type, num_epochs, batch_size, learning_rate, balance_classes,
                          random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, lr_schedule))
+
+
+def determine_threshold_vector(predictions: Tensor, val: ValSet, threshold_lambda: float,
+                               n_support: int = 250) -> Tensor:
+    """
+    Finds the optimal threshold for each class with respect to the F1 score on the validation set.
+    Predictions should be in the range 0..1, so have sigmoid already applied.
+    Returns:
+      np.ndarray containing the optimal threshold for each class.
+    """
+
+    predictions = predictions.cpu().numpy()
+    labels = val.label_tensor.cpu().numpy()
+
+    num_classes = labels.shape[1]
+    thresholds_for_class = np.linspace(0, 1, n_support)
+
+    best_thresholds = []
+
+    for class_idx in range(num_classes):
+        # Using broadcasting, we create an array where each row represents the comparison with a different threshold
+        binary_predictions = predictions[:, class_idx].reshape(-1, 1) > thresholds_for_class
+
+        f1_scores = np.array([f1_score(labels[:, class_idx], binary_predictions[:, i])
+                              for i in range(n_support)])
+
+        # Apply regularization penalty
+        f1_scores = f1_scores - threshold_lambda * np.abs(thresholds_for_class - 0.5)
+
+        # Find the threshold that maximizes the score
+        best_threshold = thresholds_for_class[np.argmax(f1_scores)]
+        best_thresholds.append(best_threshold)
+
+    return torch.FloatTensor(best_thresholds)
