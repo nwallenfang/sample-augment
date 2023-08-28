@@ -100,7 +100,8 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
                                      color_jitter: float,
                                      h_flip_p: float,
                                      v_flip_p: float,
-                                     lr_schedule: bool
+                                     lr_schedule: bool,
+                                     threshold_lambda: float
                                      ) -> StrategyComparisonClassifiers:
     trained_classifiers: List[TrainedClassifier] = []
     assert len(bundle.synthetic_datasets) == len(
@@ -121,7 +122,8 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
                                                         color_jitter,
                                                         h_flip_p,
                                                         v_flip_p,
-                                                        lr_schedule=lr_schedule
+                                                        lr_schedule=lr_schedule,
+                                                        threshold_lambda=threshold_lambda
                                                         )
         trained_classifier.configs['strategy'] = strategies[i]
         trained_classifiers.append(trained_classifier)

@@ -1,23 +1,26 @@
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
-from matplotlib import pyplot as plt
 import torch
+import matplotlib
+from matplotlib import pyplot as plt
 from sklearn.metrics import roc_auc_score
 
-from sample_augment.core import step, Experiment, Store, Config
+from sample_augment.core import step, Experiment, Store
 from sample_augment.core.config import read_config
 from sample_augment.core.step import find_steps
+from sample_augment.data.dataset import AugmentDataset
+from sample_augment.data.train_test_split import create_train_test_val
 from sample_augment.models.evaluate_classifier import KFoldClassificationReport
+from sample_augment.models.evaluate_classifier import predict_validation_set
 from sample_augment.models.train_classifier import ClassifierMetrics, TrainedClassifier, KFoldTrainedClassifiers
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import root_dir
 from sample_augment.utils.plot import prepare_latex_plot
-from sample_augment.data.train_test_split import create_train_test_val
-from sample_augment.models.evaluate_classifier import predict_validation_set
 
 
 def read_f1_losses(kfold_json: Dict) -> np.ndarray:
@@ -31,8 +34,6 @@ def read_f1_losses(kfold_json: Dict) -> np.ndarray:
 
 @step
 def compare_f1_scores(shared_directory: Path):
-    import matplotlib.pyplot as plt
-    import matplotlib
 
     # Load JSONs
     kfold_augmented_json = json.load(
@@ -103,9 +104,16 @@ def running_on_colab():
         return False
 
 
+experiment_to_step = {
+    'baseline': 'evaluate_k_classifiers',
+    'architecture': 'evaluate_k_classifiers',
+    'sampling': 'evaluate_synth_trained_classifiers'
+}
+
+
 def run_classifier_experiment(experiment_name, limit=None):
     experiments_dir = root_dir.parent / 'experiments'
-    if not running_on_colab():
+    if not running_on_colab():  # find_steps is called in init on colab
         find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
 
     # Determine the paths based on the experiment name
@@ -130,36 +138,40 @@ def run_classifier_experiment(experiment_name, limit=None):
             log.info(f"- running experiment {config_filename} -")
         # create Experiment instance
         experiment = Experiment(config)
-        experiment.run("evaluate_k_classifiers", store_save_path=store_save_path)
+        experiment.run(experiment_to_step[experiment_name], store_save_path=store_save_path)
         del experiment
 
         count += 1
 
 
-def evaluate_classifier_experiment(experiment_name: str, k_fold=True):
+def evaluate_classifier_experiment(experiment_name: str):
     experiment_run_dir = root_dir.parent / "experiments" / f"{experiment_name}-runs"
     assert experiment_run_dir.exists(), f"{experiment_run_dir} does not exist."
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    
+
     # collect experiment artifacts, care this takes tons of RAM like this preloading everything
-    runs: Dict[str, (KFoldTrainedClassifiers, KFoldClassificationReport)] = {}  # run name to run json
+    reports: Dict[str, KFoldClassificationReport] = {}  # run name to run json
     for run_filename in os.listdir(experiment_run_dir):
         name = run_filename.split("_")[0]
         artifacts = Store.load_from(experiment_run_dir / run_filename).artifacts
-        runs[name] = artifacts['KFoldTrainedClassifiers'], artifacts['KFoldClassificationReport']
+        reports[name] = artifacts['KFoldClassificationReport']
 
     all_macro_f1 = []
     all_auc = []
-    
+
     baseline_config = read_config(root_dir.parent / "experiments" / f"{experiment_name}-configs" / "b00-baseline.json")
-    
+
     augment_dataset: AugmentDataset = AugmentDataset.from_name('dataset_f00581')
     bundle = create_train_test_val(augment_dataset, baseline_config['random_seed'], baseline_config['test_ratio'],
                                    baseline_config['val_ratio'], baseline_config['min_instances'])
     val_set = bundle.val
+    # TODO include this plot: class_performance_boxplot()
+    # TODO make the evaluation procedure so TrainedClassifiers only get loaded if absolutely necessary
+    # TODO make strip plot over the folds and their macro F1 as well maybe
+    # TODO make loss plot for high learning rate vs low learning rate
 
-    for run_name, run_data in runs.items():
+    for run_name, run_data in reports.items():
         # noinspection PyUnresolvedReferences
         trained_class: List[TrainedClassifier] = run_data[0].classifiers
         val_losses = [clf.metrics.validation_loss for clf in trained_class]
@@ -167,18 +179,15 @@ def evaluate_classifier_experiment(experiment_name: str, k_fold=True):
 
         macro_f1_scores = []
         auc_scores = []
-        if not torch.cuda_is_available():
-             log.info('no cuda - no auc metric')
+        if not torch.cuda.is_available():
+            log.info('no cuda - no auc metric')
         for classifier, class_report in zip(run_data[0].classifiers, run_data[1].reports):
             report = class_report.report
             macro_f1_scores.append(report['macro avg']['f1-score'])
 
-            y_true = report['true_labels']  # Replace with your actual labels
             predictions = predict_validation_set(classifier, val_set, batch_size=32).predictions
             auc = roc_auc_score(val_set.label_tensor.numpy(), predictions, average='macro', multi_class='ovr')
             auc_scores.append(auc)
-
-               
 
         avg_macro_f1 = np.mean(macro_f1_scores)
         avg_auc = np.mean(auc_scores)
@@ -194,8 +203,16 @@ def evaluate_classifier_experiment(experiment_name: str, k_fold=True):
 
 
 def main():
-    # run_classifier_experiment("baseline", limit=1)
-    evaluate_classifier_experiment("baseline")
+    if len(sys.argv) > 1:
+        assert len(sys.argv) == 3, 'run/eval {name}'
+        if sys.argv[1] == 'run':
+            run_classifier_experiment(sys.argv[2])
+        elif sys.argv[1] == 'eval':
+            evaluate_classifier_experiment(sys.argv[2])
+        else:
+            assert False, 'run/eval {name}'
+    run_classifier_experiment("baseline", limit=1)
+    # evaluate_classifier_experiment("baseline")
     # run_classifier_experiment("architecture")
 
 

@@ -62,7 +62,14 @@ class Experiment:
 
         # extract required entries from config
         try:
-            input_configs = {key: getattr(self.config, key) for key in step.config_args.keys()}
+            input_configs = {}
+            for key, (arg_type, is_required) in step.config_args.items():
+                if hasattr(self.config, key) or is_required:
+                    input_configs[key] = getattr(self.config, key)
+                    # could do type validation here potentially
+                elif not is_required:
+                    # It's not required and it's not in the config, so just continue
+                    continue
         except (KeyError, AttributeError) as err:
             log.error(str(err))
             log.error(f"Entry missing in config.")

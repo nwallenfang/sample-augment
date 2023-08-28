@@ -92,7 +92,11 @@ class Store:
                 "configs": artifact.configs
             }
 
-        log.info(f"Store saved: {store_save_path}")
+        if data == {}:
+            log.info("Skipped saving empty store.")
+            return
+        else:
+            log.info(f"Store saved: {store_save_path}")
         with open(path_utils.root_dir / store_save_path, 'w') as f:
             try:
                 json.dump(data, f, indent=4)

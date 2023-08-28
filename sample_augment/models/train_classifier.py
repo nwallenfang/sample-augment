@@ -81,7 +81,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
                 learning_rate: float, random_seed: int,
                 balance_classes: bool, lr_schedule: bool,
                 threshold_lambda: float,
-                lr_step_size: int = 10, lr_gamma: float = 0.7) -> ClassifierMetrics:
+                lr_step_size: int, lr_gamma: float) -> ClassifierMetrics:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # make the experiment as reproducible as possible by setting a random seed
     _set_random_seed(random_seed)
@@ -98,6 +98,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
     if lr_schedule:
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size,
                                                     gamma=lr_gamma)
+        log.info(f"Doing StepLR scheduling with step_size={lr_step_size} and gamma={lr_gamma}.")
 
     train_loss_per_epoch = []
     val_loss_per_epoch = []
@@ -151,7 +152,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         if lr_schedule:
             # noinspection PyUnboundLocalVariable
             scheduler.step()
-            log.info(f"Current learning rate: {optimizer.param_groups[0]['lr']}")
+            log.info(f"Current learning rate: {optimizer.param_groups[0]['lr']:.6f}")
         # Validation Set evaluation at the end of this epoch:
 
         model.eval()
@@ -283,7 +284,8 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
                      h_flip_p: float,
                      v_flip_p: float,
                      lr_schedule: bool,
-                     threshold_lambda: float) -> TrainedClassifier:
+                     threshold_lambda: float,
+                     lr_step_size: int = 10, lr_gamma: float = 0.7) -> TrainedClassifier:
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
@@ -342,7 +344,7 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
         val_data.transform = transforms.Compose(plain_transforms)
 
     if isinstance(model, VisionTransformer):
-        log.info("Using a VisionTransformer, resizing inputs to 224x224.")
+        log.info(f"Using a VisionTransformer, resizing inputs to 224x224. (device={device})")
         train_data.transform = transforms.Compose([
             transforms.Resize((224, 224), **optional_aa_arg),
             train_data.transform
@@ -355,7 +357,8 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
     metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
                           batch_size=batch_size, learning_rate=learning_rate,
                           balance_classes=balance_classes, random_seed=random_seed,
-                          lr_schedule=lr_schedule, threshold_lambda=threshold_lambda)
+                          lr_schedule=lr_schedule, threshold_lambda=threshold_lambda,
+                          lr_step_size=lr_step_size, lr_gamma=lr_gamma)
 
     del train_data
     del val_data
@@ -385,7 +388,8 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                             h_flip_p: float,
                             v_flip_p: float,
                             lr_schedule: bool,
-                            threshold_lambda: float
+                            threshold_lambda: float,
+                            lr_step_size: int = 10, lr_gamma: float = 0.7
                             ) -> KFoldTrainedClassifiers:
     fold_random_seed = random_seed
     train_val, test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
@@ -403,7 +407,8 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                                                          num_epochs, batch_size, learning_rate, balance_classes,
                                                          fold_random_seed, data_augment, geometric_augment,
                                                          color_jitter, h_flip_p, v_flip_p, lr_schedule=lr_schedule,
-                                                         threshold_lambda=threshold_lambda)
+                                                         threshold_lambda=threshold_lambda, lr_step_size=lr_step_size,
+                                                         lr_gamma=lr_gamma)
         classifiers.append(classifier)
         elapsed_time = time.time() - start_time  # Calculate elapsed time
         minutes, seconds = divmod(elapsed_time, 60)  # Split elapsed time into minutes and seconds
@@ -430,12 +435,14 @@ def train_augmented_classifier(train_data: SynthAugmentedTrain, val_data: ValSet
                                color_jitter: float,
                                h_flip_p: float,
                                v_flip_p: float,
-                               lr_schedule: bool) -> SynthTrainedClassifier:
+                               lr_schedule: bool,
+                               threshold_lambda: float) -> SynthTrainedClassifier:
     # synth_training_set, val_set, num_epochs, batch_size, learning_rate, balance_classes,
     # random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, synth_p=synth_p
     return SynthTrainedClassifier(
         train_classifier(train_data, val_data, model_type, num_epochs, batch_size, learning_rate, balance_classes,
-                         random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, lr_schedule))
+                         random_seed, data_augment, geometric_augment, color_jitter, h_flip_p, v_flip_p, lr_schedule,
+                         threshold_lambda=threshold_lambda))
 
 
 def determine_threshold_vector(predictions: Tensor, val: ValSet, threshold_lambda: float,

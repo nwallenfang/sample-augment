@@ -6,7 +6,7 @@ import inspect
 import pkgutil
 import pprint
 import sys
-from typing import Type, Dict, Any, Callable, List, Optional
+from typing import Type, Dict, Any, Callable, List, Optional, Tuple
 
 from pydantic import BaseModel
 
@@ -25,8 +25,10 @@ class Step(Callable, BaseModel):
     func: Callable
 
     """dict (arg_name -> arg_type) of config entries this Step takes as arguments.
-       Note that every argument is either an Artifact or a config entry."""
-    config_args: Dict[str, Any]
+       Note that every argument is either an Artifact or a config entry.
+       The bool being True signifies the given config being required. If it is false, a default
+       value is provided in this Step's signature."""
+    config_args: Dict[str, Tuple[Any, bool]]
     """dict (arg_name -> artifact_type) of Artifact types this Step expects as input arguments (consumes)"""
     consumes: Dict[str, Type[Artifact]]
     """Artefact type this step produces (optional)"""
@@ -101,6 +103,12 @@ class StepRegistry:
 
             input_artifacts = []
             input_configs = {}
+
+            # populate with default args first, potentially overwrite in later loops
+            for name, param in parameters.items():
+                if param.default != inspect.Parameter.empty:
+                    input_configs[name] = param.default
+
             # go through args
             for name, param in zip(parameters.keys(), args):
 
@@ -137,16 +145,17 @@ class StepRegistry:
             return self.all_steps[name]
 
         sig = inspect.signature(func)
-
         config_kwargs = {}
         consumed_artifacts = {}
+
         for param_name, param in sig.parameters.items():
+            is_required = param.default == inspect.Parameter.empty
+
             try:
                 if isinstance(param.annotation, type) and issubclass(param.annotation, Artifact):
                     consumed_artifacts[param_name] = param.annotation
                 else:
-                    # assert somehow that this is a config
-                    config_kwargs[param_name] = param.annotation
+                    config_kwargs[param_name] = (param.annotation, is_required)
             except TypeError as _e:
                 log.error(f"weird annotation '{param}': '{param.annotation}'")
 

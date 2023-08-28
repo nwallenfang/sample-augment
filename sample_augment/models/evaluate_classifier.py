@@ -1,6 +1,5 @@
 import inspect
 import sys
-from abc import abstractmethod, ABC
 from copy import deepcopy, copy
 from pathlib import Path
 from pprint import pprint
@@ -13,7 +12,7 @@ import seaborn as sns
 import torch.cuda
 import torchvision
 import torchvision.transforms as transforms
-from sklearn.metrics import ConfusionMatrixDisplay, classification_report, roc_curve
+from sklearn.metrics import classification_report, roc_curve
 from sklearn.preprocessing import label_binarize
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
@@ -27,7 +26,8 @@ from sample_augment.data.gc10.read_labels import GC10Labels
 from sample_augment.data.train_test_split import stratified_split, stratified_k_fold_split, ValSet, \
     FoldDatasets
 from sample_augment.models.classifier import VisionTransformer
-from sample_augment.models.train_classifier import TrainedClassifier, KFoldTrainedClassifiers, plain_transforms
+from sample_augment.models.train_classifier import TrainedClassifier, KFoldTrainedClassifiers, plain_transforms, \
+    ClassifierMetrics
 from sample_augment.utils import log, plot
 from sample_augment.utils.path_utils import shared_dir
 from sample_augment.utils.plot import prepare_latex_plot
@@ -391,21 +391,21 @@ def apply_secondary_labels(labels, predictions, sec_labels, test_data):
 
 
 @step
-def plot_loss_over_epochs(classifier: TrainedClassifier, shared_directory: Path):
+def plot_loss_over_epochs(metrics: ClassifierMetrics):
     # log.info(f"Training:   {classifier.metrics.train_loss}")
     # log.info(f"Validation: {classifier.metrics.validation_loss}")
     prepare_latex_plot()
     plt.figure(figsize=(8, 5))
 
-    plt.plot(classifier.metrics.train_loss, label='Training Loss', color='blue')
-    plt.plot(classifier.metrics.validation_loss, label='Validation Loss', color='red')
+    plt.plot(metrics.train_loss, label='Training Loss', color='blue')
+    plt.plot(metrics.validation_loss, label='Validation Loss', color='red')
 
     plt.title('Cross-Entropy Loss per Epoch')
     plt.xlabel('Epoch')
     plt.ylabel('Cross-Entropy Loss')
     plt.legend()
 
-    plt.savefig(shared_directory / "figures" / f"{classifier.configs['name']}_losses.pdf")
+    plt.savefig(shared_dir / "figures" / f"{metrics.configs['name']}_losses.pdf")
 
 
 if __name__ == '__main__':
@@ -434,23 +434,22 @@ def plot_roc_curves(fpr: Dict[int, np.ndarray],
     plt.show()
 
 
-def calculate_optimal_thresholds(true_labels: np.ndarray,
-                                 probabilities: np.ndarray) -> Dict[int, float]:
-    # TODO wire this one up with evaluate_classifier()
-    """Calculate optimal threshold for each class using Youden's J statistic."""
-    # Ensure the true labels are binary
-    if len(true_labels.shape) > 1 and true_labels.shape[1] > 1:
-        binary_labels = true_labels
-    else:
-        binary_labels = label_binarize(true_labels, classes=np.unique(true_labels))
-
-    opt_threshold_dict = dict()
-
-    # Compute optimal threshold for each class
-    for i in range(binary_labels.shape[1]):
-        fpr, tpr, thresholds = roc_curve(binary_labels[:, i], probabilities[:, i])
-        j_scores = tpr - fpr
-        opt_idx = np.argmax(j_scores)
-        opt_threshold_dict[i] = thresholds[opt_idx]
-
-    return opt_threshold_dict
+# def calculate_optimal_thresholds(true_labels: np.ndarray,
+#                                  probabilities: np.ndarray) -> Dict[int, float]:
+#     """Calculate optimal threshold for each class using Youden's J statistic."""
+#     # Ensure the true labels are binary
+#     if len(true_labels.shape) > 1 and true_labels.shape[1] > 1:
+#         binary_labels = true_labels
+#     else:
+#         binary_labels = label_binarize(true_labels, classes=np.unique(true_labels))
+#
+#     opt_threshold_dict = dict()
+#
+#     # Compute optimal threshold for each class
+#     for i in range(binary_labels.shape[1]):
+#         fpr, tpr, thresholds = roc_curve(binary_labels[:, i], probabilities[:, i])
+#         j_scores = tpr - fpr
+#         opt_idx = np.argmax(j_scores)
+#         opt_threshold_dict[i] = thresholds[opt_idx]
+#
+#     return opt_threshold_dict
