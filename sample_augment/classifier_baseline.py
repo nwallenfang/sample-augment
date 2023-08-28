@@ -1,17 +1,23 @@
 import json
 import os
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
+from matplotlib import pyplot as plt
+import torch
+from sklearn.metrics import roc_auc_score
 
-from sample_augment.core import step, Experiment
+from sample_augment.core import step, Experiment, Store, Config
 from sample_augment.core.config import read_config
 from sample_augment.core.step import find_steps
-from sample_augment.models.train_classifier import ClassifierMetrics
+from sample_augment.models.evaluate_classifier import KFoldClassificationReport
+from sample_augment.models.train_classifier import ClassifierMetrics, TrainedClassifier, KFoldTrainedClassifiers
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import root_dir
 from sample_augment.utils.plot import prepare_latex_plot
+from sample_augment.data.train_test_split import create_train_test_val
+from sample_augment.models.evaluate_classifier import predict_validation_set
 
 
 def read_f1_losses(kfold_json: Dict) -> np.ndarray:
@@ -108,7 +114,7 @@ def run_classifier_experiment(experiment_name, limit=None):
     classifier_configs = experiments_dir / config_path_name
 
     count = 0
-    for config_filename in os.listdir(classifier_configs):
+    for config_filename in sorted(os.listdir(classifier_configs)):
         if limit and count >= limit:
             log.info(f"limit of {limit} runs reached.")
             break
@@ -129,13 +135,72 @@ def run_classifier_experiment(experiment_name, limit=None):
 
         count += 1
 
+
+def evaluate_classifier_experiment(experiment_name: str, k_fold=True):
+    experiment_run_dir = root_dir.parent / "experiments" / f"{experiment_name}-runs"
+    assert experiment_run_dir.exists(), f"{experiment_run_dir} does not exist."
+
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    
+    # collect experiment artifacts, care this takes tons of RAM like this preloading everything
+    runs: Dict[str, (KFoldTrainedClassifiers, KFoldClassificationReport)] = {}  # run name to run json
+    for run_filename in os.listdir(experiment_run_dir):
+        name = run_filename.split("_")[0]
+        artifacts = Store.load_from(experiment_run_dir / run_filename).artifacts
+        runs[name] = artifacts['KFoldTrainedClassifiers'], artifacts['KFoldClassificationReport']
+
+    all_macro_f1 = []
+    all_auc = []
+    
+    baseline_config = read_config(root_dir.parent / "experiments" / f"{experiment_name}-configs" / "b00-baseline.json")
+    
+    augment_dataset: AugmentDataset = AugmentDataset.from_name('dataset_f00581')
+    bundle = create_train_test_val(augment_dataset, baseline_config['random_seed'], baseline_config['test_ratio'],
+                                   baseline_config['val_ratio'], baseline_config['min_instances'])
+    val_set = bundle.val
+
+    for run_name, run_data in runs.items():
+        # noinspection PyUnresolvedReferences
+        trained_class: List[TrainedClassifier] = run_data[0].classifiers
+        val_losses = [clf.metrics.validation_loss for clf in trained_class]
+        plt.plot(val_losses, label=f"{run_name} Validation Loss")
+
+        macro_f1_scores = []
+        auc_scores = []
+        if not torch.cuda_is_available():
+             log.info('no cuda - no auc metric')
+        for classifier, class_report in zip(run_data[0].classifiers, run_data[1].reports):
+            report = class_report.report
+            macro_f1_scores.append(report['macro avg']['f1-score'])
+
+            y_true = report['true_labels']  # Replace with your actual labels
+            predictions = predict_validation_set(classifier, val_set, batch_size=32).predictions
+            auc = roc_auc_score(val_set.label_tensor.numpy(), predictions, average='macro', multi_class='ovr')
+            auc_scores.append(auc)
+
+               
+
+        avg_macro_f1 = np.mean(macro_f1_scores)
+        avg_auc = np.mean(auc_scores)
+
+        log.info(f"{run_name}: Macro avg F1: {avg_macro_f1}, Avg AUC: {avg_auc}")
+
+        all_macro_f1.append(avg_macro_f1)
+        all_auc.append(avg_auc)
+
+    plt.legend()
+    plt.title("Validation Losses Across Runs")
+    plt.show()
+
+
 def main():
-    run_classifier_experiment("baseline", limit=1)
+    # run_classifier_experiment("baseline", limit=1)
+    evaluate_classifier_experiment("baseline")
     # run_classifier_experiment("architecture")
 
 
 if __name__ == '__main__':
-    pass
+    main()
     # compare_f1_scores()
     # kfold_trained_path = Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data"
     #                           r"\KFoldTrainedClassifiers\aug-01_ecc814.json")

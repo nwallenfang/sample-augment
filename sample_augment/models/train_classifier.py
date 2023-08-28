@@ -80,7 +80,8 @@ def _set_random_seed(random_seed: int):
 def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epochs: int, batch_size: int,
                 learning_rate: float, random_seed: int,
                 balance_classes: bool, lr_schedule: bool,
-                threshold_lambda: float) -> ClassifierMetrics:
+                threshold_lambda: float,
+                lr_step_size: int = 10, lr_gamma: float = 0.7) -> ClassifierMetrics:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # make the experiment as reproducible as possible by setting a random seed
     _set_random_seed(random_seed)
@@ -93,6 +94,10 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
     # Loss and optimizer
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    if lr_schedule:
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size,
+                                                    gamma=lr_gamma)
 
     train_loss_per_epoch = []
     val_loss_per_epoch = []
@@ -112,12 +117,9 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
     for epoch in range(num_epochs):
         model.train()
         train_losses = 0
-        # val_losses = 0
         val_logits = []
         val_labels = []
         train_accuracies = 0
-        # val_accuracies = 0
-        # val_f1s = 0
 
         for batch_idx, (image, label) in enumerate(tqdm(train_loader, file=sys.stdout, desc="Training")):
             # move data to GPU if possible
@@ -146,6 +148,10 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         train_loss_per_epoch.append(avg_train_loss)
         train_acc_per_epoch.append(train_accuracies / len(train_loader))
 
+        if lr_schedule:
+            # noinspection PyUnboundLocalVariable
+            scheduler.step()
+            log.info(f"Current learning rate: {optimizer.param_groups[0]['lr']}")
         # Validation Set evaluation at the end of this epoch:
 
         model.eval()
@@ -177,7 +183,7 @@ def train_model(train_set: Dataset, val_set: Dataset, model: nn.Module, num_epoc
         # print(f"ValSet label_tensor device: {val_set.label_tensor.device}")
         thresholds = determine_threshold_vector(val_predictions, val_set, threshold_lambda, n_support=100)
         time_post = time.time()
-        log.debug(f"Threshold time: {time_post - time_pre}")
+        log.debug(f"Threshold time: {time_post - time_pre:.2f}")
 
         binary_predictions = (val_predictions > thresholds).cpu()
         val_accuracy = (binary_predictions == val_labels.cpu()).float().mean().item()
@@ -378,6 +384,8 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
                             color_jitter: float,
                             h_flip_p: float,
                             v_flip_p: float,
+                            lr_schedule: bool,
+                            threshold_lambda: float
                             ) -> KFoldTrainedClassifiers:
     fold_random_seed = random_seed
     train_val, test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
@@ -390,11 +398,12 @@ def k_fold_train_classifier(dataset: AugmentDataset, n_folds: int,
         fold_random_seed += 1
 
         start_time = time.time()  # Start the timer
-        classifier: TrainedClassifier = train_classifier(TrainSet.from_existing(train, name="train_fold_{i}"),
-                                                         ValSet.from_existing(val, name="val_fold_{i}"), model_type,
+        classifier: TrainedClassifier = train_classifier(TrainSet.from_existing(train, name=f"train_fold_{i}"),
+                                                         ValSet.from_existing(val, name=f"val_fold_{i}"), model_type,
                                                          num_epochs, batch_size, learning_rate, balance_classes,
                                                          fold_random_seed, data_augment, geometric_augment,
-                                                         color_jitter, h_flip_p, v_flip_p)
+                                                         color_jitter, h_flip_p, v_flip_p, lr_schedule=lr_schedule,
+                                                         threshold_lambda=threshold_lambda)
         classifiers.append(classifier)
         elapsed_time = time.time() - start_time  # Calculate elapsed time
         minutes, seconds = divmod(elapsed_time, 60)  # Split elapsed time into minutes and seconds

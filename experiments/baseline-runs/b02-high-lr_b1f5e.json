@@ -1,0 +1,46 @@
+{
+    "models.train_classifier.KFoldTrainedClassifiers": {
+        "path": "KFoldTrainedClassifiers/b02-high-lr_ea9a7f.json",
+        "configs": {
+            "n_folds": 5,
+            "test_ratio": 0.2,
+            "model_type": "VisionTransformer",
+            "min_instances": 10,
+            "random_seed": 100,
+            "num_epochs": 50,
+            "batch_size": 32,
+            "learning_rate": 0.001,
+            "balance_classes": true,
+            "data_augment": false,
+            "geometric_augment": false,
+            "color_jitter": 0.0,
+            "h_flip_p": 0.0,
+            "v_flip_p": 0.0,
+            "lr_schedule": false,
+            "threshold_lambda": 0.4,
+            "name": "b02-high-lr"
+        }
+    },
+    "models.evaluate_classifier.KFoldClassificationReport": {
+        "path": "KFoldClassificationReport/b02-high-lr_ea9a7f.json",
+        "configs": {
+            "test_ratio": 0.2,
+            "min_instances": 10,
+            "random_seed": 100,
+            "n_folds": 5,
+            "name": "b02-high-lr",
+            "threshold_lambda": 0.4,
+            "model_type": "VisionTransformer",
+            "num_epochs": 50,
+            "batch_size": 32,
+            "learning_rate": 0.001,
+            "balance_classes": true,
+            "data_augment": false,
+            "geometric_augment": false,
+            "color_jitter": 0.0,
+            "h_flip_p": 0.0,
+            "v_flip_p": 0.0,
+            "lr_schedule": false
+        }
+    }
+}

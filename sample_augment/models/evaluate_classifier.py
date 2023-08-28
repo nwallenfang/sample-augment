@@ -39,47 +39,6 @@ normalize = Normalize(mean=_mean, std=_std)
 inverse_normalize = Normalize((-_mean / _std).tolist(), (1.0 / _std).tolist())
 
 
-class Metric(ABC):
-    @abstractmethod
-    def calculate(self, predictions: Tensor, labels: Tensor):
-        pass
-
-
-class ConfusionMatrixMetric(Metric):
-    display: ConfusionMatrixDisplay
-    labels: str
-
-    def __init__(self, labels=None):
-        if labels:
-            self.labels = labels
-
-    def calculate(self, predictions: Tensor, labels: Tensor) -> "ConfusionMatrixMetric":
-        predicted_labels = torch.argmax(predictions, dim=1).cpu().numpy()
-        targets = labels.cpu().numpy()
-
-        self.display = ConfusionMatrixDisplay.from_predictions(targets, predicted_labels,
-                                                               display_labels=self.labels)
-        return self
-
-    @staticmethod
-    def show(title=None):
-        if title:
-            plt.suptitle(title)
-        plt.show()
-
-
-# def preprocess(data: AugmentDataset) -> AugmentDataset:
-#     img_data = data.tensors[0]
-#
-#     if img_data.dtype == torch.uint8:
-#         img_data = img_data.float()
-#         img_data /= 255.0
-#
-#     data.tensors = (normalize(img_data), data.tensors[1].long())
-#
-#     return data
-
-
 def show_image_with_label_and_prediction(image, label, prediction):
     plt.figure()
     predicted_label = torch.argmax(prediction)
@@ -213,7 +172,7 @@ def evaluate_classifier(val_pred_artifact: ValidationPredictions, val_set: ValSe
 
 
 class KFoldClassificationReport(Artifact):
-    """one report for each fold"""
+    """one report for each fold, report is a dict with the report output from scikit-learn"""
     reports: List[ClassificationReport]
 
 
@@ -226,7 +185,8 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
                            random_seed: int,
                            n_folds: int,
                            shared_directory: Path,
-                           name: str
+                           name: str,
+                           threshold_lambda: float
                            ) -> KFoldClassificationReport:
     # quick and dirty: for getting the splits these were trained on, take the same code
     train_val, _test = stratified_split(dataset, 1.0 - test_ratio, random_seed, min_instances)
@@ -236,7 +196,8 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
     reports = []
     for classifier, (_train, val) in zip(classifiers.classifiers, splits.datasets):
         predictions: ValidationPredictions = predict_validation_set(classifier, ValSet.from_existing(val), 32)
-        report: ClassificationReport = evaluate_classifier(predictions, ValSet.from_existing(val), gc10_labels)
+        report: ClassificationReport = evaluate_classifier(predictions, ValSet.from_existing(val), gc10_labels,
+                                                           threshold_lambda)
         reports.append(report)
         metrics.append(report.report)
 

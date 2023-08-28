@@ -1,5 +1,5 @@
 {
-  "name": "b00-low-lr",
+  "name": "b01-low-lr",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
@@ -10,7 +10,11 @@
   "num_epochs": 50,
   "batch_size": 32,
   "balance_classes": true,
-  "n_folds": 10,
+  "n_folds": 5,
   "data_augment": false,
+  "geometric_augment": false,
+  "color_jitter": 0.0,
+  "h_flip_p": 0.0,
+  "v_flip_p": 0.0,
   "threshold_lambda": 0.40
 }
