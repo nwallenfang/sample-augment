@@ -136,7 +136,8 @@ class MultiSeedStrategyComparison(Artifact):
 
 
 @step
-def synth_bundle_compare_classifiers_multi_seed(bundle: SyntheticBundle,
+def synth_bundle_compare_classifiers_multi_seed(
+                                                generator_name: str,
                                                 strategies: List[str],
                                                 train_set: TrainSet,
                                                 val_set: ValSet,
@@ -144,7 +145,6 @@ def synth_bundle_compare_classifiers_multi_seed(bundle: SyntheticBundle,
                                                 num_epochs: int, batch_size: int, learning_rate: float,
                                                 balance_classes: bool,
                                                 model_type: ModelType,
-                                                # random_seed: int,
                                                 data_augment: bool,
                                                 geometric_augment: bool,
                                                 color_jitter: float,
@@ -157,7 +157,10 @@ def synth_bundle_compare_classifiers_multi_seed(bundle: SyntheticBundle,
     results = []
 
     for random_seed in multi_seeds:
-        log.info(f"Running experiment with random seed {random_seed}")
+        log.info(f"Creating SynthBundle with random seed {random_seed}")
+        bundle = create_synthetic_bundle(strategies=strategies, training_set=train_set, generator_name=generator_name,
+                                         random_seed=random_seed)
+        log.info(f"Running classifier training with random seed {random_seed}")
         result = synth_bundle_compare_classifiers(
             bundle,
             strategies,

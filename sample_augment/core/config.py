@@ -21,6 +21,7 @@ CONFIG_HASH_CUTOFF: int = 5
 
 class Config(BaseModel, extra=Extra.allow, allow_mutation=False):
     # Experiment-wide parameters
+    # TODO take name from filename instead of the provided one
     name: str = "test"
 
     # path for files that get saved by steps and are not Artifacts themselves

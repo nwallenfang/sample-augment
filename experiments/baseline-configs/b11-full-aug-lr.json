@@ -1,0 +1,24 @@
+{
+  "name": "b11-full-aug-lr",
+  "random_seed": 100,
+  "test_ratio": 0.2,
+  "val_ratio": 0.1,
+  "min_instances": 10,
+  "model_type": "VisionTransformer",
+  "learning_rate": 0.001,
+  "lr_schedule": true,
+  "lr_step_size": 6,
+  "lr_gamma": 0.7,
+
+
+  "num_epochs": 50,
+  "batch_size": 32,
+  "balance_classes": true,
+  "n_folds": 5,
+  "data_augment": true,
+  "geometric_augment": true,
+  "color_jitter": 0.25,
+  "h_flip_p": 0.5,
+  "v_flip_p": 0.5,
+  "threshold_lambda": 0.40
+}
