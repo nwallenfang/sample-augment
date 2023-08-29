@@ -1,99 +1,23 @@
 import json
 import os
 import sys
-from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
+import seaborn as sns
 import torch
-import matplotlib
 from matplotlib import pyplot as plt
-from sklearn.metrics import roc_auc_score
 
-from sample_augment.core import step, Experiment, Store
+from sample_augment.core import Experiment
 from sample_augment.core.config import read_config
 from sample_augment.core.step import find_steps
-from sample_augment.data.dataset import AugmentDataset
-from sample_augment.data.train_test_split import create_train_test_val
-from sample_augment.models.evaluate_classifier import KFoldClassificationReport
-from sample_augment.models.evaluate_classifier import predict_validation_set
-from sample_augment.models.train_classifier import ClassifierMetrics, TrainedClassifier, KFoldTrainedClassifiers
+from sample_augment.models.evaluate_classifier import KFoldClassificationReport, k_fold_plot_loss_over_epochs
+from sample_augment.models.train_classifier import ClassifierMetrics, KFoldTrainedClassifiers
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import root_dir
 from sample_augment.utils.plot import prepare_latex_plot
 
-
-def read_f1_losses(kfold_json: Dict) -> np.ndarray:
-    f1_scores = []
-    # num_epochs = clas
-    for classifier_json in kfold_json['classifiers']:
-        metrics = ClassifierMetrics.from_dict(classifier_json['metrics'])
-        f1_scores.append(metrics.validation_f1)
-    return np.stack(f1_scores)
-
-
-@step
-def compare_f1_scores(shared_directory: Path):
-
-    # Load JSONs
-    kfold_augmented_json = json.load(
-        open('/home/nils/thesis/sample-augment/data/KFoldTrainedClassifiers/aug-01_ecc814.json'))
-    kfold_no_aug_json = json.load(
-        open('/home/nils/thesis/sample-augment/data/KFoldTrainedClassifiers/baseline-configs-noaug_58f246.json'))
-
-    # Extract F1 scores
-    f1_aug = read_f1_losses(kfold_augmented_json)
-    f1_noaug = read_f1_losses(kfold_no_aug_json)
-
-    # Compute mean and standard deviation
-    f1_aug_mean = np.mean(f1_aug, axis=0)
-    f1_noaug_mean = np.mean(f1_noaug, axis=0)
-    f1_aug_std = np.std(f1_aug, axis=0)
-    f1_noaug_std = np.std(f1_noaug, axis=0)
-
-    # Number of epochs
-    epochs = range(1, len(f1_aug_mean) + 1)
-
-    # Set the font to be serif, rather than sans
-    matplotlib.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
-    # Use LaTeX to handle all text layout
-    matplotlib.rc('text', usetex=True)
-    # Ensure that matplotlib's LaTeX output matches the LaTeX document
-    matplotlib.rc('figure', dpi=200)
-    matplotlib.rcParams.update({'font.size': 14})
-
-    # Create the plot
-    plt.figure(figsize=(10, 7))
-    x_ticks = np.arange(1, max(epochs) + 1, 5)
-    x_ticks = np.insert(x_ticks, 1, 1)  # Insert 1 at the beginning
-
-    prepare_latex_plot()
-
-    # F1 for each classifier in light color
-    for i in range(f1_aug.shape[0]):
-        plt.plot(epochs, f1_aug[i], color='blue', alpha=0.1)
-        plt.plot(epochs, f1_noaug[i], color='red', alpha=0.1)
-
-    # Average F1
-    plt.plot(epochs, f1_aug_mean, label='Mean F1 (Augmented)', color='blue', linewidth=2)
-    plt.fill_between(epochs, f1_aug_mean - f1_aug_std, f1_aug_mean + f1_aug_std, color='blue', alpha=0.2)
-
-    plt.plot(epochs, f1_noaug_mean, label='Mean F1 (Non-Augmented)', color='red', linewidth=2)
-    plt.fill_between(epochs, f1_noaug_mean - f1_noaug_std, f1_noaug_mean + f1_noaug_std, color='red',
-                     alpha=0.2)
-
-    # Labels, title and legend
-    plt.xlabel('Epoch')
-    plt.ylabel('F1 Score')
-    plt.legend()
-    plt.xlim([1, len(f1_aug_mean)])
-    plt.ylim([0.0, 1.0])  # F1 score range from 0 to 1
-    plt.xticks(x_ticks)
-    plt.yticks(np.arange(0, 1.1, 0.1))  # Show y-ticks from 0 to 1 with a step of 0.1
-
-    figure_path = shared_directory / "f1_comparison.pdf"
-    log.info(f"Save F1 Comparison plot to {figure_path}")
-    plt.savefig(figure_path, bbox_inches='tight', format='pdf')
+figures_dir = root_dir.parent / "experiments" / "figures"
 
 
 def running_on_colab():
@@ -144,62 +68,197 @@ def run_classifier_experiment(experiment_name, limit=None):
         count += 1
 
 
+def check_best_epoch(names, metrics, _reports):
+    all_epochs = []
+
+    sns_colors = sns.color_palette("deep", 4)  # Fetch 4 colors from the "deep" palette
+    color_groups = {
+        sns_colors[0]: ['baseline'],
+        sns_colors[1]: ['low-lr', 'high-lr', 'lr-scheduling', 'lr-scheduling-gamma'],
+        sns_colors[2]: ['small-batch', 'large-batch'],
+        sns_colors[3]: ['color-aug', 'flip-aug', 'geom-aug', 'full-aug']
+    }
+
+    color_list = []
+    for run_name, run_metrics in zip(names, metrics):
+        run_epochs = []
+
+        for fold_metrics in run_metrics:
+            # Assuming `fold_metrics` is an object and epoch is an attribute
+            best_epoch = fold_metrics.epoch  # Adjust according to your actual data structure
+            run_epochs.append(best_epoch)
+
+        for color, group_names in color_groups.items():
+            if run_name in group_names:
+                color_list.append(color)
+                break
+
+        all_epochs.append(run_epochs)
+
+    # Prepare the plot
+    prepare_latex_plot()
+    fig, ax = plt.subplots(figsize=(8, 4))
+
+    sns.swarmplot(data=all_epochs, ax=ax, palette=color_list)
+
+    ax.set_xticklabels(names)
+
+    plt.xticks(rotation=45)
+    plt.ylabel('Epoch of Best Model (max Val. F1)')
+    plt.tight_layout()
+    plt.savefig(figures_dir / "best_epoch_comparison.pdf", bbox_inches="tight")
+
+
+def check_macro_f1(names, _metrics, reports):
+    all_f1s = []
+
+    sns_colors = sns.color_palette("deep", 4)  # Fetch 4 colors from the "deep" palette
+    color_groups = {
+        sns_colors[0]: ['baseline'],
+        sns_colors[1]: ['low-lr', 'high-lr', 'lr-scheduling', 'lr-scheduling-gamma'],
+        sns_colors[2]: ['small-batch', 'large-batch'],
+        sns_colors[3]: ['color-aug', 'flip-aug', 'geom-aug', 'full-aug']
+    }
+    color_list = []
+
+    for run_name, run_reports in zip(names, reports):
+        macro_f1_scores = []
+
+        for fold_report in run_reports:
+            macro_f1_scores.append(fold_report['macro avg']['f1-score'])
+        all_f1s.append(macro_f1_scores)
+
+        # Assign a color to each run_name based on its group
+        for color, group_names in color_groups.items():
+            if run_name in group_names:
+                color_list.append(color)
+                break
+
+    prepare_latex_plot()
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    sns.swarmplot(data=all_f1s, ax=ax, palette=color_list)
+
+    baseline_mean_f1 = np.mean(
+        [reports[0][i]['macro avg']['f1-score'] for i in range(5)])
+
+    ax.axhline(baseline_mean_f1, color=sns_colors[0], linestyle='--', linewidth=0.9)
+
+    for i, f1_scores in enumerate(all_f1s):
+        mean_f1 = np.mean(f1_scores)
+        ax.axhline(mean_f1, xmin=(i + 0.3) / len(all_f1s), xmax=(i + 0.7) / len(all_f1s), color='gray')
+
+    ax.set_ylim([0.76, 0.86])
+    ax.set_xticklabels(names)
+    plt.xticks(rotation=45)
+    plt.ylabel('Macro Average F1 Score')
+
+    plt.tight_layout()
+    plt.savefig(figures_dir / "f1_comparison.pdf", bbox_inches="tight")
+
+
+def check_lr_losses(names, metrics, _reports):
+    idx_baseline = names.index('baseline')
+    # idx_lr_high = names.index('high-lr')
+    idx_lr_schedule = names.index('lr-scheduling')
+
+    metrics_baseline = metrics[idx_baseline]
+    # metrics_lr_high = metrics[idx_lr_high]
+    metrics_lr_schedule = metrics[idx_lr_schedule]
+
+    k_fold_plot_loss_over_epochs(
+        {"baseline": metrics_baseline, "lr-schedule": metrics_lr_schedule},
+        figures_dir, "lr_comparison"
+    )
+
+
+def subplot_lr_losses(names, metrics, _reports):
+    prepare_latex_plot()
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+
+    idx_baseline = names.index('baseline')
+    idx_lr_schedule = names.index('lr-scheduling')
+    idx_full_aug = names.index('full-aug')
+
+    metrics_baseline = metrics[idx_baseline]
+    metrics_lr_schedule = metrics[idx_lr_schedule]
+    metrics_full_aug = metrics[idx_full_aug]
+
+    yticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    ylims = [0.0, 0.6]
+    tab10_colors = sns.color_palette("tab10", 10)
+    custom_palette = {'baseline': tab10_colors[0], 'lr-schedule': tab10_colors[1], 'full-aug': tab10_colors[2]}
+
+    k_fold_plot_loss_over_epochs({"baseline": metrics_baseline, "lr-schedule": metrics_lr_schedule}, figures_dir,
+                                 "lr_comparison", ax=axes[0], yticks=yticks, ylim=ylims, color_dict=custom_palette)
+    k_fold_plot_loss_over_epochs({"baseline": metrics_baseline, "full-aug": metrics_full_aug}, figures_dir,
+                                 "aug_comparison", ax=axes[1], yticks=yticks, ylim=ylims, color_dict=custom_palette)
+
+    # handles, labels = axes[0].get_legend_handles_labels()
+    # fig.legend(handles, labels, loc='upper center', ncol=2)
+    plt.tight_layout()
+    plt.savefig(figures_dir / "losses_lr_fullaug.pdf", bbox_inches='tight')
+
+
 def evaluate_classifier_experiment(experiment_name: str):
     experiment_run_dir = root_dir.parent / "experiments" / f"{experiment_name}-runs"
     assert experiment_run_dir.exists(), f"{experiment_run_dir} does not exist."
 
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    _device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     # collect experiment artifacts, care this takes tons of RAM like this preloading everything
-    reports: Dict[str, KFoldClassificationReport] = {}  # run name to run json
+    results: Dict = {}  # run name to run json
     for run_filename in os.listdir(experiment_run_dir):
         name = run_filename.split("_")[0]
-        artifacts = Store.load_from(experiment_run_dir / run_filename).artifacts
-        reports[name] = artifacts['KFoldClassificationReport']
+        with open(experiment_run_dir / run_filename) as run_file:
+            run_json = json.load(run_file)
+            results[name] = run_json
 
-    all_macro_f1 = []
-    all_auc = []
-
-    baseline_config = read_config(root_dir.parent / "experiments" / f"{experiment_name}-configs" / "b00-baseline.json")
-
-    augment_dataset: AugmentDataset = AugmentDataset.from_name('dataset_f00581')
-    bundle = create_train_test_val(augment_dataset, baseline_config['random_seed'], baseline_config['test_ratio'],
-                                   baseline_config['val_ratio'], baseline_config['min_instances'])
-    val_set = bundle.val
     # TODO include this plot: class_performance_boxplot()
-    # TODO make the evaluation procedure so TrainedClassifiers only get loaded if absolutely necessary
-    # TODO make strip plot over the folds and their macro F1 as well maybe
-    # TODO make loss plot for high learning rate vs low learning rate
+    run_names = sorted(results.keys())
+    config = read_config(
+        root_dir.parent / "experiments" / f"{experiment_name}-configs" / f"{run_names[0]}.json")
+    num_experiments = len(results.keys())
+    num_folds = config.n_folds
 
-    for run_name, run_data in reports.items():
-        # noinspection PyUnresolvedReferences
-        trained_class: List[TrainedClassifier] = run_data[0].classifiers
-        val_losses = [clf.metrics.validation_loss for clf in trained_class]
-        plt.plot(val_losses, label=f"{run_name} Validation Loss")
+    metrics = np.empty((num_experiments, num_folds), dtype=object)
+    reports = np.empty((num_experiments, num_folds), dtype=object)
 
-        macro_f1_scores = []
-        auc_scores = []
-        if not torch.cuda.is_available():
-            log.info('no cuda - no auc metric')
-        for classifier, class_report in zip(run_data[0].classifiers, run_data[1].reports):
-            report = class_report.report
-            macro_f1_scores.append(report['macro avg']['f1-score'])
+    for i, run_name in enumerate(run_names):
+        run_data = results[run_name]
 
-            predictions = predict_validation_set(classifier, val_set, batch_size=32).predictions
-            auc = roc_auc_score(val_set.label_tensor.numpy(), predictions, average='macro', multi_class='ovr')
-            auc_scores.append(auc)
+        report_path = root_dir / run_data[KFoldClassificationReport.__full_name__]['path']
+        kreport = KFoldClassificationReport.from_file(report_path)
+        reports[i] = [rep.report for rep in kreport.reports]
 
-        avg_macro_f1 = np.mean(macro_f1_scores)
-        avg_auc = np.mean(auc_scores)
+        trained_clf_json = json.load(open(root_dir / run_data[KFoldTrainedClassifiers.__full_name__]['path']))
+        run_metrics: List[ClassifierMetrics] = [ClassifierMetrics.from_dict(classifier['metrics']) for classifier in
+                                                trained_clf_json['classifiers']]
+        metrics[i] = run_metrics
 
-        log.info(f"{run_name}: Macro avg F1: {avg_macro_f1}, Avg AUC: {avg_auc}")
+    analyses = [
+        # check_macro_f1,
+        # check_best_epoch,
+        # check_lr_losses,
+        subplot_lr_losses
+    ]
 
-        all_macro_f1.append(avg_macro_f1)
-        all_auc.append(avg_auc)
+    names = [name[4:] for name in run_names]
 
-    plt.legend()
-    plt.title("Validation Losses Across Runs")
-    plt.show()
+    for analysis in analyses:
+        analysis(names, metrics, reports)
+
+    # AUC
+    # if not torch.cuda.is_available():
+    #     log.info('no cuda - no auc metric')
+    # predictions = predict_validation_set(classifier, val_set, batch_size=32).predictions
+    # auc = roc_auc_score(val_set.label_tensor.numpy(), predictions, average='macro', multi_class='ovr')
+    # auc_scores.append(auc)
+
+    # augment_dataset: AugmentDataset = AugmentDataset.from_name('dataset_f00581')
+    # bundle = create_train_test_val(augment_dataset, baseline_config.random_seed, baseline_config.test_ratio,
+    #                                baseline_config.val_ratio, baseline_config.min_instances)
+    # _val_set = bundle.val
 
 
 def main():
@@ -211,19 +270,9 @@ def main():
             evaluate_classifier_experiment(sys.argv[2])
         else:
             assert False, 'run/eval {name}'
-    run_classifier_experiment("baseline", limit=1)
-    # evaluate_classifier_experiment("baseline")
-    # run_classifier_experiment("architecture")
+    else:  # default
+        run_classifier_experiment("baseline", limit=1)
 
 
 if __name__ == '__main__':
     main()
-    # compare_f1_scores()
-    # kfold_trained_path = Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data"
-    #                           r"\KFoldTrainedClassifiers\aug-01_ecc814.json")
-    # with open(kfold_trained_path) as kfold_trained_file:
-    #     kfold_trained_data = json.load(kfold_trained_file)
-    #
-    # k_fold_plot_loss_over_epochs(KFoldTrainedClassifiers.from_dict(kfold_trained_data),
-    #                              Path(r"C:\Users\Nils\Documents\Masterarbeit\sample-augment\data\shared"),
-    #                              "aug-01")

@@ -12,14 +12,12 @@ import seaborn as sns
 import torch.cuda
 import torchvision
 import torchvision.transforms as transforms
-from sklearn.metrics import classification_report, roc_curve
-from sklearn.preprocessing import label_binarize
+from sklearn.metrics import classification_report
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Normalize, ToPILImage
 from tqdm import tqdm
 
-from sample_augment import utils
 from sample_augment.core import step, Artifact
 from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.gc10.read_labels import GC10Labels
@@ -28,7 +26,7 @@ from sample_augment.data.train_test_split import stratified_split, stratified_k_
 from sample_augment.models.classifier import VisionTransformer
 from sample_augment.models.train_classifier import TrainedClassifier, KFoldTrainedClassifiers, plain_transforms, \
     ClassifierMetrics
-from sample_augment.utils import log, plot
+from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir
 from sample_augment.utils.plot import prepare_latex_plot
 
@@ -272,66 +270,116 @@ def evaluate_k_classifiers(dataset: AugmentDataset,
     return KFoldClassificationReport(reports=reports)
 
 
-@step
-def k_fold_plot_loss_over_epochs(classifiers: KFoldTrainedClassifiers, shared_directory: Path, name: str):
-    train_losses = []
-    validation_losses = []
+# @step
+# def k_fold_plot_loss_over_epochs(metrics: List[ClassifierMetrics], shared_directory: Path, name: str):
+#     train_losses = []
+#     validation_losses = []
+#
+#     for metric in metrics:
+#         train_losses.append(metric.train_loss)
+#         validation_losses.append(metric.validation_loss)
+#
+#     # Convert to numpy arrays
+#     train_losses = np.array(train_losses)
+#     validation_losses = np.array(validation_losses)
+#
+#     # Compute mean and standard deviation
+#     train_mean = np.mean(train_losses, axis=0)
+#     validation_mean = np.mean(validation_losses, axis=0)
+#     train_std = np.std(train_losses, axis=0)
+#     validation_std = np.std(validation_losses, axis=0)
+#
+#     # Number of epochs
+#     epochs = range(1, len(train_mean) + 1)
+#
+#     prepare_latex_plot()
+#     # Create the plot
+#     plt.figure(figsize=(utils.plot.text_width, 7.0 / 10.0 * utils.plot.text_width))
+#     x_ticks = np.arange(1, max(epochs) + 1, 5)
+#     x_ticks = x_ticks - 1
+#     x_ticks = np.insert(x_ticks, 1, 1)  # Insert 1 at the beginning
+#     # Training and validation loss for each classifier in light color
+#     for i in range(train_losses.shape[0]):
+#         plt.plot(epochs, train_losses[i], color='orange', alpha=0.15)
+#         plt.plot(epochs, validation_losses[i], color='blue', alpha=0.1)
+#
+#     # Average training loss
+#     plt.plot(epochs, train_mean, label='Mean Training Loss', color='orange', linewidth=2)
+#     plt.fill_between(epochs, train_mean - train_std, train_mean + train_std, color='orange', alpha=0.25)
+#
+#     # Average validation loss
+#     plt.plot(epochs, validation_mean, label='Mean Validation Loss', color='blue', linewidth=2)
+#     plt.fill_between(epochs, validation_mean - validation_std, validation_mean + validation_std, color='blue',
+#                      alpha=0.15)
+#
+#     # Labels, title and legend
+#     # plt.title('Average Cross-Entropy Loss per Epoch with Standard Deviation')
+#     plt.xlabel('Epoch')
+#     plt.ylabel('Cross-Entropy Loss')
+#     plt.legend()
+#     plt.xlim([1, len(train_mean)])
+#     plt.ylim([0.0, 2.25])
+#     y_ticks, _ = plt.yticks()
+#     y_ticks = y_ticks[1:]
+#     plt.yticks(y_ticks)
+#     plt.xticks(x_ticks)
+#
+#     # dirty nested f-string - because I can
+#     plt.tight_layout()
+#     plt.savefig(shared_directory / f"kfold_losses_{name}.pdf", bbox_inches='tight')
 
-    for classifier in classifiers.classifiers:
-        train_losses.append(classifier.metrics.train_loss)
-        validation_losses.append(classifier.metrics.validation_loss)
 
-    # Convert to numpy arrays
-    train_losses = np.array(train_losses)
-    validation_losses = np.array(validation_losses)
+def k_fold_plot_loss_over_epochs(metrics_by_run: Dict[str, List[ClassifierMetrics]], figure_dir: Path, name: str,
+                                 ax=None, ylim=None, yticks=None, color_dict=None):
+    data = []
+    for run_name, metrics in metrics_by_run.items():
+        for fold, metric in enumerate(metrics):
+            for epoch, (train_loss, val_loss) in enumerate(zip(metric.train_loss, metric.validation_loss)):
+                data.append({
+                    'Run': run_name,
+                    'Fold': fold,
+                    'Epoch': epoch + 1,  # 1-indexing for epochs
+                    'Training': train_loss,
+                    'Validation': val_loss
+                })
 
-    # Compute mean and standard deviation
-    train_mean = np.mean(train_losses, axis=0)
-    validation_mean = np.mean(validation_losses, axis=0)
-    train_std = np.std(train_losses, axis=0)
-    validation_std = np.std(validation_losses, axis=0)
+    df = pd.DataFrame(data)
+    # Reshaping the DataFrame
+    df_melt = df.melt(id_vars=['Run', 'Fold', 'Epoch'],
+                      value_vars=['Training', 'Validation'],
+                      var_name='Loss Type',
+                      value_name='Loss')
 
-    # Number of epochs
-    epochs = range(1, len(train_mean) + 1)
+    # Create color palette for each run and loss type combination
+    unique_runs = df_melt['Run'].unique()
+    colors = sns.color_palette("tab10", len(unique_runs))
+    if not color_dict:
+        color_dict = {run: color for run, color in zip(unique_runs, colors)}
 
-    prepare_latex_plot()
-    # Create the plot
-    plt.figure(figsize=(utils.plot.text_width, 7.0 / 10.0 * utils.plot.text_width))
-    x_ticks = np.arange(1, max(epochs) + 1, 5)
-    x_ticks = x_ticks - 1
-    x_ticks = np.insert(x_ticks, 1, 1)  # Insert 1 at the beginning
-    # Training and validation loss for each classifier in light color
-    for i in range(train_losses.shape[0]):
-        plt.plot(epochs, train_losses[i], color='orange', alpha=0.15)
-        plt.plot(epochs, validation_losses[i], color='blue', alpha=0.1)
+    # Generate plot
+    if ax is None:
+        prepare_latex_plot()
+        fig, ax = plt.subplots(figsize=(8, 4))
 
-    # Average training loss
-    plt.plot(epochs, train_mean, label='Mean Training Loss', color='orange', linewidth=2)
-    plt.fill_between(epochs, train_mean - train_std, train_mean + train_std, color='orange', alpha=0.25)
+    sns.lineplot(ax=ax if ax else plt.gca(), data=df_melt, x='Epoch', y='Loss',
+                 hue='Run', style='Loss Type',
+                 palette=color_dict, errorbar='sd')
 
-    # Average validation loss
-    plt.plot(epochs, validation_mean, label='Mean Validation Loss', color='blue', linewidth=2)
-    plt.fill_between(epochs, validation_mean - validation_std, validation_mean + validation_std, color='blue',
-                     alpha=0.15)
+    if ylim:
+        ax.set_ylim(ylim)
+    if yticks:
+        ax.set_yticks(yticks)
 
-    # Labels, title and legend
-    # plt.title('Average Cross-Entropy Loss per Epoch with Standard Deviation')
     plt.xlabel('Epoch')
     plt.ylabel('Cross-Entropy Loss')
-    plt.legend()
-    plt.xlim([1, len(train_mean)])
-    plt.ylim([0.0, 2.25])
-    y_ticks, _ = plt.yticks()
-    y_ticks = y_ticks[1:]
-    plt.yticks(y_ticks)
-    plt.xticks(x_ticks)
-
-    # dirty nested f-string - because I can
-    log.info(f"Saving KFold-Losses plot to {shared_directory / f'kfold_losses_{name}.pgf'}")
+    handles, labels = plt.gca().get_legend_handles_labels()
+    # plt.legend(handles=handles[1:], labels=labels[1:], title='Run',
+    #            loc='upper right')
+    # plt.legend(handles=handles[1:], labels=labels[1:], title='Run and Loss Type', bbox_to_anchor=(1.05, 1),
+    #            loc='upper left')
     plt.tight_layout()
-
-    plt.savefig(shared_directory / f"kfold_losses_{name}.pgf", bbox_inches='tight', backend="pgf")
-    plt.savefig(shared_directory / f"kfold_losses_{name}.pdf", bbox_inches='tight', backend="pgf")
+    # idk about this but fine huh
+    # plt.savefig(figure_dir / f"kfold_losses_{name}.pdf", bbox_inches='tight')
 
 
 def show_some_test_images(classes, imgs, labels, predictions, sec_labels, test_data):
@@ -432,7 +480,6 @@ def plot_roc_curves(fpr: Dict[int, np.ndarray],
     plt.title('Receiver Operating Characteristic to Multi-Class')
     plt.legend(loc="lower right")
     plt.show()
-
 
 # def calculate_optimal_thresholds(true_labels: np.ndarray,
 #                                  probabilities: np.ndarray) -> Dict[int, float]:
