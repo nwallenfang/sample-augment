@@ -344,7 +344,7 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
         val_data.transform = transforms.Compose(plain_transforms)
 
     if isinstance(model, VisionTransformer):
-        log.info(f"Using a VisionTransformer, resizing inputs to 224x224. (device={device})")
+        log.debug(f"Using a VisionTransformer, resizing inputs to 224x224. (device={device})")
         train_data.transform = transforms.Compose([
             transforms.Resize((224, 224), **optional_aa_arg),
             train_data.transform

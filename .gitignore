@@ -98,6 +98,8 @@ lightning_logs/
 
 *.iml
 
+# it's good to save the fixed run files but no need to save all figures atm
+experiments/figures
 
 # gdrive tmp dirs
 .tmp.drivedownload

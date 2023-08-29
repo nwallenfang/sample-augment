@@ -15,12 +15,6 @@ from sample_augment.utils.path_utils import root_dir, shared_dir
 from sample_augment.models.stylegan2.training.networks import Generator, Discriminator
 from sample_augment.utils.log import SuppressSpecificPrint
 
-"""
-    this file probably needs python <=3.8 and torch <=1.9, same as train_generator.
-    As such it can't be included in the core framework with steps, etc.
-    Instead we're relying on the shared directory and certain files just being well-formed.
-"""
-
 GC10_CLASSES = [
     "punching_hole",
     "welding_line",
@@ -166,8 +160,8 @@ class StyleGANGenerator:
         return imgs
 
     @staticmethod
-    def load_from_name(name: str) -> "StyleGANGenerator":
-        return StyleGANGenerator(pkl_path=root_dir / "TrainedStyleGAN" / f"{name}.pkl")
+    def load_from_name(name: str, seed: int) -> "StyleGANGenerator":
+        return StyleGANGenerator(pkl_path=root_dir / "TrainedStyleGAN" / f"{name}.pkl", seed=seed)
 
 
 def generate_image_pool(num_imgs_per_class=200, generator_name: str = "wdataaug-028_012200"):

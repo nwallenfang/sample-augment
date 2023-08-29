@@ -1,17 +1,17 @@
+import numpy as np
+import torch
 from torchvision.transforms import transforms
 
 from sample_augment.data.synth_data import SynthData
+from sample_augment.data.train_test_split import TrainSet
 from sample_augment.models.classifier import VisionTransformer
 from sample_augment.models.generator import StyleGANGenerator
-from sample_augment.data.train_test_split import TrainSet
 from sample_augment.models.train_classifier import TrainedClassifier
-import torch
-import numpy as np
-
 from sample_augment.models.train_classifier import plain_transforms
 
 
-def classifier_guided(training_set: TrainSet, generator_name: str, classifier: TrainedClassifier) -> SynthData:
+def classifier_guided(training_set: TrainSet, generator_name: str, random_seed: int,
+                      classifier: TrainedClassifier) -> SynthData:
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device("cpu")
     classifier.model.to(device)
     classifier.model.eval()
@@ -30,7 +30,7 @@ def classifier_guided(training_set: TrainSet, generator_name: str, classifier: T
     synthetic_labels_tensor = torch.empty((n_select * n_combinations, label_matrix.size(1)), device=device,
                                           dtype=torch.float32)
 
-    generator = StyleGANGenerator.load_from_name(generator_name)
+    generator = StyleGANGenerator.load_from_name(generator_name, random_seed)
 
     for label_idx, label_comb in enumerate(unique_label_combinations):
         c = label_comb.repeat(n_generate, 1)

@@ -109,11 +109,11 @@ def main():
     project_training_subset(train_test_val.train, generator_name)
 
 
-def from_projected_images(_training_set: TrainSet, generator_name: str, number_per_class=50):
+def from_projected_images(_training_set: TrainSet, generator_name: str, random_seed: int, number_per_class=50):
     synthetic_imgs = []
     synthetic_labels = []
 
-    generator = StyleGANGenerator.load_from_name(generator_name)
+    generator = StyleGANGenerator.load_from_name(generator_name, random_seed)
     class_to_latents_and_labels = defaultdict(list)
     outdir: Path = shared_dir / "projected" / generator_name
     assert outdir.is_dir(), f"can't find projected dir for generator {generator_name}"
@@ -157,7 +157,9 @@ def from_projected_images(_training_set: TrainSet, generator_name: str, number_p
 
     synthetic_imgs_tensor = torch.stack(synthetic_imgs).squeeze()
     synthetic_labels_tensor = torch.stack(synthetic_labels).squeeze()
-    return SynthData(synthetic_images=synthetic_imgs_tensor, synthetic_labels=synthetic_labels_tensor, multi_label=False)
+    return SynthData(synthetic_images=synthetic_imgs_tensor,
+                     synthetic_labels=synthetic_labels_tensor,
+                     multi_label=False)
 
 
 if __name__ == '__main__':

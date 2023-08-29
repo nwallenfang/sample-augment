@@ -1,19 +1,23 @@
 {
     "name": "synth-comparison-4-strats",
     "val_ratio": 0.1,
-    "min_instances": 10,
-    "model_type": "VisionTransformer",
-    "threshold_regularize": true,
-    "data_augment": true,
     "test_ratio": 0.2,
-    "threshold_lambda": 0.4,
+    "min_instances": 10,
+    "random_seed": 100,
+    "model_type": "VisionTransformer",
     "batch_size": 32,
-    "num_epochs": 50,
+    "num_epochs": 1,
     "learning_rate": 0.0001,
     "lr_schedule": false,
-    "balance_classes": true,
-    "geometric_augment": false,
+    "multi_seeds": [101, 102, 103, 104, 105],
+
+    "data_augment": true,
     "color_jitter": 0.25,
+    "v_flip_p": 0.5,
+    "h_flip_p": 0.5,
+    "balance_classes": true,
+    "geometric_augment": true,
+
     "generator_name": "wdataaug-028_012200",
     "strategies": [
         "random",
@@ -22,7 +26,7 @@
         "classifier-guided"
     ],
     "synth_p": 0.33,
-    "random_seed": 100,
-    "v_flip_p": 0.5,
-    "h_flip_p": 0.5
+
+    "threshold_regularize": true,
+    "threshold_lambda": 0.4
 }

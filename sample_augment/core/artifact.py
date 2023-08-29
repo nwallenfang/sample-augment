@@ -262,7 +262,6 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
             except TypeError as err:
                 log.error(str(err))
                 log.error(f"Couldn't serialize Artifact {self.__full_name__}")
-                # log.error(short_pformat(data))
                 sys.exit(-1)
 
     @classmethod

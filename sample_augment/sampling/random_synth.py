@@ -6,7 +6,7 @@ from sample_augment.data.synth_data import SynthData
 from sample_augment.utils import log
 
 
-def random_synthetic_augmentation(training_set: TrainSet, generator_name: str) -> SynthData:
+def random_synthetic_augmentation(training_set: TrainSet, generator_name: str, random_seed: int) -> SynthData:
     """
     A synthetic augmentation type based on label distribution.
     """
@@ -26,7 +26,7 @@ def random_synthetic_augmentation(training_set: TrainSet, generator_name: str) -
     synthetic_labels_tensor = torch.empty((n * n_combinations, label_matrix.size(1)), device=device,
                                           dtype=torch.float32)
 
-    generator = StyleGANGenerator.load_from_name(generator_name)
+    generator = StyleGANGenerator.load_from_name(generator_name, seed=random_seed)
 
     for label_idx, label_comb in enumerate(unique_label_combinations):
         c = label_comb.repeat(n, 1)
