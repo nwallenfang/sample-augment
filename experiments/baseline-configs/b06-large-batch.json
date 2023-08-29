@@ -1,5 +1,5 @@
 {
-  "name": "b05-large-batch",
+  "name": "b06-large-batch",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
