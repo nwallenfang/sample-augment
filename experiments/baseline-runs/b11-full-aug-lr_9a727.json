@@ -1,0 +1,50 @@
+{
+    "models.train_classifier.KFoldTrainedClassifiers": {
+        "path": "KFoldTrainedClassifiers/b11-full-aug-lr_ed74d2.json",
+        "configs": {
+            "n_folds": 5,
+            "test_ratio": 0.2,
+            "model_type": "VisionTransformer",
+            "min_instances": 10,
+            "random_seed": 100,
+            "num_epochs": 50,
+            "batch_size": 32,
+            "learning_rate": 0.001,
+            "balance_classes": true,
+            "data_augment": true,
+            "geometric_augment": true,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "lr_schedule": true,
+            "threshold_lambda": 0.4,
+            "lr_step_size": 6,
+            "lr_gamma": 0.7,
+            "name": "b11-full-aug-lr"
+        }
+    },
+    "models.evaluate_classifier.KFoldClassificationReport": {
+        "path": "KFoldClassificationReport/b11-full-aug-lr_ed74d2.json",
+        "configs": {
+            "test_ratio": 0.2,
+            "min_instances": 10,
+            "random_seed": 100,
+            "n_folds": 5,
+            "name": "b11-full-aug-lr",
+            "threshold_lambda": 0.4,
+            "model_type": "VisionTransformer",
+            "num_epochs": 50,
+            "batch_size": 32,
+            "learning_rate": 0.001,
+            "balance_classes": true,
+            "data_augment": true,
+            "geometric_augment": true,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "lr_schedule": true,
+            "lr_step_size": 6,
+            "lr_gamma": 0.7
+        }
+    }
+}

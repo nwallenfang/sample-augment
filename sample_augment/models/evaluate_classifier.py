@@ -90,19 +90,6 @@ def predict_validation_set(classifier: TrainedClassifier, validation_set: ValSet
         with torch.no_grad():
             predictions[i * batch_size:(i + 1) * batch_size] = torch.sigmoid(classifier.model(batch))
 
-    # torch.save(predictions, project_path('data/interim/predictions_densenet.pt'))
-    # start, n = 20, 1
-
-    # look at some random predictions
-    # for image, label in zip(test_data.tensors[0][start:start + n + 1],
-    #                         test_data.tensors[1][start:start + n + 1]):
-    #     prediction = classifier(image.unsqueeze(0))
-    #     show_image_with_label_and_prediction(image, label, prediction)
-
-    # OK, next steps in the analysis:
-    # Create a modified Confusion Matrix where the secondary labels are considered
-    # Qualitatively look at the misclassifications
-
     return ValidationPredictions(predictions=predictions)
 
 

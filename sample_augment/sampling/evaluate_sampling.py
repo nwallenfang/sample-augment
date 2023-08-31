@@ -12,6 +12,8 @@ from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir, root_dir
 from sample_augment.utils.plot import prepare_latex_plot
 
+figures_dir = root_dir.parent / "experiments" / "figures"
+
 
 @step
 def create_strategy_f1_plot(synth_report: SynthComparisonReport):
@@ -134,13 +136,40 @@ def multiseed_boxplot(report: MultiSeedReport):
     df = pd.concat(replicated_data)
 
     sns.set_style("whitegrid")
-    prepare_latex_plot()
-    plt.figure(figsize=(16, 8))
-    palette = ["grey"] + list(sns.color_palette("deep", n_colors=len(report.configs['strategies'])))
-    sns.boxplot(x="Strategy", y="Macro F1", hue="Strategy", data=df, palette=palette)
+    # boxplot style similar to the baseline f1 comparison
 
-    plt.legend(title="Strategy", loc='best')
-    plt.savefig(shared_dir / "figures" / f'multiseed_strategies_f1_boxplot.pdf', bbox_inches="tight")
+    prepare_latex_plot()
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    palette = ["grey"] + list(sns.color_palette("deep", n_colors=len(report.configs['strategies'])))
+
+    # Convert your DataFrame to one suitable for Seaborn
+    data_list = []
+    for _, row in df.iterrows():
+        data_list.append({'Strategy': row['Strategy'], 'Macro F1': row['Macro F1']})
+    df_new = pd.DataFrame(data_list)
+
+    sns.swarmplot(x='Strategy', y='Macro F1', data=df_new, ax=ax, hue="Strategy", palette=palette, dodge=False)
+
+    for i, strat in enumerate(df['Strategy'].unique()):
+        strat_data = df[df['Strategy'] == strat]['Macro F1']
+        mean_f1 = np.mean(strat_data)
+        std_f1 = np.std(strat_data)
+        min_f1 = np.max([mean_f1 - std_f1, np.min(strat_data)])
+        max_f1 = np.min([mean_f1 + std_f1, np.max(strat_data)])
+
+        # draw means
+        ax.hlines(mean_f1, xmin=i - 0.2, xmax=i + 0.2, colors=palette[i], linewidth=2)
+        # draw std/errorbar with whiskers
+        ax.errorbar(i, mean_f1, yerr=[[mean_f1 - min_f1], [max_f1 - mean_f1]], fmt='none', color='gray', linewidth=1,
+                    capsize=5, zorder=4)
+
+    ax.set_xticklabels(df['Strategy'].unique())
+    plt.xticks(rotation=45)
+    plt.ylabel('Macro Average F1 Score')
+
+    plt.tight_layout()
+    plt.savefig(figures_dir / 'multiseed_strategies_f1_swarmplot.pdf', bbox_inches="tight")
 
 
 if __name__ == '__main__':
@@ -151,3 +180,5 @@ if __name__ == '__main__':
     # experiment.run("multiseed_boxplot", initial_artifacts=[strategies])
     multi_report = MultiSeedReport.from_name('s00-baseline_7465aa')
     multiseed_boxplot(multi_report)
+    # TODO could also run this in the end with another value of synth_p, would be interesting,
+    #   one lower, one higher

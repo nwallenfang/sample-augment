@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
@@ -50,6 +51,9 @@ def check_best_epoch(names, metrics, _reports):
 
 
 def check_macro_f1(names, _metrics, reports):
+    # hardcode fix: only take the first 11 for our plot now
+    names = names[:11]
+    reports = reports[:11]
     all_f1s = []
     color_list = []
 
@@ -66,8 +70,15 @@ def check_macro_f1(names, _metrics, reports):
     prepare_latex_plot()
 
     fig, ax = plt.subplots(figsize=(8, 4))
-    sns.swarmplot(data=all_f1s, ax=ax, palette=color_list)
 
+    # Convert your nested list of F1 scores to a DataFrame suitable for Seaborn
+    data_list = []
+    for name, f1_scores in zip(names, all_f1s):
+        for f1 in f1_scores:
+            data_list.append({'name': name, 'f1': f1})
+    df = pd.DataFrame(data_list)
+
+    sns.swarmplot(x='name', y='f1', data=df, ax=ax, palette=color_list, dodge=False)
     baseline_mean_f1 = np.mean(
         [reports[0][i]['macro avg']['f1-score'] for i in range(5)])
 
@@ -75,12 +86,24 @@ def check_macro_f1(names, _metrics, reports):
 
     for i, f1_scores in enumerate(all_f1s):
         mean_f1 = np.mean(f1_scores)
-        ax.axhline(mean_f1, xmin=(i + 0.3) / len(all_f1s), xmax=(i + 0.7) / len(all_f1s), color='gray')
+        min_f1 = np.min(f1_scores)
+        max_f1 = np.max(f1_scores)
+        # draw means
+        ax.hlines(mean_f1, xmin=i - 0.2, xmax=i + 0.2, colors=color_list[i], linewidth=2, zorder=5)
+        # draw std/errorbar with whiskers
+        std_f1 = np.std(f1_scores)
+        lower_std = np.clip(mean_f1 - std_f1, min_f1, mean_f1)
+        upper_std = np.clip(mean_f1 + std_f1, mean_f1, max_f1)
+
+        # draw std/errorbar with whiskers
+        ax.errorbar(i, mean_f1, yerr=[[mean_f1 - lower_std], [upper_std - mean_f1]], fmt='none', color='gray',
+                    linewidth=1, capsize=5, zorder=4)
 
     ax.set_ylim([0.76, 0.86])
     ax.set_xticklabels(names)
     plt.xticks(rotation=45)
     plt.ylabel('Macro Average F1 Score')
+    plt.xlabel('Training Run')
 
     plt.tight_layout()
     plt.savefig(figures_dir / "f1_comparison.pdf", bbox_inches="tight")

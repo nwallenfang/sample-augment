@@ -1,0 +1,62 @@
+{
+    "sampling.compare_strategies.StrategyComparisonClassifiers": {
+        "path": "StrategyComparisonClassifiers/01-addition-for-merging_45b039.json",
+        "configs": {
+            "strategies": [
+                "random",
+                "hand-picked",
+                "projection",
+                "classifier-guided"
+            ],
+            "synth_p": 0.33,
+            "num_epochs": 50,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "balance_classes": true,
+            "model_type": "VisionTransformer",
+            "random_seed": 100,
+            "data_augment": true,
+            "geometric_augment": true,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "lr_schedule": false,
+            "threshold_lambda": 0.4,
+            "name": "01-addition-for-merging",
+            "generator_name": "wdataaug-028_012200",
+            "test_ratio": 0.2,
+            "val_ratio": 0.1,
+            "min_instances": 10
+        }
+    },
+    "sampling.compare_strategies.SynthComparisonReport": {
+        "path": "SynthComparisonReport/01-addition-for-merging_45b039.json",
+        "configs": {
+            "strategies": [
+                "random",
+                "hand-picked",
+                "projection",
+                "classifier-guided"
+            ],
+            "threshold_lambda": 0.4,
+            "name": "01-addition-for-merging",
+            "synth_p": 0.33,
+            "num_epochs": 50,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "balance_classes": true,
+            "model_type": "VisionTransformer",
+            "random_seed": 100,
+            "data_augment": true,
+            "geometric_augment": true,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "lr_schedule": false,
+            "generator_name": "wdataaug-028_012200",
+            "test_ratio": 0.2,
+            "val_ratio": 0.1,
+            "min_instances": 10
+        }
+    }
+}
