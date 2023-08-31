@@ -1,17 +1,18 @@
 import json
 import os
-import sys
-from typing import Dict, List
+from typing import Dict, List, Optional
 
+import click
 import numpy as np
 
 from sample_augment.core import Experiment
 from sample_augment.core.config import read_config
 from sample_augment.core.step import find_steps
 from sample_augment.models.evaluate_baseline import check_macro_f1, subplot_lr_losses, check_best_epoch, \
-    check_lr_losses
+    check_lr_losses, calc_auc
 from sample_augment.models.evaluate_classifier import KFoldClassificationReport
 from sample_augment.models.train_classifier import ClassifierMetrics, KFoldTrainedClassifiers
+from sample_augment.sampling.evaluate_sampling import sampling_eval
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import root_dir
 
@@ -33,8 +34,14 @@ experiment_to_step = {
 
 def run_experiment(experiment_name, limit=None):
     experiments_dir = root_dir.parent / 'experiments'
-    if not running_on_colab():  # find_steps is called in init on colab
+    if not running_on_colab(): 
         find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
+    else:
+        log.info("Colab finding steps :)")
+        find_steps(
+            include=['sample_augment.test', 'sample_augment.data', 'sample_augment.models', 'sample_augment.sampling'],
+            exclude=['sample_augment.models.stylegan2']
+        )
 
     # Determine the paths based on the experiment name
     config_path_name = f"{experiment_name}-configs"
@@ -64,19 +71,9 @@ def run_experiment(experiment_name, limit=None):
         count += 1
 
 
-def evaluate_experiment(experiment_name: str):
-    experiment_run_dir = root_dir.parent / "experiments" / f"{experiment_name}-runs"
-    assert experiment_run_dir.exists(), f"{experiment_run_dir} does not exist."
-
-    results: Dict = {}  # run name to run json
-    for run_filename in os.listdir(experiment_run_dir):
-        name = run_filename.split("_")[0]
-        with open(experiment_run_dir / run_filename) as run_file:
-            run_json = json.load(run_file)
-            results[name] = run_json
-
+# duplicating this code per experiment because it's faster and easier at the moment
+def baseline_eval(results, experiment_name="baseline"):
     # TODO include this plot: class_performance_boxplot() for rolled_pit or other difficult class
-    # TODO AUC step, for this the TrainedClassifierModels are needed
     run_names = sorted(results.keys())
     config = read_config(
         root_dir.parent / "experiments" / f"{experiment_name}-configs" / f"{run_names[0]}.json")
@@ -103,7 +100,8 @@ def evaluate_experiment(experiment_name: str):
         check_macro_f1,
         check_best_epoch,
         check_lr_losses,
-        subplot_lr_losses
+        subplot_lr_losses,
+        calc_auc,  # TODO
     ]
 
     names = [name[4:] for name in run_names]
@@ -111,30 +109,35 @@ def evaluate_experiment(experiment_name: str):
     for step in steps:
         step(names, metrics, reports)
 
-    # AUC
-    # if not torch.cuda.is_available():
-    #     log.info('no cuda - no auc metric')
-    # predictions = predict_validation_set(classifier, val_set, batch_size=32).predictions
-    # auc = roc_auc_score(val_set.label_tensor.numpy(), predictions, average='macro', multi_class='ovr')
-    # auc_scores.append(auc)
 
-    # augment_dataset: AugmentDataset = AugmentDataset.from_name('dataset_f00581')
-    # bundle = create_train_test_val(augment_dataset, baseline_config.random_seed, baseline_config.test_ratio,
-    #                                baseline_config.val_ratio, baseline_config.min_instances)
-    # _val_set = bundle.val
+def evaluate_experiment(experiment_name: str):
+    experiment_run_dir = root_dir.parent / "experiments" / f"{experiment_name}-runs"
+    assert experiment_run_dir.exists(), f"{experiment_run_dir} does not exist."
+
+    results: Dict = {}  # run name to run json
+    for run_filename in os.listdir(experiment_run_dir):
+        name = run_filename.split("_")[0]
+        with open(experiment_run_dir / run_filename) as run_file:
+            run_json = json.load(run_file)
+            results[name] = run_json
+
+    if experiment_name == 'baseline':
+        baseline_eval(results)
+    elif experiment_name == 'sampling':
+        sampling_eval(results)
+    else:
+        raise click.UsageError("No eval implemented for this experiment.")
 
 
-def main():
-    if len(sys.argv) > 1:
-        assert len(sys.argv) == 3, 'run/eval {name}'
-        if sys.argv[1] == 'run':
-            run_experiment(sys.argv[2])
-        elif sys.argv[1] == 'eval':
-            evaluate_experiment(sys.argv[2])
-        else:
-            assert False, 'run/eval {name}'
-    else:  # default
-        run_experiment("baseline", limit=1)
+@click.command()
+@click.argument('action', type=click.Choice(['run', 'eval']))
+@click.argument('name')
+@click.option('--limit', default=None, type=int, help='Limit parameter.')
+def main(action: str, name: str, limit: Optional[int]):
+    if action == 'run':
+        run_experiment(name, limit)
+    elif action == 'eval':
+        evaluate_experiment(name)
 
 
 if __name__ == '__main__':

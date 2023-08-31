@@ -15,7 +15,7 @@ def test_repeated_save_load(tmpdir):
     ones = int(0.4 * n)
     dataset = create_dummy_dataset(n, ones, root_dir=Path(tmpdir))
     assert len(dataset) == n
-    store = Store(root_directory=Path(tmpdir), artifacts={'AugmentDataset': dataset})
+    store = Store(artifacts={'AugmentDataset': dataset})
 
     store1_path = store.save('save1.json', run_identifier='test')
 

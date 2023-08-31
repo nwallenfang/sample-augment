@@ -1,3 +1,5 @@
+import enum
+
 import numpy as np
 import torch
 from torchvision.transforms import transforms
@@ -8,6 +10,11 @@ from sample_augment.models.classifier import VisionTransformer
 from sample_augment.models.generator import StyleGANGenerator
 from sample_augment.models.train_classifier import TrainedClassifier
 from sample_augment.models.train_classifier import plain_transforms
+
+
+class GuidanceMetric(enum.Enum):
+    L2Distance = "l2distance"
+    Entropy = "entropy"
 
 
 def classifier_guided(training_set: TrainSet, generator_name: str, random_seed: int,
@@ -41,20 +48,19 @@ def classifier_guided(training_set: TrainSet, generator_name: str, random_seed: 
         else:
             synth_processed = preprocess(synth_raw)
 
-        with torch.no_grad():  # Context where gradients won't be computed
+        with torch.no_grad():
             scores = classifier.model(synth_processed)
             scores = torch.sigmoid(scores)
 
         metric = calculate_metric(scores, c)
 
-        # Selecting the top 10 instances based on metric
+        # selected the top n_select instances based on metric
         top_idx = metric.argsort()[-n_select:]
         selected_instances = synth_raw[top_idx]
 
         synthetic_imgs_tensor[label_idx * n_select:(label_idx + 1) * n_select] = selected_instances
         synthetic_labels_tensor[label_idx * n_select:(label_idx + 1) * n_select] = c[:n_select]
 
-    # Move everything to CPU before returning
     synthetic_imgs_tensor = synthetic_imgs_tensor.cpu()
     synthetic_labels_tensor = synthetic_labels_tensor.cpu()
 
@@ -62,7 +68,6 @@ def classifier_guided(training_set: TrainSet, generator_name: str, random_seed: 
 
 
 def calculate_metric(predicted_scores, actual_labels):
-    # Implement the similarity or uncertainty metric here based on the predicted_scores and actual_labels
-    # For example, you can use Euclidean distance, cosine similarity, or a custom metric
+    # potential for selecting based on other metrics such as two-model or entropy-based
     similarity = np.linalg.norm(predicted_scores.cpu().numpy() - actual_labels.cpu().numpy(), axis=1)
     return similarity

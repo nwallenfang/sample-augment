@@ -5,7 +5,9 @@ from matplotlib.widgets import Button
 
 from sample_augment.models.generator import StyleGANGenerator, GC10_CLASSES
 from sample_augment.utils.path_utils import shared_dir
-
+"""
+this script is horrible code and was just used for selecting a hand-picked subset of synthetic images one-off
+"""
 if __name__ == '__main__':
     images = [np.random.rand(10, 10) for _ in range(9)]  # replace this with your images
     colors = ['red'] * 9
@@ -143,5 +145,4 @@ if __name__ == '__main__':
         plt.show()
 
 
-    if __name__ == '__main__':
-        setup_handpicking()
+    setup_handpicking()

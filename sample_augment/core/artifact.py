@@ -249,6 +249,7 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
 
     def save_to_disk(self):
         if not self.serialize_this:
+            # FIXME if save_to_disk gets called explicitly it should be fine and not returned
             return
         data = self.to_dict(extra_configs={})
         external_directory = path_utils.root_dir / self.__class__.__name__

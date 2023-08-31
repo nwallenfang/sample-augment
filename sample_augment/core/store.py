@@ -66,6 +66,11 @@ class Store:
     #     return deserialized_artifact
 
     def save(self, config_name: str, config_hash: str, store_save_path: Optional[Path] = None):
+        # TODO the config_hash shouldn't be needed to be passed here. In fact Store should not be coupled to a config.
+        #   if some central hash is needed for saving artifacts (which I doubt atm), it should be calculated by the
+        #   union of all config entries or similar. Semantically, it should be fine for a store to contain Artifacts
+        #   produced by contradicting sets of config entries. So giving it a single config hash makes no sense
+        #   in that regard.
         if store_save_path is None:
             store_save_path = path_utils.root_dir / f"{config_name}_{config_hash}.json"
         elif store_save_path.is_dir():

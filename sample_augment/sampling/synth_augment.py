@@ -41,7 +41,6 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
     for class_idx, class_name in enumerate(GC10_CLASSES):
         _n_missing = _target_count - class_counts[class_idx]
 
-
         # Find the images for the class_name
         generated_image_paths = glob.glob(
             f"{generated_dir}/{class_name}/*.jpg")
@@ -84,7 +83,8 @@ def synth_augment(training_set: TrainSet, generator_name: str, synth_p: float) -
 
 
 @step
-def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: float) -> SynthAugmentedTrain:
+def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: float,
+                         random_seed: int) -> SynthAugmentedTrain:
     """
     A synthetic augmentation type based on label distribution.
     """
@@ -104,7 +104,7 @@ def synth_augment_online(training_set: TrainSet, generator_name: str, synth_p: f
                                         device=device)
     synthetic_labels_tensor = torch.empty((n * n_combinations, label_matrix.size(1)), device=device)
 
-    generator = StyleGANGenerator.load_from_name(generator_name)
+    generator = StyleGANGenerator.load_from_name(generator_name, seed=random_seed)
 
     for label_idx, label_comb in enumerate(unique_label_combinations):
         c = label_comb.repeat(n, 1)

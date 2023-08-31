@@ -248,7 +248,16 @@ def find_steps(include: List[str], exclude: List[str] = None):
         exclude = []
     for root_module in include:
         # Recursively import all submodules in the package
-        package = importlib.import_module(root_module)
+        try:
+            package = importlib.import_module(root_module)
+        except ModuleNotFoundError:
+            try:
+                log.info(f'trying fallback import sample_augment.{root_module}')
+                package = importlib.import_module('sample_augment.' + root_module)
+            except ModuleNotFoundError:
+                log.error(f'failed to import {root_module}, continuing but might fail later.')
+                continue
+                
         prefix = package.__name__ + "."
         for _importer, modname, _ispkg in pkgutil.walk_packages(package.__path__, prefix):
             if modname not in sys.modules and not any([mod in modname for mod in exclude]):

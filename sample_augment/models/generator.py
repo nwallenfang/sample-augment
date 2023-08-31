@@ -160,13 +160,13 @@ class StyleGANGenerator:
         return imgs
 
     @staticmethod
-    def load_from_name(name: str, seed: int) -> "StyleGANGenerator":
+    def load_from_name(name: str, seed: int = 100) -> "StyleGANGenerator":
         return StyleGANGenerator(pkl_path=root_dir / "TrainedStyleGAN" / f"{name}.pkl", seed=seed)
 
 
-def generate_image_pool(num_imgs_per_class=200, generator_name: str = "wdataaug-028_012200"):
+def generate_image_pool(num_imgs_per_class=200, generator_name: str = "wdataaug-028_012200", random_seed: int = 100):
     # now that we calc more imgs per class, we could do a class-wise diversity metric
-    generator = StyleGANGenerator.load_from_name(generator_name)
+    generator = StyleGANGenerator.load_from_name(generator_name, seed=random_seed)
     num_classes = generator.G.c_dim
     generated_root = shared_dir / "generated" / generator_name
     generated_root.mkdir(exist_ok=True)

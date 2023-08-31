@@ -3,6 +3,7 @@ import torch
 
 from sample_augment.core.artifact import Artifact
 from sample_augment.core import Store
+from sample_augment.utils import log
 
 
 class SimpleArtifact(Artifact):
@@ -19,6 +20,7 @@ class ComplexArtifact(Artifact):
 
 def test_artifact_store(tmpdir):
     # TODO fix this test
+    log.warning("deprecated test")
     # First, let's create some Artifacts
     simple_artifact = SimpleArtifact(x=1, y=2.0, z='three')
     complex_artifact = ComplexArtifact(simple=simple_artifact,
@@ -28,6 +30,7 @@ def test_artifact_store(tmpdir):
     # Then, create a Store from these artifacts and save it
     artifact_store = Store(artifacts={'SimpleArtifact': simple_artifact, 'ComplexArtifact':
                            complex_artifact})
+    # noinspection PyArgumentList
     artifact_store.save(tmpdir)
 
     # Finally, load the ArtifactStore

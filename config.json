@@ -1,5 +1,5 @@
 {
-  "name": "idkrn",
+  "name": "synthbundle",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
@@ -19,5 +19,14 @@
   "h_flip_p": 0.5,
   "v_flip_p": 0.5,
 
-  "threshold_lambda": 0.40
+  "threshold_lambda": 0.40,
+
+  "generator_name": "wdataaug-028_012200",
+  "strategies": [
+      "random",
+      "hand-picked",
+      "projection",
+      "classifier-guided"
+  ],
+  "synth_p": 0.33
 }
