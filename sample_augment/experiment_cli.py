@@ -34,7 +34,7 @@ experiment_to_step = {
 
 def run_experiment(experiment_name, limit=None, run: str = None):
     experiments_dir = root_dir.parent / 'experiments'
-    if not running_on_colab(): 
+    if not running_on_colab():
         find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
     else:
         log.info("Colab finding steps :)")
@@ -46,16 +46,16 @@ def run_experiment(experiment_name, limit=None, run: str = None):
     # Determine the paths based on the experiment name
     config_path_name = f"{experiment_name}-configs"
     run_path_name = f"{experiment_name}-runs"
-    
+
     classifier_configs = experiments_dir / config_path_name
     count = 0
     if run:
-        run: Path = run + '.json'
+        run = run + '.json'
         assert (classifier_configs / run).exists()
         run_configs = [run]
     else:
         run_configs = sorted(os.listdir(classifier_configs))
-    
+
     for config_filename in run_configs:
         if limit and count >= limit:
             log.info(f"limit of {limit} runs reached.")
@@ -117,16 +117,31 @@ def baseline_eval(results, experiment_name="baseline"):
         step(names, metrics, reports)
 
 
-def evaluate_experiment(experiment_name: str):
+def evaluate_experiment(experiment_name: str, run: Optional[str]):
     experiment_run_dir = root_dir.parent / "experiments" / f"{experiment_name}-runs"
     assert experiment_run_dir.exists(), f"{experiment_run_dir} does not exist."
 
     results: Dict = {}  # run name to run json
-    for run_filename in os.listdir(experiment_run_dir):
+    if run:
+        run_list = [run]
+    else:
+        run_list = os.listdir(experiment_run_dir)
+
+    for run_filename in run_list:
         name = run_filename.split("_")[0]
-        with open(experiment_run_dir / run_filename) as run_file:
-            run_json = json.load(run_file)
-            results[name] = run_json
+        try:
+            with open(experiment_run_dir / run_filename) as run_file:
+                run_json = json.load(run_file)
+                results[name] = run_json
+        except FileNotFoundError as _e:
+            log.info(f"Run file {run_filename} not found.")
+            continue
+    if not results:
+        print(run_list)
+        log.info("No run files loaded. Passing {run_name: None} as results dict to eval.")
+        results = {
+            run_file.split("_")[0]: None for run_file in run_list
+        }
 
     if experiment_name == 'baseline':
         baseline_eval(results)
@@ -145,7 +160,7 @@ def main(action: str, name: str, limit: Optional[int], run=Optional[str]):
     if action == 'run':
         run_experiment(name, limit, run)
     elif action == 'eval':
-        evaluate_experiment(name)
+        evaluate_experiment(name, run=run)
 
 
 if __name__ == '__main__':

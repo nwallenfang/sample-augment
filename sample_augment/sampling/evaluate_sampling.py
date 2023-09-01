@@ -63,20 +63,32 @@ def create_strategy_f1_plot(synth_report: SynthComparisonReport):
 
 def sampling_eval(results, experiment_name="sampling"):
     run_names = sorted(results.keys())
+
     config = read_config(
         root_dir.parent / "experiments" / f"{experiment_name}-configs" / f"{run_names[0]}.json")
     num_experiments = len(results.keys())
-    strategies = config.strategies
-    num_strategies = len(strategies)
+    num_strategies = len(config.strategies)
 
-    reports = np.empty((num_experiments, num_strategies), dtype=object)
+    reports: np.ndarray = np.empty((num_experiments, num_strategies), dtype=object)
     # baselines = None
+    log.info(f"num experiments: {num_experiments}")
     #
     for i, run_name in enumerate(run_names):
-        run_data = results[run_name]
-        report_path = root_dir / run_data[MultiSeedStrategyComparison.__full_name__]['path']
-        multiseed = MultiSeedStrategyComparison.from_file(report_path)
-        reports[i] = [comparison for comparison in multiseed.strategy_comparisons]
+        run_data = results.get(run_name, None)
+        if run_data:
+            report_path = root_dir / run_data[MultiSeedStrategyComparison.__full_name__]['path']
+            multiseed = MultiSeedStrategyComparison.from_file(report_path)
+            reports[i] = [comparison for comparison in multiseed.strategy_comparisons]
+        else:
+            raise NotImplementedError()
+            # If MultiSeedStrategyComparison does not exist, load individual StrategyComparisonClassifiers
+            # artifact_dir = root_dir / StrategyComparisonClassifiers.__name__
+            # matching_files = glob.glob(f"{artifact_dir}/{run_name}_*.json", recursive=True)
+            # log.info(f"loading individual StrategyComparisonClassifiers, found {len(matching_files)} comparisons")
+            # reports[i]
+            # for j, file in enumerate(matching_files):
+            #     reports[i, j] = StrategyComparisonClassifiers.from_file(file)
+
         assert isinstance(reports[i, 0], SynthComparisonReport), type(reports[i, 0])
 
     # for sampling, we'll probably have some steps taking a single SynthComparisonReport
