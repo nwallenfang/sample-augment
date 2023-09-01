@@ -1,3 +1,4 @@
+import glob
 import hashlib
 import inspect
 import json
@@ -50,11 +51,6 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
     serialize_this = True
     """dict for tracking the configs this Artifact depends on (by inspecting @step input args)"""
     configs: Dict[str, Any] = Field(default_factory=dict)
-
-    @property
-    def fully_qualified_name(self):
-        log.warning("fully qualified name is a little broken, use __full_name__ attr instead.")
-        return f'{self.__module__}.{self.__class__.__name__}'
 
     def _serialize_field(self, field, field_name: str, field_type, external_directory: Path,
                          extra_configs: Dict):
@@ -198,12 +194,23 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
         self.configs['name'] = name
         if self.complete_path.exists():
             return True
-        # TODO check other Artifacts if they have the same config.
-        #   then it's serialized as well
+
         return self.complete_path.exists()
 
+    @classmethod
+    def exists(cls, name: str) -> Optional[str]:
+        artifact_dir = path_utils.root_dir / cls.__name__
+        matching_files = glob.glob(f"{artifact_dir}/{name}_*.json", recursive=True)
+        full_names = [Path(f).stem for f in matching_files]
+
+        if len(full_names) == 0:
+            return None
+        if len(full_names) > 1:
+            log.warning(f"Multiple artifacts match the name {name}. Returning the first one.")
+        return full_names[0]
+
     @property
-    def complete_path(self):
+    def complete_path(self) -> Path:
         artifact_dir = path_utils.root_dir / self.__class__.__name__
         if 'name' in self.configs:
             return artifact_dir / f"{self.configs['name']}_{self.config_hash}.json"

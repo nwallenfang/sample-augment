@@ -32,7 +32,7 @@ experiment_to_step = {
 }
 
 
-def run_experiment(experiment_name, limit=None):
+def run_experiment(experiment_name, limit=None, run: str = None):
     experiments_dir = root_dir.parent / 'experiments'
     if not running_on_colab(): 
         find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
@@ -46,10 +46,17 @@ def run_experiment(experiment_name, limit=None):
     # Determine the paths based on the experiment name
     config_path_name = f"{experiment_name}-configs"
     run_path_name = f"{experiment_name}-runs"
+    
     classifier_configs = experiments_dir / config_path_name
-
     count = 0
-    for config_filename in sorted(os.listdir(classifier_configs)):
+    if run:
+        run: Path = run + '.json'
+        assert (classifier_configs / run).exists()
+        run_configs = [run]
+    else:
+        run_configs = sorted(os.listdir(classifier_configs))
+    
+    for config_filename in run_configs:
         if limit and count >= limit:
             log.info(f"limit of {limit} runs reached.")
             break
@@ -133,9 +140,10 @@ def evaluate_experiment(experiment_name: str):
 @click.argument('action', type=click.Choice(['run', 'eval']))
 @click.argument('name')
 @click.option('--limit', default=None, type=int, help='Limit parameter.')
-def main(action: str, name: str, limit: Optional[int]):
+@click.option('--run', default=None, type=str, help='for running a specific config')
+def main(action: str, name: str, limit: Optional[int], run=Optional[str]):
     if action == 'run':
-        run_experiment(name, limit)
+        run_experiment(name, limit, run)
     elif action == 'eval':
         evaluate_experiment(name)
 

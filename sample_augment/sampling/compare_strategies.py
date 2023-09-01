@@ -162,6 +162,10 @@ def synth_bundle_compare_classifiers_multi_seed(
     results = []
 
     for random_seed in multi_seeds:
+        if artifact_name := StrategyComparisonClassifiers.exists(name=f'{name}_{random_seed}'):
+            log.info(f"Seed {random_seed} already exists - skipping")
+            results.append(StrategyComparisonClassifiers.from_name(artifact_name))
+            continue
         log.info(f"Creating SynthBundle with random seed {random_seed}")
         bundle = create_synthetic_bundle(strategies=strategies, training_set=train_set, generator_name=generator_name,
                                          random_seed=random_seed)
