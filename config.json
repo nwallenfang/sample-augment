@@ -23,9 +23,6 @@
 
   "generator_name": "wdataaug-028_012200",
   "strategies": [
-      "random",
-      "hand-picked",
-      "projection",
       "classifier-guided"
   ],
   "synth_p": 0.33

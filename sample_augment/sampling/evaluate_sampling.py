@@ -125,6 +125,17 @@ def multiseed_boxplot(report: MultiSeedReport):
 
         # Filling the dataframe
         for idx, class_report in enumerate(reports):
+            log.info(f"Processing report for strategy: {idx_to_name(idx)}")
+
+            # Append macro F1 score once for the strategy
+            macro_data.append({
+                "Seed": seed,
+                "Strategy": idx_to_name(idx),
+                "Macro F1": class_report['macro avg']['f1-score']
+            })
+            log.debug(f"Appending macro F1 score for strategy: {idx_to_name(idx)}")
+            log.info(f"Seed: {seed}, Strategy: {idx_to_name(idx)}, Macro F1: {class_report['macro avg']['f1-score']}")
+            # Append individual F1 scores for each class
             for class_name in GC10_CLASSES:
                 all_data.append({
                     "Seed": seed,
@@ -132,20 +143,15 @@ def multiseed_boxplot(report: MultiSeedReport):
                     "Class": class_name,
                     "F1 Score": class_report[class_name]["f1-score"]
                 })
-                macro_data.append({
-                    "Seed": seed,
-                    "Strategy": idx_to_name(idx),
-                    "Macro F1": class_report['macro avg']['f1-score']
-                })
-
+                log.debug(f"Appending F1 score for class: {class_name}")
     # df = pd.DataFrame(all_data)
     df = pd.DataFrame(macro_data)
-    replicated_data = []
-    for i in range(4):  # Four replicas
-        new_data = df.copy()
-        new_data['Macro F1'] = df['Macro F1'] + np.random.normal(0, 0.11, df.shape[0])  # Noise added
-        replicated_data.append(new_data)
-    df = pd.concat(replicated_data)
+    # replicated_data = []
+    # for i in range(4):  # Four replicas
+    #     new_data = df.copy()
+    #     new_data['Macro F1'] = df['Macro F1'] + np.random.normal(0, 0.11, df.shape[0])  # Noise added
+    #     replicated_data.append(new_data)
+    # df = pd.concat(replicated_data)
 
     sns.set_style("whitegrid")
     # boxplot style similar to the baseline f1 comparison
@@ -155,13 +161,9 @@ def multiseed_boxplot(report: MultiSeedReport):
     fig, ax = plt.subplots(figsize=(8, 5))
     palette = ["grey"] + list(sns.color_palette("deep", n_colors=len(report.configs['strategies'])))
 
-    # Convert your DataFrame to one suitable for Seaborn
-    data_list = []
-    for _, row in df.iterrows():
-        data_list.append({'Strategy': row['Strategy'], 'Macro F1': row['Macro F1']})
-    df_new = pd.DataFrame(data_list)
-
-    sns.swarmplot(x='Strategy', y='Macro F1', data=df_new, ax=ax, hue="Strategy", palette=palette, dodge=False)
+    print(df.head())
+    print(df['Strategy'].value_counts())
+    sns.swarmplot(x='Strategy', y='Macro F1', data=df, ax=ax, hue="Strategy", palette=palette, dodge=False)
 
     for i, strat in enumerate(df['Strategy'].unique()):
         strat_data = df[df['Strategy'] == strat]['Macro F1']
@@ -170,10 +172,21 @@ def multiseed_boxplot(report: MultiSeedReport):
         min_f1 = np.max([mean_f1 - std_f1, np.min(strat_data)])
         max_f1 = np.min([mean_f1 + std_f1, np.max(strat_data)])
 
+        error_below = mean_f1 - min_f1
+        error_above = max_f1 - mean_f1
+
+        if error_below < 0:
+            print(f"Clamping error_below: Original value: {error_below}, Strat: {strat}, Index: {i}")
+            error_below = 0
+
+        if error_above < 0:
+            print(f"Clamping error_above: Original value: {error_above}, Strat: {strat}, Index: {i}")
+            error_above = 0
+
         # draw means
         ax.hlines(mean_f1, xmin=i - 0.2, xmax=i + 0.2, colors=palette[i], linewidth=2)
         # draw std/errorbar with whiskers
-        ax.errorbar(i, mean_f1, yerr=[[mean_f1 - min_f1], [max_f1 - mean_f1]], fmt='none', color='gray', linewidth=1,
+        ax.errorbar(i, mean_f1, yerr=[[error_below], [error_above]], fmt='none', color='gray', linewidth=1,
                     capsize=5, zorder=4)
 
     ax.set_xticklabels(df['Strategy'].unique())
@@ -190,7 +203,7 @@ if __name__ == '__main__':
     # # create Experiment instance
     # experiment = Experiment(read_config(shared_dir / "configs/config_s00-baseline_7175d.json"))
     # experiment.run("multiseed_boxplot", initial_artifacts=[strategies])
-    multi_report = MultiSeedReport.from_name('s00-baseline_7465aa')
+    multi_report = MultiSeedReport.from_name('s01-baseline_df5f64')
     multiseed_boxplot(multi_report)
     # TODO could also run this in the end with another value of synth_p, would be interesting,
     #   one lower, one higher

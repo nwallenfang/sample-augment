@@ -90,6 +90,7 @@ def predict_validation_set(classifier: TrainedClassifier, validation_set: ValSet
         with torch.no_grad():
             predictions[i * batch_size:(i + 1) * batch_size] = torch.sigmoid(classifier.model(batch))
 
+    classifier.model.cpu()
     return ValidationPredictions(predictions=predictions)
 
 

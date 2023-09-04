@@ -19,7 +19,7 @@ def show_image_numpy(img: np.ndarray, title: str, text: str = None, save_path: s
         
     
 def show_image_tensor(img_tensor: torch.Tensor, title: str, text: str = None, save_path: str = None):
-    img_numpy = img_tensor.permute(1, 2, 0).numpy()
+    img_numpy = img_tensor.cpu().permute(1, 2, 0).numpy()
     show_image_numpy(img_numpy, title, text, save_path)
 
 

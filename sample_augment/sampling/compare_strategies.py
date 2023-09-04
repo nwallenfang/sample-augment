@@ -9,11 +9,13 @@ from sample_augment.models.evaluate_classifier import evaluate_classifier, Class
     ValidationPredictions
 from sample_augment.models.train_classifier import ModelType
 from sample_augment.models.train_classifier import train_augmented_classifier, TrainedClassifier, train_classifier
-from sample_augment.sampling.classifier_guidance import classifier_guided
+from sample_augment.sampling.classifier_guidance import classifier_guided, GuidanceMetric
 from sample_augment.sampling.project_images import from_projected_images
 from sample_augment.sampling.random_synth import random_synthetic_augmentation
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir
+
+import torch
 
 
 @step
@@ -44,7 +46,8 @@ ALL_STRATEGIES = {
     "random": random_synthetic_augmentation,
     "hand-picked": hand_picked_dataset,
     "projection": from_projected_images,
-    "classifier-guided": classifier_guided
+    "classifier-guided": classifier_guided,
+    "classifier-guided-entropy": classifier_guided,
 }
 
 
@@ -54,7 +57,8 @@ def create_synthetic_bundle(strategies: List[str], training_set: TrainSet,
     synthetic_datasets = []
     strategy_specific_args = {
         "classifier-guided": {  # TODO pick a specific good one, this is just a random trained classifier
-            "classifier": TrainedClassifier.from_name("ViT-100e_ce6b40")
+            "classifier": TrainedClassifier.from_name("ViT-100e_ce6b40"),
+            "guidance_metric": GuidanceMetric.L2Distance
         }
     }
     for strategy in strategies:
@@ -119,6 +123,7 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
                                                         threshold_lambda=threshold_lambda
                                                         )
         trained_classifier.configs['strategy'] = strategies[i]
+        trained_classifier.configs['random_seed'] = random_seed
         trained_classifiers.append(trained_classifier)
 
     log.info(f'Training baseline-configs without synthetic data.')
@@ -208,7 +213,7 @@ def evaluate_synth_trained_classifiers(trained_classifiers: StrategyComparisonCl
                                        threshold_lambda: float
                                        ) -> SynthComparisonReport:
     synth_reports = []
-    for strategy, classifier in zip(strategies, trained_classifiers.classifiers):
+    for idx, (strategy, classifier) in enumerate(zip(strategies, trained_classifiers.classifiers)):
         predictions: ValidationPredictions = predict_validation_set(classifier, val_set,
                                                                     batch_size=32)
         log.info(f"-- Strategy {strategy} --")
@@ -247,5 +252,6 @@ def evaluate_multiseed_synth(multiseed: MultiSeedStrategyComparison, val_set: Va
             threshold_lambda=threshold_lambda
         )
         all_reports.append(synth_comparison_report)
+        torch.cuda.empty_cache()
 
     return MultiSeedReport(reports=all_reports)

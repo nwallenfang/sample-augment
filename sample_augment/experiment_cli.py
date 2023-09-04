@@ -28,7 +28,7 @@ def running_on_colab():
 experiment_to_step = {
     'baseline': 'evaluate_k_classifiers',
     'architecture': 'evaluate_k_classifiers',
-    'sampling': 'synth_bundle_compare_classifiers_multi_seed'
+    'sampling': 'evaluate_multiseed_synth'
 }
 
 
