@@ -1,5 +1,4 @@
 import enum
-import sys
 
 import numpy as np
 import torch
@@ -54,9 +53,9 @@ def classifier_guided(training_set: TrainSet, generator_name: str, random_seed: 
                                           dtype=torch.float32)
 
     generator = StyleGANGenerator.load_from_name(generator_name, random_seed)
-    visualize_best_worst_images(training_set, generator_name, random_seed, classifier, GuidanceMetric.Entropy)
-    visualize_best_worst_images(training_set, generator_name, random_seed, classifier, GuidanceMetric.L2Distance)
-    sys.exit(0)
+    # visualize_best_worst_images(training_set, generator_name, random_seed, classifier, GuidanceMetric.Entropy)
+    # visualize_best_worst_images(training_set, generator_name, random_seed, classifier, GuidanceMetric.L2Distance)
+    # sys.exit(0)
     for label_idx, label_comb in enumerate(unique_label_combinations):
         c = label_comb.repeat(n_generate, 1)
         synth_raw = generator.generate(c=c).permute(0, 3, 1, 2)
@@ -70,7 +69,8 @@ def classifier_guided(training_set: TrainSet, generator_name: str, random_seed: 
             scores = classifier.model(synth_processed)
             scores = torch.sigmoid(scores)
 
-        metric = guidance_metric.value(scores, c)
+        # noinspection PyCallingNonCallable
+        metric = guidance_metric(scores, c)
 
         # selected the top n_select instances based on metric
         top_idx = metric.argsort()[-n_select:]

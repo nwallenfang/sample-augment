@@ -1,0 +1,66 @@
+{
+    "sampling.compare_strategies.MultiSeedStrategyComparison": {
+        "path": "MultiSeedStrategyComparison/s03-synth-p05_178d2e.json",
+        "configs": {
+            "generator_name": "wdataaug-028_012200",
+            "name": "s03-synth-p05",
+            "strategies": [
+                "random"
+            ],
+            "synth_p": 0.05,
+            "num_epochs": 120,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "balance_classes": true,
+            "model_type": "VisionTransformer",
+            "data_augment": true,
+            "geometric_augment": true,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "lr_schedule": false,
+            "threshold_lambda": 0.4,
+            "multi_seeds": [
+                302,
+                303,
+                304
+            ],
+            "random_seed": 100,
+            "test_ratio": 0.2,
+            "val_ratio": 0.1,
+            "min_instances": 10
+        }
+    },
+    "sampling.compare_strategies.MultiSeedReport": {
+        "path": "MultiSeedReport/s03-synth-p05_178d2e.json",
+        "configs": {
+            "strategies": [
+                "random"
+            ],
+            "threshold_lambda": 0.4,
+            "name": "s03-synth-p05",
+            "generator_name": "wdataaug-028_012200",
+            "synth_p": 0.05,
+            "num_epochs": 120,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "balance_classes": true,
+            "model_type": "VisionTransformer",
+            "data_augment": true,
+            "geometric_augment": true,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "lr_schedule": false,
+            "multi_seeds": [
+                302,
+                303,
+                304
+            ],
+            "random_seed": 100,
+            "test_ratio": 0.2,
+            "val_ratio": 0.1,
+            "min_instances": 10
+        }
+    }
+}

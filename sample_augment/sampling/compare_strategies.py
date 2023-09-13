@@ -1,5 +1,5 @@
 import sys
-from typing import List
+from typing import List, Optional
 
 from sample_augment.core import Artifact, step
 from sample_augment.data.gc10.read_labels import GC10Labels
@@ -78,7 +78,7 @@ def create_synthetic_bundle(strategies: List[str], training_set: TrainSet,
 
 
 class StrategyComparisonClassifiers(Artifact):
-    baseline: TrainedClassifier
+    baseline: Optional[TrainedClassifier]
     classifiers: List[TrainedClassifier]
 
 
@@ -98,7 +98,8 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
                                      h_flip_p: float,
                                      v_flip_p: float,
                                      lr_schedule: bool,
-                                     threshold_lambda: float
+                                     threshold_lambda: float,
+                                     train_baseline: bool = True
                                      ) -> StrategyComparisonClassifiers:
     trained_classifiers: List[TrainedClassifier] = []
     assert len(bundle.synthetic_datasets) == len(
@@ -126,15 +127,20 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
         trained_classifier.configs['random_seed'] = random_seed
         trained_classifiers.append(trained_classifier)
 
-    log.info(f'Training baseline-configs without synthetic data.')
-    baseline = train_classifier(train_data=train_set, val_data=val_set, model_type=model_type, num_epochs=num_epochs,
-                                batch_size=batch_size, learning_rate=learning_rate, balance_classes=balance_classes,
-                                random_seed=random_seed, data_augment=data_augment, geometric_augment=geometric_augment,
-                                color_jitter=color_jitter, h_flip_p=h_flip_p, v_flip_p=v_flip_p,
-                                lr_schedule=lr_schedule, threshold_lambda=threshold_lambda)
+    if train_baseline:
+        log.info(f'Training baseline-configs without synthetic data.')
+        baseline = train_classifier(train_data=train_set, val_data=val_set, model_type=model_type, num_epochs=num_epochs,
+                                    batch_size=batch_size, learning_rate=learning_rate, balance_classes=balance_classes,
+                                    random_seed=random_seed, data_augment=data_augment,
+                                    geometric_augment=geometric_augment,
+                                    color_jitter=color_jitter, h_flip_p=h_flip_p, v_flip_p=v_flip_p,
+                                    lr_schedule=lr_schedule, threshold_lambda=threshold_lambda)
 
-    # get models out of GPU so we don't run out of memory when running this for multiple in one eperiment
-    baseline.model = baseline.model.cpu()
+        # get models out of GPU so we don't run out of memory when running this for multiple in one eperiment
+        baseline.model = baseline.model.cpu()
+    else:
+        baseline = None
+
     for classifier in trained_classifiers:
         classifier.model = classifier.model.cpu()
     return StrategyComparisonClassifiers(baseline=baseline, classifiers=trained_classifiers)

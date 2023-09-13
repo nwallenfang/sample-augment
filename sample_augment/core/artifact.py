@@ -77,6 +77,14 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
                     'path': save_path.relative_to(path_utils.root_dir).as_posix()
                 })
             return serialized_tensor_strings
+        if origin is Union:  # only Unions with None (Optional) are supported
+            types = get_args(field_type)
+            if type(None) in types:
+                # It's an Optional type
+                actual_type = next(t for t in types if not isinstance(t, type(None)))
+                if field is None:
+                    return None
+                return self._serialize_field(field, field_name, actual_type, external_directory, extra_configs)
         if not inspect.isclass(field_type):
             # it's a primitive type or a list
             if origin is list or origin is List:  # check if field_type is a list

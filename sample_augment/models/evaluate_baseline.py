@@ -69,7 +69,7 @@ def check_macro_f1(names, _metrics, reports):
 
     prepare_latex_plot()
 
-    fig, ax = plt.subplots(figsize=(8, 4))
+    fig, ax = plt.subplots(figsize=(6, 3))
 
     # Convert your nested list of F1 scores to a DataFrame suitable for Seaborn
     data_list = []
@@ -101,7 +101,7 @@ def check_macro_f1(names, _metrics, reports):
 
     ax.set_ylim([0.76, 0.86])
     ax.set_xticklabels(names)
-    plt.xticks(rotation=45)
+    plt.xticks(rotation=25)
     plt.ylabel('Macro Average F1 Score')
     plt.xlabel('Training Run')
 
