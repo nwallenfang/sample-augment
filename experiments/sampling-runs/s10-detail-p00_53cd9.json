@@ -1,0 +1,84 @@
+{
+    "sampling.compare_strategies.MultiSeedStrategyComparison": {
+        "path": "MultiSeedStrategyComparison/s10-detail-p00_1008a0.json",
+        "configs": {
+            "generator_name": "wdataaug-028_012200",
+            "name": "s10-detail-p00",
+            "strategies": [
+                "random",
+                "classifier-guided"
+            ],
+            "synth_p": 0.0,
+            "num_epochs": 120,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "balance_classes": true,
+            "model_type": "VisionTransformer",
+            "data_augment": true,
+            "geometric_augment": true,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "lr_schedule": false,
+            "threshold_lambda": 0.4,
+            "multi_seeds": [
+                401,
+                402,
+                403,
+                404,
+                405,
+                406,
+                407,
+                408,
+                409,
+                410
+            ],
+            "train_baseline": false,
+            "random_seed": 100,
+            "test_ratio": 0.2,
+            "val_ratio": 0.1,
+            "min_instances": 10
+        }
+    },
+    "sampling.compare_strategies.MultiSeedReport": {
+        "path": "MultiSeedReport/s10-detail-p00_1008a0.json",
+        "configs": {
+            "strategies": [
+                "random",
+                "classifier-guided"
+            ],
+            "threshold_lambda": 0.4,
+            "name": "s10-detail-p00",
+            "generator_name": "wdataaug-028_012200",
+            "synth_p": 0.0,
+            "num_epochs": 120,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "balance_classes": true,
+            "model_type": "VisionTransformer",
+            "data_augment": true,
+            "geometric_augment": true,
+            "color_jitter": 0.25,
+            "h_flip_p": 0.5,
+            "v_flip_p": 0.5,
+            "lr_schedule": false,
+            "multi_seeds": [
+                401,
+                402,
+                403,
+                404,
+                405,
+                406,
+                407,
+                408,
+                409,
+                410
+            ],
+            "train_baseline": false,
+            "random_seed": 100,
+            "test_ratio": 0.2,
+            "val_ratio": 0.1,
+            "min_instances": 10
+        }
+    }
+}

@@ -296,9 +296,14 @@ class Artifact(BaseModel, metaclass=ArtifactMeta):
             # if field_type is a subclass of Artifact, we need to recursively deserialize it
             # else we can deserialize the field with our helper method.
             if isinstance(field_type, type) and issubclass(field_type, Artifact):
-                # save subartifact in external dict and apply after the main loop
-                # since the field_name needs to change
-                subartifacts[field_name] = field_type.from_dict(value)
+                if value is None:
+                    # if value is None, set subartifact to None and hope it's an Optional field
+                    # else we will get a descriptive error from parse_obj_as()
+                    subartifacts[field_name] = None
+                else:
+                    # save subartifact in external dict and apply after the main loop
+                    # since the field_name needs to change
+                    subartifacts[field_name] = field_type.from_dict(value)
             else:
                 data[field_name] = Artifact._deserialize_field(field_name, value,
                                                                cls.__annotations__[field_name] if

@@ -59,6 +59,11 @@ def create_synthetic_bundle(strategies: List[str], training_set: TrainSet,
         "classifier-guided": {  # TODO pick a specific good one, this is just a random trained classifier
             "classifier": TrainedClassifier.from_name("ViT-100e_ce6b40"),
             "guidance_metric": GuidanceMetric.L2Distance
+        },
+        "classifier-guided-entropy": {
+            "classifier": TrainedClassifier.from_name("ViT-100e_ce6b40"),
+            "guidance_metric": GuidanceMetric.Entropy
+
         }
     }
     for strategy in strategies:
@@ -102,6 +107,7 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
                                      train_baseline: bool = True
                                      ) -> StrategyComparisonClassifiers:
     trained_classifiers: List[TrainedClassifier] = []
+    log.info(f"Value of train_baseline: {train_baseline}")
     assert len(bundle.synthetic_datasets) == len(
         strategies), f'{len(bundle.synthetic_datasets)} datasets != {len(strategies)} strategies'
     for i, synthetic_dataset in enumerate(bundle.synthetic_datasets):
@@ -129,7 +135,8 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
 
     if train_baseline:
         log.info(f'Training baseline-configs without synthetic data.')
-        baseline = train_classifier(train_data=train_set, val_data=val_set, model_type=model_type, num_epochs=num_epochs,
+        baseline = train_classifier(train_data=train_set, val_data=val_set, model_type=model_type,
+                                    num_epochs=num_epochs,
                                     batch_size=batch_size, learning_rate=learning_rate, balance_classes=balance_classes,
                                     random_seed=random_seed, data_augment=data_augment,
                                     geometric_augment=geometric_augment,
@@ -168,13 +175,14 @@ def synth_bundle_compare_classifiers_multi_seed(
         v_flip_p: float,
         lr_schedule: bool,
         threshold_lambda: float,
-        multi_seeds: List[int]
+        multi_seeds: List[int],
+        train_baseline: bool = True,
 ) -> MultiSeedStrategyComparison:
     results = []
 
     for random_seed in multi_seeds:
         if artifact_name := StrategyComparisonClassifiers.exists(name=f'{name}_{random_seed}'):
-            log.info(f"Seed {random_seed} already exists - skipping")
+            log.info(f"Seed {random_seed} already exists - loading results")
             results.append(StrategyComparisonClassifiers.from_name(artifact_name))
             continue
         log.info(f"Creating SynthBundle with random seed {random_seed}")
@@ -197,7 +205,8 @@ def synth_bundle_compare_classifiers_multi_seed(
             h_flip_p,
             v_flip_p,
             lr_schedule,
-            threshold_lambda
+            threshold_lambda,
+            train_baseline,
         )
         result.configs['name'] = f'{name}_{random_seed}'
         result.save_to_disk()
@@ -208,7 +217,7 @@ def synth_bundle_compare_classifiers_multi_seed(
 
 class SynthComparisonReport(Artifact):
     serialize_this = True
-    baseline_report: ClassificationReport
+    baseline_report: Optional[ClassificationReport]
     synth_reports: List[ClassificationReport]
 
 
@@ -224,16 +233,18 @@ def evaluate_synth_trained_classifiers(trained_classifiers: StrategyComparisonCl
                                                                     batch_size=32)
         log.info(f"-- Strategy {strategy} --")
         report: ClassificationReport = evaluate_classifier(predictions, val_set, labels, threshold_lambda)
-
-        # log.info(report.report)
         synth_reports.append(report)
 
-    log.info(" -- Baseline --")
-    predictions_baseline: ValidationPredictions = predict_validation_set(trained_classifiers.baseline, val_set,
-                                                                         batch_size=32)
-    baseline_report: ClassificationReport = evaluate_classifier(predictions_baseline, val_set, labels,
-                                                                threshold_lambda)
+    if trained_classifiers.baseline is not None:
+        log.info(" -- Baseline --")
 
+        predictions_baseline: ValidationPredictions = predict_validation_set(trained_classifiers.baseline, val_set,
+                                                                             batch_size=32)
+        baseline_report: Optional[ClassificationReport] = evaluate_classifier(predictions_baseline, val_set, labels,
+                                                                              threshold_lambda)
+    else:
+        log.info("No baseline classifier, skipping baseline evaluation.")
+        baseline_report = None
     return SynthComparisonReport(baseline_report=baseline_report, synth_reports=synth_reports)
 
 

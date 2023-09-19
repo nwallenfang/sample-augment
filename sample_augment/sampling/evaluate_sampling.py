@@ -197,13 +197,82 @@ def multiseed_boxplot(report: MultiSeedReport):
     plt.savefig(figures_dir / 'multiseed_strategies_f1_swarmplot.pdf', bbox_inches="tight")
 
 
+def macro_f1_for_seeds(multi_seed_report):
+    """Extract the macro F1 scores for each random seed."""
+    # Make sure there's only one strategy in SynthComparisonReport
+    assert len(multi_seed_report.reports[0].synth_reports) == 1, "Expected only one strategy in SynthComparisonReport"
+
+    # Get macro F1 scores for each seed
+    return [seed_report.synth_reports[0].report['macro avg']['f1-score'] for seed_report in multi_seed_report.reports]
+
+
+def mean_and_whiskers(values):
+    """Compute mean and whisker values for a list of values."""
+    return {
+        "mean": sum(values) / len(values),
+        "min": min(values),
+        "max": max(values)
+    }
+
+
+def plot_macro_f1_vs_synth_p(reports):
+    """Plot Macro F1 scores with whiskers against Synth P values."""
+    synth_p_values = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
+    stats = [mean_and_whiskers(macro_f1_for_seeds(report)) for report in reports]
+
+    means = [s["mean"] for s in stats]
+    lower_errors = [s["mean"] - s["min"] for s in stats]
+    upper_errors = [s["max"] - s["mean"] for s in stats]
+
+    prepare_latex_plot()
+    plt.figure(figsize=(0.9*6, 0.9*3.0))
+
+    # Convert synth_p_values to percentages for plotting
+    synth_p_percentage = [x * 100 for x in synth_p_values]
+
+    plt.errorbar(synth_p_percentage, means, yerr=[lower_errors, upper_errors], fmt='--o', capsize=5, ecolor="grey",
+                 label="Random Sampling")
+
+    plt.xlabel(r'$\fontsize{14}{14}\selectfont p_{synth}$ (%)')
+    plt.ylabel('Macro F1 Score')
+    plt.legend()
+    # Set y-ticks to display whole F1 scores
+    min_f1 = min([s["min"] for s in stats])
+    max_f1 = max([s["max"] for s in stats])
+    plt.yticks(np.arange(np.floor(min_f1 * 100) / 100, np.ceil(max_f1 * 100) / 100, 0.01))
+
+    plt.grid(True)
+    # plt.show()
+    plt.tight_layout()
+    plt.savefig(figures_dir / "synth_p.pdf", bbox_inches="tight")
+
+
+def synth_p_lineplot():
+    """Generate line plot for Macro F1 scores vs. Synth P values."""
+    filenames = [
+        's03-synth-p05_178d2e.json',
+        's04-synth-p10_95271f.json',
+        's05-synth-p15_08f3b7.json',
+        's06-synth-p20_dfa894.json',
+        's07-synth-p25_6250a0.json',
+        's08-synth-p30_9cb4d2.json'
+    ]
+
+    # Load reports using filenames
+    reports = list(map(MultiSeedReport.from_name, filenames))
+
+    # Plot the results
+    plot_macro_f1_vs_synth_p(reports)
+
+
 if __name__ == '__main__':
     # strategies = MultiSeedStrategyComparison.from_name('s00-baseline_7465aa')
     # find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
     # # create Experiment instance
     # experiment = Experiment(read_config(shared_dir / "configs/config_s00-baseline_7175d.json"))
     # experiment.run("multiseed_boxplot", initial_artifacts=[strategies])
-    multi_report = MultiSeedReport.from_name('s01-baseline_df5f64')
-    multiseed_boxplot(multi_report)
+    # multi_report = MultiSeedReport.from_name('s01-baseline_df5f64')
+    # multiseed_boxplot(multi_report)
+    synth_p_lineplot()
     # TODO could also run this in the end with another value of synth_p, would be interesting,
     #   one lower, one higher
