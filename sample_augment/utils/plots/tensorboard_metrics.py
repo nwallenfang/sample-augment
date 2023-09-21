@@ -134,7 +134,7 @@ def plot_fid(event_files: Dict[str, EventAccumulator]):
 
     plt.xlim([0, 12.5])
     plt.xlabel('Total Images Processed by Discriminator [millions]')
-    plt.ylabel('FID Score')
+    plt.ylabel('FID')
     plt.ylim([30, 80])
     plt.legend(loc="upper right", title="Runs", frameon=True)
     plt.tight_layout()
@@ -151,13 +151,13 @@ def main():
             str(root_dir / 'TrainedStyleGAN' / 'unified-030.out.tfevents.1692698037.ipt-d-0432.14936.0')),
         'resume-fail': get_event_accumulator(str(root_dir / 'TrainedStyleGAN' / 'resume-fail-024.out.tfevents.1689928298.ipt-d-0432.32864.0'))
     }
-    plot_real_vs_fake_loss(event_files)
-    # plot_fid(event_files)
+    # plot_real_vs_fake_loss(event_files)
+    plot_fid(event_files)
     # plot_single_metric_for_runs(event_files, "Loss/pl_penalty", "PL Length Penalty", "style_gan_pl_length", ylim=[0.0, 1.0])
     # plot_single_metric_for_runs(event_files, "Loss/r1_penalty", "R1 Penalty", "stylegan_r1_penalty",
     #                             ylim=[0.0, 1.0])
-    plot_single_metric_for_runs(event_files, "Progress/augment", "Augment", "stylegan_augment_score",
-                                ylim=[0.0, 1.0])
+    # plot_single_metric_for_runs(event_files, "Progress/augment", "Augment", "stylegan_augment_score",
+    #                             ylim=[0.0, 1.0])
 
 
 if __name__ == '__main__':

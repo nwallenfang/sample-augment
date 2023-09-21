@@ -26,6 +26,14 @@ name_to_color = {
     'full-aug-strength': palette[4]
 }
 
+arc_to_color = {
+    'DenseNet': palette[0],
+    'ResNet': palette[1],
+    'EfficientNet-S': palette[2],
+    'EfficientNet-L': palette[3],
+    'VisionTransformer': palette[4],
+}
+
 
 def check_best_epoch(names, metrics, _reports):
     all_epochs = []
@@ -109,6 +117,69 @@ def check_macro_f1(names, _metrics, reports):
     plt.savefig(figures_dir / "f1_comparison.pdf", bbox_inches="tight")
 
 
+def check_architecture_reports(names, reports):
+    # hardcode fix: only take the first 11 for our plot now
+    all_f1s = []
+    color_list = []
+
+    for run_name, run_reports in zip(names, reports):
+        macro_f1_scores = []
+
+        for fold_report in run_reports:
+            macro_f1_scores.append(fold_report.report['macro avg']['f1-score'])
+        all_f1s.append(macro_f1_scores)
+
+        # Assign a color to each run_name based on its group
+        color_list.append(arc_to_color.get(run_name, palette[4]))
+
+    prepare_latex_plot()
+
+    fig, ax = plt.subplots(figsize=(0.90 * 6.8, 0.90 * 3))
+
+    # Convert your nested list of F1 scores to a DataFrame suitable for Seaborn
+    data_list = []
+    for name, f1_scores in zip(names, all_f1s):
+        for f1 in f1_scores:
+            data_list.append({'name': name, 'f1': f1})
+    df = pd.DataFrame(data_list)
+
+    sns.swarmplot(x='name', y='f1', data=df, ax=ax, palette=color_list, dodge=False)
+    # baseline_mean_f1 = np.mean(
+    #     [reports[0][i]['macro avg']['f1-score'] for i in range(5)])
+    #
+    # ax.axhline(baseline_mean_f1, color=name_to_color['baseline'], linestyle='--', linewidth=0.9)
+    minmin = 1
+    maxmax = -1
+    for i, f1_scores in enumerate(all_f1s):
+        mean_f1 = np.mean(f1_scores)
+        min_f1 = np.min(f1_scores)
+        max_f1 = np.max(f1_scores)
+        # draw means
+        ax.hlines(mean_f1, xmin=i - 0.2, xmax=i + 0.2, colors=color_list[i], linewidth=2, zorder=5)
+        # draw std/errorbar with whiskers
+        std_f1 = np.std(f1_scores)
+        lower_std = np.clip(mean_f1 - std_f1, min_f1, mean_f1)
+        upper_std = np.clip(mean_f1 + std_f1, mean_f1, max_f1)
+
+        # draw std/errorbar with whiskers
+        # ax.errorbar(i, mean_f1, yerr=[[mean_f1 - lower_std], [upper_std - mean_f1]], fmt='none', color='gray',
+        #             linewidth=1, capsize=5, zorder=4)
+        minmin = min(min_f1, minmin)
+        maxmax = max(max_f1, maxmax)
+
+    minmin = np.round(minmin / 0.05) * 0.05
+    maxmax = np.round(maxmax / 0.05) * 0.05
+    ax.set_ylim([0.76, 0.86])
+    ax.set_yticks(np.arange(0.70, 0.90, 0.05))
+    ax.set_xticklabels(names)
+    # plt.xticks(rotation=25)
+    plt.ylabel('Macro-Average F1 Score')
+    plt.xlabel('Architecture')
+    plt.grid(axis='y')
+    plt.tight_layout()
+    plt.savefig(figures_dir / "architecture_comparison.pdf", bbox_inches="tight")
+
+
 def check_lr_losses(names, metrics, _reports):
     idx_baseline = names.index('baseline')
     # idx_lr_high = names.index('high-lr')
@@ -142,7 +213,7 @@ def calc_auc(names, metrics, reports):
 
 def subplot_lr_losses(names, metrics, _reports):
     prepare_latex_plot()
-    fig, axes = plt.subplots(1, 2, figsize=(8.5, 3.5))
+    fig, axes = plt.subplots(1, 2, figsize=(0.7 * 8.5, 0.7 * 4.0))
 
     idx_baseline = names.index('baseline')
     idx_lr_schedule = names.index('lr-scheduling')

@@ -197,13 +197,18 @@ def multiseed_boxplot(report: MultiSeedReport):
     plt.savefig(figures_dir / 'multiseed_strategies_f1_swarmplot.pdf', bbox_inches="tight")
 
 
-def macro_f1_for_seeds(multi_seed_report):
-    """Extract the macro F1 scores for each random seed."""
-    # Make sure there's only one strategy in SynthComparisonReport
-    assert len(multi_seed_report.reports[0].synth_reports) == 1, "Expected only one strategy in SynthComparisonReport"
+def macro_f1_for_seeds(multi_seed_report, strategies):
+    """Extract the macro F1 scores for each random seed and strategy."""
+    # num_strategies = len(multi_seed_report.reports[0].synth_reports)
 
-    # Get macro F1 scores for each seed
-    return [seed_report.synth_reports[0].report['macro avg']['f1-score'] for seed_report in multi_seed_report.reports]
+    # Get macro F1 scores for each seed and strategy
+    f1_scores_by_strategy = {}
+    for i, strat in enumerate(strategies):
+        f1_scores = [seed_report.synth_reports[i].report['macro avg']['f1-score']
+                     for seed_report in multi_seed_report.reports]
+        f1_scores_by_strategy[strat] = f1_scores
+
+    return f1_scores_by_strategy
 
 
 def mean_and_whiskers(values):
@@ -225,7 +230,7 @@ def plot_macro_f1_vs_synth_p(reports):
     upper_errors = [s["max"] - s["mean"] for s in stats]
 
     prepare_latex_plot()
-    plt.figure(figsize=(0.9*6, 0.9*3.0))
+    plt.figure(figsize=(0.9 * 6, 0.9 * 3.0))
 
     # Convert synth_p_values to percentages for plotting
     synth_p_percentage = [x * 100 for x in synth_p_values]
@@ -247,6 +252,52 @@ def plot_macro_f1_vs_synth_p(reports):
     plt.savefig(figures_dir / "synth_p.pdf", bbox_inches="tight")
 
 
+def plot_macro_f1_vs_synth_p_multistrat(reports):
+    """Plot Macro F1 scores against Synth P values for multiple strategies using side-by-side subplots."""
+    synth_p_values = [report.configs['synth_p'] for report in reports]
+    strategies = reports[0].configs['strategies']
+    prepare_latex_plot()
+
+    fig, axs = plt.subplots(1, len(strategies), figsize=(12, 4))
+
+    for i, strategy in enumerate(strategies):
+        ax = axs[i]
+        stats = [mean_and_whiskers(macro_f1_for_seeds(report, strategies)[strategy]) for report in reports]
+
+        # means = [s["mean"] for s in stats]
+        # lower_errors = [s["mean"] - s["min"] for s in stats]
+        # upper_errors = [s["max"] - s["mean"] for s in stats]
+        #
+        # ax.errorbar(synth_p_values, means, yerr=[lower_errors, upper_errors],
+        #             fmt='--o', capsize=5, ecolor="grey")
+        f1_values = [macro_f1_for_seeds(report, strategies)[strategy] for report in reports]
+        ax.boxplot(f1_values, notch=False, patch_artist=True)
+        ax.set_xticklabels(synth_p_values)
+        ax.set_xticks(range(1,
+                            len(synth_p_values) + 1))  # Assuming the synth_p_values list is 1-indexed        ax.set_title(f"{strategy} Sampling")
+        ax.set_xlabel(r'$p_{synth}$')
+        ax.set_ylabel('Macro F1 Score')
+        ax.grid(True)
+
+    # Initialize variables
+    min_f1 = float('inf')
+    max_f1 = -float('inf')
+
+    # Iterate through reports to find min and max f1 scores
+    for report in reports:
+        for strategy in report.configs['strategies']:
+            stats = mean_and_whiskers(macro_f1_for_seeds(report, strategies)[strategy])
+            min_f1 = min(min_f1, stats["min"])
+            max_f1 = max(max_f1, stats["max"])
+
+    # Then use min_f1 and max_f1 to set the y-axis limit
+    for ax in axs:
+        ax.set_ylim([min_f1 - 0.01, max_f1 + 0.01])
+    plt.tight_layout()
+    plt.savefig(figures_dir / "synth_p_multistrat_side_by_side.pdf", bbox_inches="tight")
+
+
+
 def synth_p_lineplot():
     """Generate line plot for Macro F1 scores vs. Synth P values."""
     filenames = [
@@ -265,6 +316,19 @@ def synth_p_lineplot():
     plot_macro_f1_vs_synth_p(reports)
 
 
+def synth_p_detail():
+    filenames = [
+        's10-detail-p00_1008a0.json',
+        's11-detail-p05_9441e6.json',
+        's12-detail-p075_7c201a.json',
+        's13-detail-p10_c06a70.json',
+    ]
+
+    # Load reports using filenames
+    reports = list(map(MultiSeedReport.from_name, filenames))
+    plot_macro_f1_vs_synth_p_multistrat(reports)
+
+
 if __name__ == '__main__':
     # strategies = MultiSeedStrategyComparison.from_name('s00-baseline_7465aa')
     # find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
@@ -273,6 +337,5 @@ if __name__ == '__main__':
     # experiment.run("multiseed_boxplot", initial_artifacts=[strategies])
     # multi_report = MultiSeedReport.from_name('s01-baseline_df5f64')
     # multiseed_boxplot(multi_report)
-    synth_p_lineplot()
-    # TODO could also run this in the end with another value of synth_p, would be interesting,
-    #   one lower, one higher
+    # synth_p_lineplot()
+    synth_p_detail()

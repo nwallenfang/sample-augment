@@ -28,16 +28,16 @@ GC10_CLASSES = [
     "waist_folding"
 ]
 GC10_CLASSES_TEXT = [
-    "Punching hole",
-    "Welding line",
-    "Crescent gap",
-    "Water spot",
-    "Oil spot",
-    "Silk spot",
-    "Inclusion",
-    "Rolled pit",
-    "Crease",
-    "Waist folding"
+    "punching hole",
+    "welding line",
+    "crescent gap",
+    "water spot",
+    "oil spot",
+    "silk spot",
+    "inclusion",
+    "rolled pit",
+    "crease",
+    "waist folding"
 ]
 
 
