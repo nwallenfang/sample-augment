@@ -8,8 +8,8 @@ import numpy as np
 from sample_augment.core import Experiment
 from sample_augment.core.config import read_config
 from sample_augment.core.step import find_steps
-from sample_augment.models.evaluate_baseline import check_macro_f1, subplot_lr_losses, check_best_epoch, \
-    check_lr_losses, calc_auc
+from sample_augment.models.evaluate_baseline import check_macro_f1, subplot_lr_losses, check_lr_losses, calc_auc, \
+    check_best_epoch_histogram
 from sample_augment.models.evaluate_classifier import KFoldClassificationReport
 from sample_augment.models.train_classifier import ClassifierMetrics, KFoldTrainedClassifiers
 from sample_augment.sampling.evaluate_sampling import sampling_eval
@@ -105,7 +105,7 @@ def baseline_eval(results, experiment_name="baseline"):
 
     steps = [
         check_macro_f1,
-        check_best_epoch,
+        check_best_epoch_histogram,
         check_lr_losses,
         subplot_lr_losses,
         calc_auc,  # TODO

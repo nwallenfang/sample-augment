@@ -35,27 +35,50 @@ arc_to_color = {
 }
 
 
-def check_best_epoch(names, metrics, _reports):
-    all_epochs = []
+def check_best_epoch_histogram(names, metrics, _reports):
+    # Prepare data and colors
+    epoch_data_by_color = {color: [] for color in list(name_to_color.values())}
 
-    color_list = []
     for run_name, run_metrics in zip(names, metrics):
+        color = name_to_color.get(run_name, palette[4])
         run_epochs = [fold_metric.epoch for fold_metric in run_metrics]
-        color_list.append(name_to_color.get(run_name, palette[4]))
-        all_epochs.append(run_epochs)
+        epoch_data_by_color[color].extend(run_epochs)
 
     # Prepare the plot
     prepare_latex_plot()
-    fig, ax = plt.subplots(figsize=(8, 4))
+    plt.figure(figsize=(8, 4))
+    color_to_label = {
+        palette[0]: 'Baseline',
+        palette[1]: 'Learning Rate',
+        palette[2]: 'Batch Size',
+        palette[4]: 'Data Augmentation'
+    }
 
-    sns.swarmplot(data=all_epochs, ax=ax, palette=color_list)
 
-    ax.set_xticklabels(names)
+    bins = [x + 2.5 for x in range(0, 51, 5)]  # Change this based on your specific needs
+    hist_data = {}
 
-    plt.xticks(rotation=45)
-    plt.ylabel('Epoch of Best Model (max Val. F1)')
+    for color, data in epoch_data_by_color.items():
+        hist, _ = np.histogram(data, bins=bins)
+        hist = hist / np.sum(hist)  # Normalize to sum to 1
+        hist_data[color] = hist
+
+    # Plotting
+    width = np.diff(bins)[0]  # The width of each bin
+
+    bottoms = np.zeros_like(bins[:-1], dtype=np.float64)  # Initialize the bottoms of the bars to zeros
+
+    for color, hist in hist_data.items():
+        plt.bar(bins[:-1], hist, width=width, bottom=bottoms, alpha=0.7, label=color_to_label.get(color, 'Unknown'),
+                color=color)
+        bottoms += hist  # Add the height of this histogram to the bottoms for the next one
+
+    plt.xlabel('Epoch of Best Model (max. Val. F1)')
+    plt.ylabel('Frequency')
+    plt.legend(title='Adjustment')
+
     plt.tight_layout()
-    plt.savefig(figures_dir / "best_epoch_comparison.pdf", bbox_inches="tight")
+    plt.savefig(figures_dir / "best_epoch_histogram.pdf", bbox_inches="tight")
 
 
 def check_macro_f1(names, _metrics, reports):
@@ -77,7 +100,7 @@ def check_macro_f1(names, _metrics, reports):
 
     prepare_latex_plot()
 
-    fig, ax = plt.subplots(figsize=(6, 3))
+    fig, ax = plt.subplots(figsize=(0.65 * 6, 0.65 * 3))
 
     # Convert your nested list of F1 scores to a DataFrame suitable for Seaborn
     data_list = []
