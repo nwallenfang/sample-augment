@@ -297,7 +297,6 @@ def plot_macro_f1_vs_synth_p_multistrat(reports):
     plt.savefig(figures_dir / "synth_p_multistrat_side_by_side.pdf", bbox_inches="tight")
 
 
-
 def synth_p_lineplot():
     """Generate line plot for Macro F1 scores vs. Synth P values."""
     filenames = [
@@ -329,6 +328,49 @@ def synth_p_detail():
     plot_macro_f1_vs_synth_p_multistrat(reports)
 
 
+def get_classwise_f1_scores(reports):
+    # Create a dictionary to hold arrays of F1 scores for each class
+    classwise_f1 = {}
+
+    for report in reports:
+        for cls, metrics in report.items():
+            if cls not in classwise_f1:
+                classwise_f1[cls] = []
+            classwise_f1[cls].append(metrics.get('f1-score', 0.0))
+
+    return classwise_f1
+
+
+def calc_avg_std(f1_scores):
+    avg = np.mean(f1_scores)
+    std = np.std(f1_scores)
+    return avg, std
+
+
+def compare_generators():
+    cguided_old = MultiSeedReport.from_name('s12-detail-p075_7c201a.json')
+    cguided_unified = MultiSeedReport.from_name('s16-unified-generator_03aa95.json')
+    assert cguided_old.configs['synth_p'] == cguided_unified.configs['synth_p']
+    print(cguided_old.configs['strategies'], cguided_unified.configs['strategies'])
+
+    reports_old = [seed_report.synth_reports[1].report for seed_report in cguided_old.reports]
+    reports_unified = [seed_report.synth_reports[0].report for seed_report in cguided_unified.reports]
+
+    # Calculate class-wise F1 scores for each set of reports
+    f1_old = get_classwise_f1_scores(reports_old)
+    f1_unified = get_classwise_f1_scores(reports_unified)
+
+    # Calculate and print average and std deviation for each class
+    print("Class-wise F1 score comparison:")
+    for cls in f1_old.keys():
+        avg_old, std_old = calc_avg_std(f1_old[cls])
+        avg_unified, std_unified = calc_avg_std(f1_unified.get(cls, []))
+
+        print(f"For class {cls}:")
+        print(f"  Old generator: Avg = {avg_old:.4f}, Std = {std_old:.4f}")
+        print(f"  Unified generator: Avg = {avg_unified:.4f}, Std = {std_unified:.4f}")
+
+
 if __name__ == '__main__':
     # strategies = MultiSeedStrategyComparison.from_name('s00-baseline_7465aa')
     # find_steps(include=['test', 'data', 'models', 'sampling'], exclude=['models.stylegan2'])
@@ -338,4 +380,5 @@ if __name__ == '__main__':
     # multi_report = MultiSeedReport.from_name('s01-baseline_df5f64')
     # multiseed_boxplot(multi_report)
     # synth_p_lineplot()
-    synth_p_detail()
+    compare_generators()
+    # synth_p_detail()

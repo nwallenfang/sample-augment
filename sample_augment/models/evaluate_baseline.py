@@ -46,7 +46,7 @@ def check_best_epoch_histogram(names, metrics, _reports):
 
     # Prepare the plot
     prepare_latex_plot()
-    plt.figure(figsize=(8, 4))
+    plt.figure(figsize=(0.7 * 8, 0.7 * 4))
     color_to_label = {
         palette[0]: 'Baseline',
         palette[1]: 'Learning Rate',
