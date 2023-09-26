@@ -23,7 +23,8 @@ name_to_color = {
     'geom-aug': palette[4],
     'full-aug': palette[4],
     'full-aug-lr': palette[4],
-    'full-aug-strength': palette[4]
+    'full-aug-strength': palette[4],
+    'synthetic': palette[1]
 }
 
 arc_to_color = {
