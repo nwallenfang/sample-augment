@@ -1,5 +1,5 @@
 {
-  "name": "synthbundle",
+  "name": "debug-synth-p-issue",
   "random_seed": 100,
   "test_ratio": 0.2,
   "val_ratio": 0.1,
@@ -25,6 +25,6 @@
   "strategies": [
       "classifier-guided"
   ],
-  "synth_p": 0.33,
+  "synth_p": 0.0,
   "train_baseline": false
 }

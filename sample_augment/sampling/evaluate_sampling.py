@@ -111,7 +111,7 @@ def sampling_eval(results, experiment_name="sampling"):
 def multiseed_boxplot(report: MultiSeedReport):
     # report.save_to_disk()
     def idx_to_name(_idx):
-        return report.reports[0].configs["strategies"][_idx - 1] if _idx > 0 else "Baseline"
+        return (report.reports[0].configs["strategies"][_idx - 1] if _idx > 0 else "Baseline").capitalize()
 
     all_data = []
     macro_data = []
@@ -158,17 +158,19 @@ def multiseed_boxplot(report: MultiSeedReport):
 
     prepare_latex_plot()
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(0.7*8, 0.7*5))
     palette = ["grey"] + list(sns.color_palette("deep", n_colors=len(report.configs['strategies'])))
 
     print(df.head())
     print(df['Strategy'].value_counts())
     sns.swarmplot(x='Strategy', y='Macro F1', data=df, ax=ax, hue="Strategy", palette=palette, dodge=False)
+    ax.legend_.remove()
 
     for i, strat in enumerate(df['Strategy'].unique()):
         strat_data = df[df['Strategy'] == strat]['Macro F1']
         mean_f1 = np.mean(strat_data)
         std_f1 = np.std(strat_data)
+        print("strat", strat, std_f1)
         min_f1 = np.max([mean_f1 - std_f1, np.min(strat_data)])
         max_f1 = np.min([mean_f1 + std_f1, np.max(strat_data)])
 
@@ -271,6 +273,7 @@ def plot_macro_f1_vs_synth_p_multistrat(reports):
         # ax.errorbar(synth_p_values, means, yerr=[lower_errors, upper_errors],
         #             fmt='--o', capsize=5, ecolor="grey")
         f1_values = [macro_f1_for_seeds(report, strategies)[strategy] for report in reports]
+        print(strategy, f1_values[0])
         ax.boxplot(f1_values, notch=False, patch_artist=True)
         ax.set_xticklabels(synth_p_values)
         ax.set_xticks(range(1,
@@ -380,5 +383,8 @@ if __name__ == '__main__':
     # multi_report = MultiSeedReport.from_name('s01-baseline_df5f64')
     # multiseed_boxplot(multi_report)
     # synth_p_lineplot()
-    compare_generators()
-    # synth_p_detail()
+    # compare_generators()
+    synth_p_detail()
+
+    multi_report = MultiSeedReport.from_name('s17-synth_p_0_check_9ef8df')
+    multiseed_boxplot(multi_report)
