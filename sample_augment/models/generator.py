@@ -52,9 +52,10 @@ class StyleGANGenerator:
     pkl_path: Path
     name: str
     device: torch.device
-    seed: int
+    # seed: int
     G: Generator
     D: Discriminator
+    _random_state: np.random.RandomState
 
     def __init__(self, pkl_path: Union[str, Path], seed: int = 100):
         if isinstance(pkl_path, str):
@@ -65,7 +66,7 @@ class StyleGANGenerator:
         self.name = pkl_path.name.split('.')[0].split('_')[0]
         self.out_dir = root_dir / "shared" / "generated" / self.name
         self.out_dir.mkdir(exist_ok=True)
-        self.seed = seed
+        self._random_state = np.random.RandomState(seed)
 
         os.makedirs(self.out_dir, exist_ok=True)
 
@@ -151,7 +152,7 @@ class StyleGANGenerator:
         n: int = c.shape[0]
 
         # build input z vector (gaussian distribution)
-        z = torch.from_numpy(np.random.RandomState(self.seed).randn(n, self.G.z_dim)).to(self.device)
+        z = torch.from_numpy(self._random_state.randn(c.shape[0], self.G.z_dim)).to(self.device)
 
         # with SuppressSpecificPrint("Setting up PyTorch plugin \"upfirdn2d_plugin\"... Failed!"):
         imgs = self.G(z, c, truncation_psi=truncation_psi, noise_mode=noise_mode)

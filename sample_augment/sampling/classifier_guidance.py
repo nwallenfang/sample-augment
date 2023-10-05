@@ -1,4 +1,5 @@
 import enum
+import os
 
 import numpy as np
 import torch
@@ -12,7 +13,10 @@ from sample_augment.models.generator import StyleGANGenerator
 from sample_augment.models.train_classifier import TrainedClassifier
 from sample_augment.models.train_classifier import plain_transforms
 from sample_augment.utils import log
-from sample_augment.utils.path_utils import root_dir
+from sample_augment.utils.path_utils import root_dir, shared_dir
+from PIL import Image
+
+from sample_augment.utils.plot import multihot_to_classnames
 
 
 def l2_distance(predicted_scores, actual_labels):
@@ -39,6 +43,7 @@ def classifier_guided(training_set: TrainSet, generator_name: str, random_seed: 
     classifier.model.eval()
     label_matrix = training_set.label_tensor.to(device)
 
+    # resize for the vision transformer
     resize = transforms.Resize((224, 224), antialias=True)
     preprocess = transforms.Compose(plain_transforms)
 
@@ -53,8 +58,8 @@ def classifier_guided(training_set: TrainSet, generator_name: str, random_seed: 
                                           dtype=torch.float32)
 
     generator = StyleGANGenerator.load_from_name(generator_name, random_seed)
-    # visualize_best_worst_images(training_set, generator_name, random_seed, classifier, GuidanceMetric.Entropy)
-    # visualize_best_worst_images(training_set, generator_name, random_seed, classifier, GuidanceMetric.L2Distance)
+    visualize_best_worst_images(training_set, generator_name, random_seed, classifier, GuidanceMetric.Entropy)
+    visualize_best_worst_images(training_set, generator_name, random_seed, classifier, GuidanceMetric.L2Distance)
     # sys.exit(0)
     for label_idx, label_comb in enumerate(unique_label_combinations):
         c = label_comb.repeat(n_generate, 1)
@@ -89,19 +94,22 @@ def classifier_guided(training_set: TrainSet, generator_name: str, random_seed: 
 
 def visualize_best_worst_images(training_set: TrainSet, generator_name: str, random_seed: int,
                                 classifier: TrainedClassifier, guidance_metric: GuidanceMetric,
-                                n_combinations_to_plot=3):
+                                n_combinations_to_plot=3,
+                                output_dir=shared_dir / 'generated' / 'cguidance'):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     # 1. Select Label Combinations
     resize = transforms.Resize((224, 224), antialias=True)
     preprocess = transforms.Compose(plain_transforms)
 
     unique_label_combinations, _ = torch.unique(training_set.label_tensor, dim=0, return_inverse=True)
-    selected_combinations = unique_label_combinations[torch.randint(len(unique_label_combinations),
-                                                                    (n_combinations_to_plot,))]
+    names = [(i, multihot_to_classnames(comb.cpu().numpy())) for i, comb in enumerate(unique_label_combinations)]
+    print(names)
+    selected_combinations = unique_label_combinations[[27, 34, 37]]
 
     # Define the functions for generating images and computing metric
     def generate_images_and_metric(_label_comb):
         c = _label_comb.repeat(50, 1)  # you defined n_generate = 50
-        # TODO confirm setting random_seed makes StyleGAN deterministic
         _synth_raw = StyleGANGenerator.load_from_name(generator_name, random_seed).generate(c=c).permute(0, 3, 1, 2)
         with torch.no_grad():
             scores = classifier.model(resize(preprocess(_synth_raw)))
@@ -115,22 +123,49 @@ def visualize_best_worst_images(training_set: TrainSet, generator_name: str, ran
     for idx, label_comb in enumerate(selected_combinations):
         synth_raw, metric = generate_images_and_metric(label_comb)
 
+        np.save(os.path.join(output_dir, f'metric_{guidance_metric.__name__}_comb_{idx}.npy'), metric)
+
         # 3. Visualize Results
         fig, axs = plt.subplots(2, 6, figsize=(15, 6))
         top_idx = metric.argsort()[-6:]
         bottom_idx = metric.argsort()[:6]
 
+        top_images = []
+        bottom_images = []
+
+        # Save Top and Bottom Images and Their Metrics
+        for i, image_idx in enumerate(top_idx):
+            img_np = synth_raw[image_idx].permute(1, 2, 0).cpu().numpy()
+            # print('minmax', np.min(img_np), np.max(img_np))
+            # img_pil = Image.fromarray((img_np * 255).astype(np.uint8))
+            img_pil = Image.fromarray(img_np)
+            img_pil.save(os.path.join(output_dir, f'top_{i + 1}_{guidance_metric.__name__}_comb_{idx}.png'))
+            top_images.append(img_np)
+
+        for i, image_idx in enumerate(bottom_idx):
+            img_np = synth_raw[image_idx].permute(1, 2, 0).cpu().numpy()
+            # img_pil = Image.fromarray((img_np * 255).astype(np.uint8))
+            img_pil = Image.fromarray(img_np)
+            img_pil.save(os.path.join(output_dir, f'bottom_{i + 1}_{guidance_metric.__name__}_comb_{idx}.png'))
+            bottom_images.append(img_np)
+
+        # Save Labels for this Combination
+        np.save(os.path.join(output_dir, f'{guidance_metric.__name__}_comb_{idx}.npy'), label_comb.cpu().numpy())
+
         for i, image_idx in enumerate(top_idx):
             axs[0, i].imshow(synth_raw[image_idx].permute(1, 2, 0).cpu().numpy())
-            axs[0, i].set_title(f"Top {i + 1}")
+            axs[0, i].set_title(f"Top {i + 1} (metric={metric[image_idx]})")
             axs[0, i].axis('off')
 
         for i, image_idx in enumerate(bottom_idx):
             axs[1, i].imshow(synth_raw[image_idx].permute(1, 2, 0).cpu().numpy())
-            axs[1, i].set_title(f"Bottom {i + 1}")
+            axs[1, i].set_title(f"Bottom {i + 1} (metric={metric[image_idx]})")
             axs[1, i].axis('off')
 
+        plt.suptitle(f'{guidance_metric.__name__} - {label_comb}')
+
         # 4. Save the Plots
+        # plt.show()
         log.info(f'Saving plot {guidance_metric.__name__} :)')
         file_name = f"{guidance_metric.__name__}_label_comb_{idx}.png"
         fig.savefig(f"{str(root_dir.parent / 'experiments/figures')}/{file_name}")

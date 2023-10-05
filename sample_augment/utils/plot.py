@@ -1,7 +1,21 @@
+from typing import List
+
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+
+from sample_augment.models.generator import GC10_CLASSES_TEXT
+
+
+def multihot_to_classnames(multihot_label: np.ndarray) -> List[str]:
+    """
+    Convert multi-hot encoded labels to a list of class names.
+    """
+    active_classes = np.where(multihot_label == 1)[0]  # Get indices of active classes
+    class_list = [GC10_CLASSES_TEXT[i] for i in active_classes]
+
+    return class_list
 
 
 def show_image_numpy(img: np.ndarray, title: str, text: str = None, save_path: str = None):

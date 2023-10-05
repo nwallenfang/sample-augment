@@ -280,6 +280,7 @@ def plot_macro_f1_vs_synth_p_multistrat(reports):
                             len(synth_p_values) + 1))  # Assuming the synth_p_values list is 1-indexed        ax.set_title(f"{strategy} Sampling")
         ax.set_xlabel(r'$p_{synth}$')
         ax.set_ylabel('Macro F1 Score')
+        ax.set_title(strategy)
         ax.grid(True)
 
     # Initialize variables
@@ -380,11 +381,11 @@ if __name__ == '__main__':
     # # create Experiment instance
     # experiment = Experiment(read_config(shared_dir / "configs/config_s00-baseline_7175d.json"))
     # experiment.run("multiseed_boxplot", initial_artifacts=[strategies])
-    # multi_report = MultiSeedReport.from_name('s01-baseline_df5f64')
-    # multiseed_boxplot(multi_report)
+    multi_report = MultiSeedReport.from_name('s01-baseline_df5f64')
+    multiseed_boxplot(multi_report)
     # synth_p_lineplot()
     # compare_generators()
-    synth_p_detail()
+    # synth_p_detail()
 
-    multi_report = MultiSeedReport.from_name('s17-synth_p_0_check_9ef8df')
-    multiseed_boxplot(multi_report)
+    # multi_report = MultiSeedReport.from_name('s17-synth_p_0_check_9ef8df')
+    # multiseed_boxplot(multi_report)

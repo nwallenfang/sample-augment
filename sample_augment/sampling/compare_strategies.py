@@ -116,16 +116,17 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
         synth_training_set = synth_data_to_training_set(train_set, synthetic_dataset,
                                                         generator_name=bundle.configs['generator_name'],
                                                         synth_p=synth_p)
-        trained_classifier = train_augmented_classifier(synth_training_set, val_set,
-                                                        num_epochs, batch_size, learning_rate,
-                                                        balance_classes,
-                                                        model_type,
-                                                        random_seed,
-                                                        data_augment,
-                                                        geometric_augment,
-                                                        color_jitter,
-                                                        h_flip_p,
-                                                        v_flip_p,
+        trained_classifier = train_augmented_classifier(train_data=synth_training_set, val_data=val_set,
+                                                        num_epochs=num_epochs, batch_size=batch_size,
+                                                        learning_rate=learning_rate,
+                                                        balance_classes=balance_classes,
+                                                        model_type=model_type,
+                                                        random_seed=random_seed,
+                                                        data_augment=data_augment,
+                                                        geometric_augment=geometric_augment,
+                                                        color_jitter=color_jitter,
+                                                        h_flip_p=h_flip_p,
+                                                        v_flip_p=v_flip_p,
                                                         lr_schedule=lr_schedule,
                                                         threshold_lambda=threshold_lambda
                                                         )
@@ -133,7 +134,7 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
         trained_classifier.configs['random_seed'] = random_seed
         trained_classifiers.append(trained_classifier)
 
-    if train_baseline:
+    if train_baseline:  # should train baseline (optional)
         log.info(f'Training baseline-configs without synthetic data.')
         baseline = train_classifier(train_data=train_set, val_data=val_set, model_type=model_type,
                                     num_epochs=num_epochs,
@@ -148,7 +149,7 @@ def synth_bundle_compare_classifiers(bundle: SyntheticBundle,
     else:
         baseline = None
 
-    for classifier in trained_classifiers:
+    for classifier in trained_classifiers:  # move top CPU
         classifier.model = classifier.model.cpu()
     return StrategyComparisonClassifiers(baseline=baseline, classifiers=trained_classifiers)
 
@@ -240,8 +241,8 @@ def evaluate_synth_trained_classifiers(trained_classifiers: StrategyComparisonCl
 
         predictions_baseline: ValidationPredictions = predict_validation_set(trained_classifiers.baseline, val_set,
                                                                              batch_size=32)
-        baseline_report: Optional[ClassificationReport] = evaluate_classifier(predictions_baseline, val_set, labels,
-                                                                              threshold_lambda)
+        baseline_report: ClassificationReport = evaluate_classifier(predictions_baseline, val_set, labels,
+                                                                    threshold_lambda)
     else:
         log.info("No baseline classifier, skipping baseline evaluation.")
         baseline_report = None

@@ -286,6 +286,8 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
                      lr_schedule: bool,
                      threshold_lambda: float,
                      lr_step_size: int = 10, lr_gamma: float = 0.7) -> TrainedClassifier:
+    _set_random_seed(random_seed)
+
     """
     test the classifier training by training a Densenet201 on GC-10
     this code is taken in large part from Michel's notebook,
@@ -353,6 +355,9 @@ def train_classifier(train_data: TrainSet, val_data: ValSet, model_type: ModelTy
             transforms.Resize((224, 224), **optional_aa_arg),
             val_data.transform
         ])
+
+    # debugging:
+    # return train_data
 
     metrics = train_model(train_data, val_data, model, num_epochs=num_epochs,
                           batch_size=batch_size, learning_rate=learning_rate,
@@ -477,3 +482,9 @@ def determine_threshold_vector(predictions: Tensor, val: ValSet, threshold_lambd
         best_thresholds.append(best_threshold)
 
     return torch.FloatTensor(best_thresholds)
+
+
+def determine_threshodl_revisited(predictions: Tensor, val: ValSet, threshold_lambda: float,
+                               n_support: int = 250):
+    # TODO, this would also imply that I would have to redo all my evaluations
+    pass

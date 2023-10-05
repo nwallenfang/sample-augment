@@ -125,8 +125,11 @@ class Store:
             try:
                 ArtifactSubclass = getattr(import_module(module_name), class_name)
             except ModuleNotFoundError as _e:
-                log.error(f"Loading from {store_path.name}: Module `{module_name}` does not exist.")
-                sys.exit(-1)
+                try:  # hack due to weird bug
+                    ArtifactSubclass = getattr(import_module('sample_augment.' + module_name), class_name)
+                except ModuleNotFoundError as _e:
+                    log.error(f"Loading from {store_path.name}: Module `{module_name}` does not exist.")
+                    sys.exit(-1)
 
             with open(artifact_path, 'r') as artifact_json:
                 artifacts[class_name] = ArtifactSubclass.from_dict(json.load(artifact_json))

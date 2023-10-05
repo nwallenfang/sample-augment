@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -13,10 +12,11 @@ from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import create_train_test_val
 from sample_augment.models.evaluate_classifier import ValidationPredictions, predict_validation_set
 from sample_augment.models.generator import GC10_CLASSES
-from sample_augment.models.train_classifier import determine_threshold_vector, TrainedClassifier
+from sample_augment.models.train_classifier import TrainedClassifier, determine_threshold_vector
 from sample_augment.sampling.compare_strategies import MultiSeedStrategyComparison
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir
+from sample_augment.utils.plot import prepare_latex_plot
 
 
 def class_get_positive_and_negative_instances(labels: Tensor, predictions: ValidationPredictions, class_idx: int):
@@ -70,21 +70,17 @@ def plot_first_n_histograms(df: pd.DataFrame, lambda_thresholds: Tuple[Tensor, T
 
         # plt.hist([positives, negatives], bins=bin_edges, color=[deep_colors[0], deep_colors[1]], label=['Positive',
         #                                                                                                 'Negative'],
-        # align='left', density=True)
+                 # align='left', density=True)
         plt.hist(positives, bins=bin_edges, alpha=0.7, label='Positive', color=deep_colors[0], density=True)
         plt.hist(negatives, bins=bin_edges, alpha=0.7, label='Negative', color=deep_colors[1], density=True)
 
         lambda_0_thres = lambda_thresholds[0][class_idx].cpu().numpy()
         lambda_04_thres = lambda_thresholds[1][class_idx].cpu().numpy()
-        lambda_02_thres = lambda_thresholds[2][class_idx].cpu().numpy()
 
         plt.axvline(x=lambda_0_thres, color=deep_colors[7], linestyle='--', label=f'λ=0: {lambda_0_thres:.2f}',
                     linewidth=2.0)
         plt.axvline(x=lambda_04_thres, color=deep_colors[3], linestyle='--', label=f'λ=0.4: {lambda_04_thres:.2f}',
                     linewidth=2.0)
-        plt.axvline(x=lambda_02_thres, color=deep_colors[4], linestyle='--', label=f'λ=0.1: {lambda_02_thres:.2f}',
-                    linewidth=2.0)
-
 
         plt.title(f"Histogram for Class: {class_name}")
         plt.xlabel("Classification Probability")
@@ -100,13 +96,12 @@ def plot_two_sided_violin(from_csv: Optional[Path] = None, plot=True):
     Create a two-sided violin plot comparing the distribution of classification outputs for
     positive and negative instances.
     """
+    # TODO maybe keep it simple: positive boxplot vs negative boxplot
     if not from_csv:
         # classifier = TrainedClassifier.from_name("ViT-100e_ce6b40")
-        # all_classifiers = MultiSeedStrategyComparison.from_name("s01-baseline_df5f64")
-        # takes too long, let's instead load the model explicitly
-        classifier_json = json.load(open(shared_dir / 'figures/threshold-reg/classifier.json'))
-        classifier = TrainedClassifier.from_dict(classifier_json)
-        # log.info(f'choose classifier from strategy {all_classifiers.configs["strategies"][0]}')
+        all_classifiers = MultiSeedStrategyComparison.from_name("s01-baseline_df5f64")
+        classifier = all_classifiers.strategy_comparisons[0].classifiers[0]
+        log.info(f'choose classifier from strategy {all_classifiers.configs["strategies"][0]}')
         dataset = AugmentDataset.from_name("dataset_f00581")
         val_set = create_train_test_val(dataset, random_seed=100, test_ratio=0.1, val_ratio=0.2, min_instances=10).val
         predictions: ValidationPredictions = predict_validation_set(classifier, val_set, batch_size=32)
@@ -124,21 +119,18 @@ def plot_two_sided_violin(from_csv: Optional[Path] = None, plot=True):
 
         lambda_0_thresholds = determine_threshold_vector(predictions.predictions, val_set, 0.0, n_support=250)
         print('l=0 thresholds:', lambda_0_thresholds)
-        lambda_02_thresholds = determine_threshold_vector(predictions.predictions, val_set, 0.1, n_support=250)
         lambda_04_thresholds = determine_threshold_vector(predictions.predictions, val_set, 0.4, n_support=250)
         print('l=0.4 thresholds:', lambda_04_thresholds)
-        print('l=0.2 thresholds:', lambda_02_thresholds)
         # Save the thresholds as .npy files
         np.save(shared_dir / "lambda_0_thresholds.npy", lambda_0_thresholds.cpu().numpy())
         np.save(shared_dir / "lambda_04_thresholds.npy", lambda_04_thresholds.cpu().numpy())
-        np.save(shared_dir / "lambda_02_thresholds.npy", lambda_02_thresholds.cpu().numpy())
 
         df = pd.DataFrame(data)
         log.info('saved CSV')
 
         df.to_csv(shared_dir / f"thresholding_visualization.csv")
 
-        plot_first_n_histograms(df, lambda_thresholds=(lambda_0_thresholds, lambda_04_thresholds, lambda_02_thresholds))
+        plot_first_n_histograms(df, lambda_thresholds=(lambda_0_thresholds, lambda_04_thresholds))
 
     else:
         log.info('from csv')
@@ -162,6 +154,7 @@ def plot_two_sided_violin(from_csv: Optional[Path] = None, plot=True):
 
         plt.savefig(shared_dir / "figures" / f"thresholding_visualization.pdf",
                     bbox_inches="tight")
+
 
 
 if __name__ == '__main__':

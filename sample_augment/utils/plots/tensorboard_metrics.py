@@ -149,7 +149,7 @@ def main():
             str(root_dir / 'TrainedStyleGAN' / 'wdataaug-028.out.tfevents.1690380831.ipt-d-0432.12244.0')),
         'apa-12k-merged': get_event_accumulator(
             str(root_dir / 'TrainedStyleGAN' / 'unified-030.out.tfevents.1692698037.ipt-d-0432.14936.0')),
-        'resume-fail': get_event_accumulator(str(root_dir / 'TrainedStyleGAN' / 'resume-fail-024.out.tfevents.1689928298.ipt-d-0432.32864.0'))
+        # 'resume-fail': get_event_accumulator(str(root_dir / 'TrainedStyleGAN' / 'resume-fail-024.out.tfevents.1689928298.ipt-d-0432.32864.0'))
     }
     # plot_real_vs_fake_loss(event_files)
     plot_fid(event_files)
