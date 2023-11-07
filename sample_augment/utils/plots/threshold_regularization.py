@@ -13,7 +13,7 @@ from sample_augment.data.dataset import AugmentDataset
 from sample_augment.data.train_test_split import create_train_test_val
 from sample_augment.models.evaluate_classifier import ValidationPredictions, predict_validation_set
 from sample_augment.models.generator import GC10_CLASSES
-from sample_augment.models.train_classifier import determine_threshold_vector, TrainedClassifier
+from sample_augment.models.train_classifier import determine_threshold_revisited, TrainedClassifier
 from sample_augment.sampling.compare_strategies import MultiSeedStrategyComparison
 from sample_augment.utils import log
 from sample_augment.utils.path_utils import shared_dir
@@ -122,10 +122,10 @@ def plot_two_sided_violin(from_csv: Optional[Path] = None, plot=True):
             for prob in neg_probs:
                 data.append({'Class': class_name, 'Probability': prob, 'Type': 'Negative'})
 
-        lambda_0_thresholds = determine_threshold_vector(predictions.predictions, val_set, 0.0, n_support=250)
+        lambda_0_thresholds = determine_threshold_revisited(predictions.predictions, val_set, 0.0, n_support=250)
         print('l=0 thresholds:', lambda_0_thresholds)
-        lambda_02_thresholds = determine_threshold_vector(predictions.predictions, val_set, 0.1, n_support=250)
-        lambda_04_thresholds = determine_threshold_vector(predictions.predictions, val_set, 0.4, n_support=250)
+        lambda_02_thresholds = determine_threshold_revisited(predictions.predictions, val_set, 0.1, n_support=250)
+        lambda_04_thresholds = determine_threshold_revisited(predictions.predictions, val_set, 0.4, n_support=250)
         print('l=0.4 thresholds:', lambda_04_thresholds)
         print('l=0.2 thresholds:', lambda_02_thresholds)
         # Save the thresholds as .npy files

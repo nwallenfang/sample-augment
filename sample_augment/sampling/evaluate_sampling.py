@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -107,83 +109,18 @@ def sampling_eval(results, experiment_name="sampling"):
         _step(names, reports)
 
 
-@step
-def multiseed_boxplot(report: MultiSeedReport):
-    # report.save_to_disk()
-    def idx_to_name(_idx):
-        return (report.reports[0].configs["strategies"][_idx - 1] if _idx > 0 else "Baseline").capitalize()
-
-    all_data = []
-    macro_data = []
-    # Iterating through every seed's report
-    for seed, synth_report in zip(report.configs['multi_seeds'], report.reports):
-        log.info(f'Loading random seed {seed}')
-        reports = [
-            synth_report.baseline_report.report,
-            *[synth.report for synth in synth_report.synth_reports]
-        ]
-
-        # Filling the dataframe
-        for idx, class_report in enumerate(reports):
-            log.info(f"Processing report for strategy: {idx_to_name(idx)}")
-
-            # Append macro F1 score once for the strategy
-            macro_data.append({
-                "Seed": seed,
-                "Strategy": idx_to_name(idx),
-                "Macro F1": class_report['macro avg']['f1-score']
-            })
-            log.debug(f"Appending macro F1 score for strategy: {idx_to_name(idx)}")
-            log.info(f"Seed: {seed}, Strategy: {idx_to_name(idx)}, Macro F1: {class_report['macro avg']['f1-score']}")
-            # Append individual F1 scores for each class
-            for class_name in GC10_CLASSES:
-                all_data.append({
-                    "Seed": seed,
-                    "Strategy": idx_to_name(idx),
-                    "Class": class_name,
-                    "F1 Score": class_report[class_name]["f1-score"]
-                })
-                log.debug(f"Appending F1 score for class: {class_name}")
-    # df = pd.DataFrame(all_data)
-    df = pd.DataFrame(macro_data)
-    # replicated_data = []
-    # for i in range(4):  # Four replicas
-    #     new_data = df.copy()
-    #     new_data['Macro F1'] = df['Macro F1'] + np.random.normal(0, 0.11, df.shape[0])  # Noise added
-    #     replicated_data.append(new_data)
-    # df = pd.concat(replicated_data)
-
-    sns.set_style("whitegrid")
-    # boxplot style similar to the baseline f1 comparison
-
-    prepare_latex_plot()
-
-    fig, ax = plt.subplots(figsize=(0.7*8, 0.7*5))
-    palette = ["grey"] + list(sns.color_palette("deep", n_colors=len(report.configs['strategies'])))
-
-    print(df.head())
-    print(df['Strategy'].value_counts())
-    sns.swarmplot(x='Strategy', y='Macro F1', data=df, ax=ax, hue="Strategy", palette=palette, dodge=False)
-    ax.legend_.remove()
-
+def draw_error_bars(ax, df, palette):
     for i, strat in enumerate(df['Strategy'].unique()):
         strat_data = df[df['Strategy'] == strat]['Macro F1']
         mean_f1 = np.mean(strat_data)
+        print(strat, f"mean: {mean_f1}")
         std_f1 = np.std(strat_data)
-        print("strat", strat, std_f1)
+
         min_f1 = np.max([mean_f1 - std_f1, np.min(strat_data)])
         max_f1 = np.min([mean_f1 + std_f1, np.max(strat_data)])
 
         error_below = mean_f1 - min_f1
         error_above = max_f1 - mean_f1
-
-        if error_below < 0:
-            print(f"Clamping error_below: Original value: {error_below}, Strat: {strat}, Index: {i}")
-            error_below = 0
-
-        if error_above < 0:
-            print(f"Clamping error_above: Original value: {error_above}, Strat: {strat}, Index: {i}")
-            error_above = 0
 
         # draw means
         ax.hlines(mean_f1, xmin=i - 0.2, xmax=i + 0.2, colors=palette[i], linewidth=2)
@@ -192,8 +129,90 @@ def multiseed_boxplot(report: MultiSeedReport):
                     capsize=5, zorder=4)
 
     ax.set_xticklabels(df['Strategy'].unique())
-    plt.xticks(rotation=45)
-    plt.ylabel('Macro Average F1 Score')
+    # ax.xticks(rotation=45)
+    ax.set_ylabel('Macro Average F1 Score')
+
+
+@step
+def multiseed_boxplot(report: MultiSeedReport, second_report: Optional[MultiSeedReport] = None):
+    # report.save_to_disk()
+    def idx_to_name(_idx, is_second=False):
+        if is_second:
+            return "C-guided Entropy"
+        else:
+            strategy_name = report.configs["strategies"][_idx - 1] if _idx > 0 else "Baseline"
+            if strategy_name == "classifier-guided":
+                return "C-guided $L_2$"
+            return strategy_name.capitalize()
+
+    all_data = []
+    macro_data = []
+
+    def process_report(seed, synth_report, is_second=False):
+        if is_second:
+            # in our case second report has no baselines trained, which is fine
+            reports = [synth.report for synth in synth_report.synth_reports]
+        else:
+            reports = [
+                synth_report.baseline_report.report,
+                *[synth.report for synth in synth_report.synth_reports]
+            ]
+
+        for idx, class_report in enumerate(reports):
+            macro_data.append({
+                "Seed": seed,
+                "Strategy": idx_to_name(idx, is_second),
+                "Macro F1": class_report['macro avg']['f1-score']
+            })
+
+            for class_name in GC10_CLASSES:
+                all_data.append({
+                    "Seed": seed,
+                    "Strategy": idx_to_name(idx, is_second),
+                    "Class": class_name,
+                    "F1 Score": class_report[class_name]["f1-score"]
+                })
+
+    # Process the first report
+    for seed, synth_report in zip(report.configs['multi_seeds'], report.reports):
+        process_report(seed, synth_report)
+
+    # Optionally process the second report
+    if second_report:
+        for seed, synth_report in zip(second_report.configs['multi_seeds'], second_report.reports):
+            process_report(seed, synth_report, is_second=True)
+
+    df = pd.DataFrame(macro_data)
+
+    sns.set_style("whitegrid")
+    prepare_latex_plot()
+
+    fig, axs = plt.subplots(1, 2, figsize=(0.55 * 11, 0.55 * 5), gridspec_kw={'width_ratios': [4, 1]})
+    # Filter the dataframe to separate the 'entropy' strategy
+    df_main = df[df['Strategy'] != 'C-guided Entropy']
+    df_entropy = df[df['Strategy'] == 'C-guided Entropy']
+
+    print(df_entropy)
+
+    # Use two different palettes or you can use the same
+    palette_main = ["grey"] + list(sns.color_palette("deep", n_colors=len(report.configs['strategies']) + 1))[:-1]
+    palette_entropy = [list(sns.color_palette("deep", n_colors=len(report.configs['strategies']) + 1))[-1]]
+
+    # Plot for the main strategies
+    sns.swarmplot(x='Strategy', y='Macro F1', data=df_main, ax=axs[0], hue="Strategy", palette=palette_main,
+                  dodge=False)
+    draw_error_bars(axs[0], df_main, palette_main)
+    axs[0].legend_.remove()
+    axs[0].set_xlabel('')
+
+    # Plot for the 'entropy' strategy
+    sns.swarmplot(x='Strategy', y='Macro F1', data=df_entropy, ax=axs[1], hue="Strategy", palette=palette_entropy,
+                  dodge=False)
+    axs[1].legend_.remove()
+    axs[1].set_xlabel('')
+    axs[1].set_ylabel('Macro Average F1 Score')
+
+    fig.text(0.5, 0.00, 'Strategy', ha='center', va='center')
 
     plt.tight_layout()
     plt.savefig(figures_dir / 'multiseed_strategies_f1_swarmplot.pdf', bbox_inches="tight")
@@ -254,51 +273,42 @@ def plot_macro_f1_vs_synth_p(reports):
     plt.savefig(figures_dir / "synth_p.pdf", bbox_inches="tight")
 
 
-def plot_macro_f1_vs_synth_p_multistrat(reports):
-    """Plot Macro F1 scores against Synth P values for multiple strategies using side-by-side subplots."""
+def plot_macro_f1_vs_synth_p_cguided(reports):
+    """Plot Macro F1 scores against Synth P values for the classifier-guided strategy."""
     synth_p_values = [report.configs['synth_p'] for report in reports]
-    strategies = reports[0].configs['strategies']
+
     prepare_latex_plot()
 
-    fig, axs = plt.subplots(1, len(strategies), figsize=(12, 4))
+    # Initialize a single plot
+    fig, ax = plt.subplots(figsize=(6, 2.5))
 
-    for i, strategy in enumerate(strategies):
-        ax = axs[i]
-        stats = [mean_and_whiskers(macro_f1_for_seeds(report, strategies)[strategy]) for report in reports]
+    strategy = 'classifier-guided'
+    strategies = reports[0].configs['strategies']
+    f1_values = [macro_f1_for_seeds(report, strategies)[strategy] for report in reports]
+    positions = [0, 2, 3, 4, 5]
+    # Plotting the boxplot
+    ax.boxplot(f1_values, positions=positions, notch=False, patch_artist=True)
 
-        # means = [s["mean"] for s in stats]
-        # lower_errors = [s["mean"] - s["min"] for s in stats]
-        # upper_errors = [s["max"] - s["mean"] for s in stats]
-        #
-        # ax.errorbar(synth_p_values, means, yerr=[lower_errors, upper_errors],
-        #             fmt='--o', capsize=5, ecolor="grey")
-        f1_values = [macro_f1_for_seeds(report, strategies)[strategy] for report in reports]
-        print(strategy, f1_values[0])
-        ax.boxplot(f1_values, notch=False, patch_artist=True)
-        ax.set_xticklabels(synth_p_values)
-        ax.set_xticks(range(1,
-                            len(synth_p_values) + 1))  # Assuming the synth_p_values list is 1-indexed        ax.set_title(f"{strategy} Sampling")
-        ax.set_xlabel(r'$p_{synth}$')
-        ax.set_ylabel('Macro F1 Score')
-        ax.set_title(strategy)
-        ax.grid(True)
+    tick_labels = ['0.0', '0.05', '0.075', '0.1', '0.125']
 
-    # Initialize variables
-    min_f1 = float('inf')
-    max_f1 = -float('inf')
+    # Set the x-tick locations and labels
+    ax.set_xticks(positions)
+    ax.set_xticklabels(tick_labels)
+    # ax.set_xticklabels(synth_p_values)
+    # ax.set_xticks(range(1, len(synth_p_values) + 1))  # Assuming the synth_p_values list is 1-indexed
+    # ax.set_title(strategy)
+    ax.set_xlabel(r'$p_{synth}$', fontsize=13.5)
+    ax.set_ylabel('Macro F1 Score')
+    ax.grid(True)
 
-    # Iterate through reports to find min and max f1 scores
-    for report in reports:
-        for strategy in report.configs['strategies']:
-            stats = mean_and_whiskers(macro_f1_for_seeds(report, strategies)[strategy])
-            min_f1 = min(min_f1, stats["min"])
-            max_f1 = max(max_f1, stats["max"])
+    # Finding the min and max f1 scores to set y-axis limits
+    min_f1 = min(min(f1) for f1 in f1_values)
+    max_f1 = max(max(f1) for f1 in f1_values)
 
-    # Then use min_f1 and max_f1 to set the y-axis limit
-    for ax in axs:
-        ax.set_ylim([min_f1 - 0.01, max_f1 + 0.01])
+    ax.set_ylim([min_f1 - 0.01, max_f1 + 0.01])
+
     plt.tight_layout()
-    plt.savefig(figures_dir / "synth_p_multistrat_side_by_side.pdf", bbox_inches="tight")
+    plt.savefig(figures_dir / "synth_p_classifier_guided.pdf", bbox_inches="tight")
 
 
 def synth_p_lineplot():
@@ -325,11 +335,12 @@ def synth_p_detail():
         's11-detail-p05_9441e6.json',
         's12-detail-p075_7c201a.json',
         's13-detail-p10_c06a70.json',
+        's14-detail-p125_cc0c53.json'
     ]
 
     # Load reports using filenames
     reports = list(map(MultiSeedReport.from_name, filenames))
-    plot_macro_f1_vs_synth_p_multistrat(reports)
+    plot_macro_f1_vs_synth_p_cguided(reports)
 
 
 def get_classwise_f1_scores(reports):
@@ -382,7 +393,13 @@ if __name__ == '__main__':
     # experiment = Experiment(read_config(shared_dir / "configs/config_s00-baseline_7175d.json"))
     # experiment.run("multiseed_boxplot", initial_artifacts=[strategies])
     multi_report = MultiSeedReport.from_name('s01-baseline_df5f64')
-    multiseed_boxplot(multi_report)
+    # merge the entropy run into the multi_report
+    entropy_run = MultiSeedReport.from_name('s15-entropy-guidance_5d4e40.json')
+    # entropy_run.configs['strategies'] = ['entropy']
+    # configs = multi_report.configs
+    # configs["strategies"] = multi_report.configs['strategies'] + entropy_run.configs['strategies']
+    # merged_report = MultiSeedReport(configs=configs, reports=[*multi_report.reports, *entropy_run.reports])
+    multiseed_boxplot(multi_report, entropy_run)
     # synth_p_lineplot()
     # compare_generators()
     # synth_p_detail()

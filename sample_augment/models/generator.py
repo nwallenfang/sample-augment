@@ -101,7 +101,7 @@ class StyleGANGenerator:
         if seed:
             z = torch.from_numpy(np.random.RandomState(seed).randn(c.shape[0], self.G.z_dim)).to(self.device)
         else:
-            z = torch.from_numpy(np.random.RandomState(self.seed).randn(c.shape[0], self.G.z_dim)).to(self.device)
+            z = torch.from_numpy(self._random_state.randn(c.shape[0], self.G.z_dim)).to(self.device)
         return self.G.mapping(z, c, truncation_psi=truncation_psi)
 
     def w_to_img(self, w: Union[torch.Tensor, np.ndarray]):

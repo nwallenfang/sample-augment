@@ -484,7 +484,12 @@ def determine_threshold_vector(predictions: Tensor, val: ValSet, threshold_lambd
     return torch.FloatTensor(best_thresholds)
 
 
-def determine_threshodl_revisited(predictions: Tensor, val: ValSet, threshold_lambda: float,
-                               n_support: int = 250):
-    # TODO, this would also imply that I would have to redo all my evaluations
-    pass
+def determine_threshold_revisited(predictions: Tensor, val: ValSet, threshold_lambda: float,
+                               n_support: int = 250) -> Tensor:
+    # linear inteprolation between optimal and naive threshold, based on threshold_lambda
+    # this is a more natural threshold regularization, which I expect to perform better
+    # but all experiments have been done with the old `determine_threshold_vector`
+    optimal_threshold = determine_threshold_vector(predictions, val, threshold_lambda=0.0, n_support=n_support)
+    natural_threshold = 0.5 * torch.ones_like(optimal_threshold)
+    # linear interpolate between optimal threshold and (0.5,) according to threshold_lambda
+    return (1 - threshold_lambda) * optimal_threshold + threshold_lambda * natural_threshold
